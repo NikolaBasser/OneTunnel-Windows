@@ -4,12 +4,12 @@
   <Border Background="#E7EDE6" BorderBrush="#CBD6CC" BorderThickness="0,0,1,0">
    <Grid Margin="24,30,20,20"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <StackPanel><TextBlock Text="OneTunnel" FontSize="29" FontWeight="SemiBold"/><TextBlock Text="Одна оболочка. Твои подключения." Margin="0,7,0,30" Foreground="{StaticResource Muted}"/></StackPanel>
-    <Grid Grid.Row="1" Margin="0,0,0,14"><TextBlock Text="Подключения" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Content="Добавить" HorizontalAlignment="Right" Padding="10,7" Margin="0" Click="Add_Click"/></Grid>
+    <Grid Grid.Row="1" Margin="0,0,0,14"><TextBlock Text="Подключения" FontWeight="SemiBold" VerticalAlignment="Center"/><Button x:Name="AddProfileButton" Content="Добавить" HorizontalAlignment="Right" Padding="10,7" Margin="0" Click="Add_Click"/></Grid>
     <ListBox x:Name="ProfilesList" Grid.Row="2" SelectionChanged="Profiles_SelectionChanged" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
      <ListBox.GroupStyle><GroupStyle><GroupStyle.ContainerStyle><Style TargetType="GroupItem"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupItem"><Expander IsExpanded="True" Loaded="Group_Loaded" Expanded="Group_Changed" Collapsed="Group_Changed" Margin="0,6,0,6"><Expander.Header><StackPanel Orientation="Horizontal"><ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" MaxWidth="170" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding ItemCount, StringFormat=({0})}" Margin="6,0,0,0" Foreground="{StaticResource Muted}"/></StackPanel></Expander.Header><ItemsPresenter/></Expander></ControlTemplate></Setter.Value></Setter></Style></GroupStyle.ContainerStyle></GroupStyle></ListBox.GroupStyle>
      <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="5,10"><ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Name}"/><TextBlock Text="{Binding Protocol}" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,5,0,0"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
     </ListBox>
-    <StackPanel Grid.Row="3"><TextBlock Text="Windows · 0.2.0" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,20,0,12"/><Button Content="Движки и восстановление" Margin="0" Click="Engines_Click"/></StackPanel>
+    <StackPanel Grid.Row="3"><TextBlock Text="Windows · 0.3.0" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,20,0,12"/><Button Content="Движки и восстановление" Margin="0" Click="Engines_Click"/></StackPanel>
    </Grid>
   </Border>
   <Grid Grid.Column="1" Margin="34,30,34,22"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -57,10 +57,10 @@
       <TextBlock Text="Движки и восстановление" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,18"/>
       <TextBlock x:Name="EngineDetails" LineHeight="26" Margin="0,0,0,18"/>
       <TextBlock Text="Компоненты поставляются рядом с приложением, в папке engines. Если папка пуста, запусти scripts\Setup-Engines.ps1 из исходного проекта и пересобери приложение." Foreground="{StaticResource Muted}" Margin="0,0,0,18"/>
-      <Button Content="Установить / обновить службу" HorizontalAlignment="Left" Click="InstallService_Click" Margin="0,0,0,12"/>
-      <Button Content="Запустить службу" HorizontalAlignment="Left" Click="StartService_Click" Margin="0,0,0,12"/>
+      <Button x:Name="InstallServiceButton" Content="Установить / обновить службу" HorizontalAlignment="Left" Click="InstallService_Click" Margin="0,0,0,12"/>
+      <Button x:Name="StartServiceButton" Content="Запустить службу" HorizontalAlignment="Left" Click="StartService_Click" Margin="0,0,0,12"/>
       <TextBlock Text="Служба управляет подключением. Закрытие окна сохраняет VPN; для возврата обычной сети нажми «Отключить». Установка требует подтверждения Windows один раз." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,12"/>
-      <Button Content="Восстановить подключение прежней версии от администратора" HorizontalAlignment="Left" Click="Elevate_Click" Margin="0,0,0,16"/>
+      <Button x:Name="LegacyRecoveryButton" Content="Восстановить подключение прежней версии от администратора" HorizontalAlignment="Left" Click="Elevate_Click" Margin="0,0,0,16"/>
       <TextBlock Text="После аварийного завершения восстановление удалит только туннель OneTunnel и его временные настройки. Системный прокси Windows приложение не меняет." Foreground="{StaticResource Muted}" LineHeight="22" Margin="0,0,0,12"/>
       <WrapPanel Margin="0,0,0,24"><Button x:Name="RecoveryButton" Content="Очистить оставшееся подключение" Click="Recovery_Click"/><Button Content="Назад к подключению" Click="Cancel_Click"/></WrapPanel>
      </StackPanel>
