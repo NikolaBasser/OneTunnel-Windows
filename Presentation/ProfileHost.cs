@@ -29,7 +29,7 @@ internal static class ProfileHost
         AppDomain.CurrentDomain.ProcessExit += (_, _) => { try { worker?.StandardInput.Close(); } catch { } };
     }
     public static T Call<T>(string command, object? args = null) => CallAsync<T>(command, args).GetAwaiter().GetResult();
-    public static async Task<T> CallAsync<T>(string command, object? args = null, int seconds = 40, CancellationToken cancellation = default)
+    public static async Task<T> CallAsync<T>(string command, object? args = null, int seconds = 40, CancellationToken cancellation = default, Action<T>? received = null)
     {
         await Gate.WaitAsync(cancellation).ConfigureAwait(false);
         byte[] request = [], response = [];
@@ -55,7 +55,9 @@ internal static class ProfileHost
             var root = document.RootElement;
             if (root.GetProperty("Version").GetInt32() != 1) throw new InvalidDataException();
             if (root.TryGetProperty("Error", out var error) && error.ValueKind == JsonValueKind.String) throw new FormatException(error.GetString());
-            return root.GetProperty("Value").ValueKind == JsonValueKind.Null ? default! : root.GetProperty("Value").Deserialize<T>()!;
+            var value = root.GetProperty("Value").ValueKind == JsonValueKind.Null ? default! : root.GetProperty("Value").Deserialize<T>()!;
+            received?.Invoke(value); // Deliver before releasing Gate; Go projections keep their wire order.
+            return value;
         }
         catch (FormatException) { throw; }
         catch
@@ -72,13 +74,13 @@ internal static class ProfileHost
             Gate.Release();
         }
     }
-    public static async Task WatchAsync(Func<DesktopReply, Task> receive, CancellationToken cancellation)
+    public static async Task WatchAsync(Func<DesktopObservation, Task> receive, CancellationToken cancellation)
     {
         using var process = Spawn("--events");
         try
         {
             while (!cancellation.IsCancellationRequested)
-                await receive(await CoreWire.ReadAsync<DesktopReply>(process.StandardOutput.BaseStream, cancellation).ConfigureAwait(false)).ConfigureAwait(false);
+                await receive(await CoreWire.ReadAsync<DesktopObservation>(process.StandardOutput.BaseStream, cancellation).ConfigureAwait(false)).ConfigureAwait(false);
         }
         finally
         {

@@ -2,69 +2,65 @@ using OneTunnel.Core;
 
 namespace OneTunnel.Client;
 
-// View state and transport glue only. Go authenticates/controls the service,
-// prepares profiles, evaluates errors and owns connection sequencing.
+// Ordered transport and read-only Go presentation snapshots. No connection
+// reducer, epoch/revision policy or action-availability rules belong here.
 public sealed class ServiceConnection : IConnectionController
 {
-    private CoreStatus state = new(false, false, false, false, false, false, 0, "Проверка службы…", null);
-    private string instance = "";
-    private ulong revision;
-    private long epoch;
-    private readonly object gate = new();
-    public bool Available { get; private set; }
-    public bool Active => state.Active;
-    public bool NeedsRecovery => state.NeedsRecovery;
-    public bool TrafficLocked => state.TrafficLocked;
-    public bool WholeDevice => state.WholeDevice;
-    public bool FullDeviceMode => state.FullDeviceMode;
-    public bool ClockSynchronized => state.ClockSynchronized;
-    public int LocalPort => state.LocalPort;
-    public string Status => Available ? state.Status : "Служба недоступна · состояние сети не подтверждено";
-    public Guid? ProfileId => state.ProfileId;
-    public AppliedProfiles? Prepared { get; private set; }
+    private volatile DesktopReply snapshot = new(false, new(1,"",new(false,false,false,false,false,false,0,"Проверка службы…",null)),0,"");
+    private DesktopContext? context;
+    private static readonly DesktopActions InitialActions = new();
+    private static readonly DesktopDisplay InitialDisplay = new();
+    public bool Available => snapshot.Available;
+    public bool Active => snapshot.Response.State.Active;
+    public bool NeedsRecovery => snapshot.Response.State.NeedsRecovery;
+    public bool TrafficLocked => snapshot.Response.State.TrafficLocked;
+    public bool WholeDevice => snapshot.Response.State.WholeDevice;
+    public bool FullDeviceMode => snapshot.Response.State.FullDeviceMode;
+    public bool ClockSynchronized => snapshot.Response.State.ClockSynchronized;
+    public int LocalPort => snapshot.Response.State.LocalPort;
+    public Guid? ProfileId => snapshot.Response.State.ProfileId;
+    public DesktopActions Actions => snapshot.Actions ?? InitialActions;
+    public DesktopDisplay Display => snapshot.Display ?? InitialDisplay;
+    public string Status => Display.Status;
+    public AppliedProfiles? Prepared => snapshot.Prepared;
     public event Action? Changed;
     private void Apply(DesktopReply reply)
     {
-        bool notify = false;
-        lock(gate)
-        {
-        if (reply.Environment != null) DesktopEnvironment.Accept(reply.Environment);
-        if (reply.Prepared != null) Prepared = reply.Prepared;
-        if (!reply.Available) { Available = false; notify = true; }
-        else if (!(reply.PeerStarted < epoch || reply.PeerStarted == epoch && reply.Response.Instance == instance && reply.Response.Revision > 0 && reply.Response.Revision < revision))
-        {
-        if (epoch != reply.PeerStarted || instance != reply.Response.Instance) revision = 0;
-        epoch = reply.PeerStarted; instance = reply.Response.Instance; if (reply.Response.Revision > 0) revision = reply.Response.Revision;
-        state = reply.Response.State; Available = true; notify = true;
-        }
-        }
-        if (notify) Changed?.Invoke();
+        if(reply.Environment!=null) DesktopEnvironment.Accept(reply.Environment);
+        snapshot=reply;
+        Changed?.Invoke();
     }
-    private async Task<DesktopReply> Call(string command, Guid? id = null, bool fullDevice = false)
+    public async Task SetContextAsync(DesktopContext value)
     {
-        var reply = await DesktopBackend.CallAsync(command, id, fullDevice);
-        Apply(reply);
-        if (reply.Response.Error != null) throw new CoreCommandException(reply.Response.Error, reply.Message);
+        if(context==value) return; // Deduplicate identical UI inputs on the transport.
+        context=value;
+        try { await DesktopBackend.ContextAsync(value,Apply,snapshot); }
+        catch { context=null; throw; }
+    }
+    private async Task<DesktopReply> Call(string command, Guid? id=null, bool fullDevice=false)
+    {
+        var reply=await DesktopBackend.CallAsync(command,Apply,id,fullDevice,context,snapshot);
+        if(reply.Response.Error!=null) throw new CoreCommandException(reply.Response.Error,reply.Message);
         return reply;
     }
     public async Task RefreshAsync() { try { await Call("connection.status"); } catch { } }
-    public async Task StartAsync(Profile profile, bool fullDevice) { Prepared = null; await Call("connection.start", profile.Id, fullDevice); }
+    public async Task StartAsync(Profile profile,bool fullDevice) => await Call("connection.start",profile.Id,fullDevice);
+    public async Task<string> ToggleAsync(Guid? id,bool fullDevice) => (await Call("connection.toggle",id,fullDevice)).Message;
     public async Task StopAsync() => await Call("connection.stop");
     public async Task RecoverAsync() => await Call("connection.recover");
-    public async Task<string> ProbeAsync() => (await Call("connection.probe")).Response.Result ?? "Проверка не завершена.";
+    public async Task<string> ProbeAsync() => (await Call("connection.probe")).Response.Result ?? "";
     public async Task StartServiceAsync() => await Call("service.start");
     public async Task InstallServiceAsync() => await Call("service.install");
     public async Task ObserveAsync(CancellationToken cancellation)
     {
-        while (!cancellation.IsCancellationRequested)
+        while(!cancellation.IsCancellationRequested)
         {
-            try { await DesktopBackend.WatchAsync(reply => { Apply(reply); return Task.CompletedTask; }, cancellation); }
-            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return; }
-            catch { Available = false; Changed?.Invoke(); }
-            try { await Task.Delay(1000, cancellation); } catch (OperationCanceledException) { return; }
+            try { await DesktopBackend.WatchAsync(async observation => { await DesktopBackend.ObservationAsync(observation,Apply,context,snapshot); },cancellation); }
+            catch(OperationCanceledException) when(cancellation.IsCancellationRequested) { return; }
+            catch { try { await Call("desktop.unavailable"); } catch { } }
+            try { await Task.Delay(1000,cancellation); } catch(OperationCanceledException) { return; }
         }
     }
 }
-
-public sealed class CoreCommandException(string code, string message) : InvalidOperationException(message)
-{ public string Code { get; } = code; }
+public sealed class CoreCommandException(string code,string message) : InvalidOperationException(message)
+{ public string Code {get;}=code; }

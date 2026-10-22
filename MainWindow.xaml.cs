@@ -27,7 +27,7 @@ public partial class MainWindow : Window
         try { foreach (var p in Storage.Load()) profiles.Add(p); storageReady = true; }
         catch { Feedback.Text = "Не удалось прочитать хранилище профилей. Файл сохранён; новые записи заблокированы. Проверь права доступа и учётную запись Windows."; }
         RefreshGroups();
-        connection.Changed += () => { if (!lifetime.IsCancellationRequested) Dispatcher.Invoke(() => { StatusLabel.Text = connection.Status; PresentConnectionState(); RefreshControls(); }); };
+        connection.Changed += () => { if (!lifetime.IsCancellationRequested) Dispatcher.BeginInvoke(new Action(() => { StatusLabel.Text = connection.Status; PresentConnectionState(); RefreshControls(); })); };
         if (profiles.Count > 0) ProfilesList.SelectedIndex = 0;
         if (storageReady && DesktopEnvironment.NeedsRecovery) { ShowPanel("engines"); Feedback.Text = "Найдено подключение прежней версии. Перед установкой службы отключи его в прежней версии приложения либо используй восстановление от администратора."; }
         Log("Приложение готово. Подключения не запускаются автоматически."); RefreshControls();
@@ -56,14 +56,15 @@ public partial class MainWindow : Window
     }
     private void PresentConnectionState()
     {
+        var display=connection.Display;
+        StatusLabel.Text=display.Status;
         if (connection.ProfileId is { } id && profiles.FirstOrDefault(p => p.Id == id) is { } active) ProfilesList.SelectedItem = active;
-        if (connection.Active && connection.Available)
-        {
-            ModeBox.SelectedIndex = connection.FullDeviceMode ? 1 : 0;
-            ConnectionInfo.Text = connection.WholeDevice ? connection.FullDeviceMode ? "Всё устройство · системный туннель" : "Системный туннель · по конфигурации" : $"127.0.0.1:{connection.LocalPort}";
-            ConnectionHint.Text = connection.TrafficLocked ? "Kill switch включён. Закрытие окна сохраняет подключение; явное отключение возвращает обычную сеть." : "Соединением управляет служба. Закрытие окна его не прерывает.";
+        if(display.ShowSession) {
+            ModeBox.SelectedIndex=display.ModeIndex;
+            ConnectionInfo.Text=display.ConnectionInfo;
+            ConnectionHint.Text=display.ConnectionHint;
         }
-        if (connection.NeedsRecovery) Feedback.Text = "Незавершённое подключение. Доступно восстановление собственного сетевого состояния.";
+        if(display.RecoveryHint!="") Feedback.Text=display.RecoveryHint;
     }
     private void Log(string message)
     {
@@ -83,17 +84,23 @@ public partial class MainWindow : Window
             EngineDetails.Text = $"AmneziaWG / WireGuard — {(state.Awg ? "компонент найден" : "не установлен")}\nSOCKS5 / Shadowsocks / TUN (sing-box) — {(state.SingBox ? "компонент найден" : "не установлен")}\nVLESS / Hysteria2 (Xray) — {(state.Xray ? "компонент найден" : "не установлен")}\nПрофили, импорт и подписки: Go-ядро\nУправляющая служба: {(connection.Available ? "доступна" : "нет связи — установи или запусти службу")}\nДля обычной работы права администратора интерфейсу не требуются.";
         }
     }
-    private void RefreshControls()
+    private async void RefreshControls()
     {
-        ConnectButton.Content = connection.Active ? "Отключить" : "Подключить";
-        ConnectButton.IsEnabled = !busy && storageReady && connection.Available && (connection.Active || selected != null && !connection.NeedsRecovery && !DesktopEnvironment.NeedsRecovery);
-        ProbeButton.IsEnabled = !busy && connection.Available && connection.Active;
-        EditButton.IsEnabled = DeleteButton.IsEnabled = !busy && !connection.Active && selected != null;
-        ProfilesList.IsEnabled = !busy && !connection.Active;
-        ModeBox.IsEnabled = !busy && !connection.Active;
-        RecoveryButton.IsEnabled = !busy && (connection.Available || storageReady && DesktopEnvironment.IsAdministrator && DesktopEnvironment.NeedsRecovery);
-        EditorPanel.IsEnabled = !busy;
-        EditorActions.IsEnabled = !busy;
+        try { await connection.SetContextAsync(new(busy,storageReady,selected?.Id.ToString()??"")); }
+        catch { Feedback.Text="Нет ответа от пользовательского Go-ядра."; }
+        var actions=connection.Actions;
+        ConnectButton.Content=actions.ConnectCaption;
+        ConnectButton.IsEnabled=actions.CanToggle;
+        ProbeButton.IsEnabled=actions.CanProbe;
+        EditButton.IsEnabled=actions.CanEdit; DeleteButton.IsEnabled=actions.CanDelete;
+        AddProfileButton.IsEnabled=actions.CanAdd;
+        ProfilesList.IsEnabled=actions.CanSelect;
+        ModeBox.IsEnabled=actions.CanChangeMode;
+        RecoveryButton.IsEnabled=LegacyRecoveryButton.IsEnabled=actions.CanRecover;
+        InstallServiceButton.IsEnabled=actions.CanInstallService;
+        StartServiceButton.IsEnabled=actions.CanStartService;
+        EditorPanel.IsEnabled=EditorActions.IsEnabled=actions.CanSave;
+        SaveProfileButton.IsEnabled=actions.CanSave;
     }
     private async void Profiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -117,7 +124,7 @@ public partial class MainWindow : Window
             catch { Feedback.Text = "Нет ответа от Go-ядра."; }
         }
         UpdateModeHelp(); RefreshControls();
-        if (connection.Active || connection.NeedsRecovery || connection.TrafficLocked) PresentConnectionState();
+        PresentConnectionState();
     }
     private void Mode_Changed(object sender, SelectionChangedEventArgs e) => UpdateModeHelp();
     private void UpdateModeHelp()
@@ -127,7 +134,7 @@ public partial class MainWindow : Window
     }
     private void Add_Click(object sender, RoutedEventArgs e)
     {
-        if (busy || connection.Active) { Feedback.Text = "Сначала отключи активное подключение."; return; }
+        if (!connection.Actions.CanAdd) return;
         editing = null; LoadTransport(null); NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; ProtocolBox.SelectedIndex = 0; EditorTitle.Text = "Новое подключение"; ShowPanel("editor"); NameBox.Focus();
     }
     private void EmojiPicker_Click(object sender, RoutedEventArgs e)
@@ -158,7 +165,7 @@ public partial class MainWindow : Window
 
     private async void Edit_Click(object sender, RoutedEventArgs e)
     {
-        if (selected is not { } p || busy || connection.Active) return;
+        if (!connection.Actions.CanEdit || selected is not { } p) return;
         await Execute(async () => {
             var edit = await ProfileBackend.LoadEditorAsync(p.Id);
             LoadTransport(edit.Transport);
@@ -167,7 +174,7 @@ public partial class MainWindow : Window
     }
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
-        if (busy || connection.Active || !storageReady) { Feedback.Text = "Сохранение сейчас недоступно. Проверь состояние подключения и хранилища."; return; }
+        if (!connection.Actions.CanSave) return;
         await Execute(async () =>
         {
             var result=await ProfileBackend.SaveEditorAsync(NameBox.Text,SourceBox.Text,GroupBox.Text,editing,ReadTransport());
@@ -236,7 +243,7 @@ public partial class MainWindow : Window
     }
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
-        if (busy || connection.Active || !storageReady || selected is not { } p) return;
+        if (!connection.Actions.CanDelete || selected is not { } p) return;
         if (MessageBox.Show(this, "Удалить выбранный профиль с этого компьютера?", "Удаление профиля", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
         try { PresentDocument(ProfileBackend.Delete(p.Id)); Feedback.Text = "Профиль удалён."; }
         catch { Feedback.Text = "Не удалось удалить профиль из хранилища."; }
@@ -248,20 +255,17 @@ public partial class MainWindow : Window
         catch (Exception ex) { Feedback.Text = ex is InvalidOperationException or TimeoutException or FormatException ? ex.Message : "Операция не выполнена. Проверь доступность сервера, настройки и права доступа."; Log("Операция не выполнена. Подробности в строке состояния."); }
         finally { busy = false; RefreshControls(); }
     }
-    private async void Connect_Click(object sender, RoutedEventArgs e) => await Execute(async () =>
+    private async void Connect_Click(object sender, RoutedEventArgs e)
     {
-        if (connection.Active) { await connection.StopAsync(); Feedback.Text = "Подключение остановлено."; Log("Отключение завершено."); }
-        else if (selected is { } p)
-        {
-            bool fullDevice = ModeBox.SelectedIndex == 1;
-            Feedback.Text = "Подготовка профиля и подключение…";
-            try { await connection.StartAsync(p, fullDevice); }
-            finally { if (connection.Prepared is { } prepared) PresentDocument(prepared.Document, prepared.Selected?.Id); }
-            Feedback.Text = "Соединение запущено. Проверка доступа доступна отдельно.";
-            if (connection.ClockSynchronized) Feedback.Text = "Время скорректировано внутри движка; часы Windows не изменены.";
-            PresentConnectionState(); Log("Подключение выполнено Go-ядром.");
-        }
-    });
+        var id=selected?.Id;
+        bool fullDevice=ModeBox.SelectedIndex==1;
+        await Execute(async () => {
+            Feedback.Text="Выполнение команды…";
+            try { Feedback.Text=await connection.ToggleAsync(id,fullDevice); }
+            finally { if(connection.Prepared is { } prepared) PresentDocument(prepared.Document,prepared.Selected?.Id); }
+            PresentConnectionState(); Log("Команда подключения завершена Go-ядром.");
+        });
+    }
     private async void Probe_Click(object sender, RoutedEventArgs e) => await Execute(async () => { Feedback.Text = "Проверка…"; Feedback.Text = await connection.ProbeAsync(); Log("Проверка завершена."); });
     private async void Recovery_Click(object sender, RoutedEventArgs e) => await Execute(async () => { await connection.RecoverAsync(); Feedback.Text = "Подключение очищено, блокировка kill switch снята. Обычная сеть восстановлена."; Log("Восстановление завершено."); });
     private void Cancel_Click(object sender, RoutedEventArgs e) { ShowPanel("connection"); }
@@ -281,7 +285,7 @@ public partial class MainWindow : Window
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
         if (allowClose) return;
-        if (busy) { e.Cancel = true; Feedback.Text = "Дождись завершения текущей операции."; return; }
+        if (!connection.Actions.CanClose) { e.Cancel = true; Feedback.Text = "Дождись завершения текущей операции."; return; }
         lifetime.Cancel(); preview?.Cancel();
         // The service owns the connection. Closing the UI never tears it down.
     }
