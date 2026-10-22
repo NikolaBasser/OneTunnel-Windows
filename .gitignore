@@ -1,4 +1,15 @@
 # Build output, installed engines and private diagnostics
+*.md
+*.MD
+/docs/
+/tests/
+*_test.go
+/GoCore/**/testdata/
+/GoCore/cmd/live-export/
+/GoCore/cmd/probecheck/
+/scripts/Analyze-*
+/scripts/Test-*
+/scripts/Setup-Engines.ps1
 **/bin/
 **/obj/
 /dist/

@@ -11,8 +11,7 @@ try {
     & .\scripts\Build-GoCore.ps1 -Output (Join-Path $output 'service')
     New-Item -ItemType Directory -Path (Join-Path $output 'scripts') -Force | Out-Null
     Copy-Item .\scripts\Install-Service.ps1 -Destination (Join-Path $output 'scripts')
-    Copy-Item .\README.md,.\THIRD-PARTY.md -Destination $output
-    Copy-Item -LiteralPath .\docs -Destination $output -Recurse -Force
+    Copy-Item .\BUILD.txt,.\THIRD-PARTY-NOTICES.txt -Destination $output
     Compress-Archive -Path $output -DestinationPath "$output.zip" -Force
     Get-FileHash "$output.zip" -Algorithm SHA256 | Format-List
 } finally { Pop-Location }
