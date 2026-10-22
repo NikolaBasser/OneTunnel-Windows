@@ -1,0 +1,75 @@
+<Window x:Class="OneTunnel.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ui="clr-namespace:OneTunnel.Controls" Title="OneTunnel — подключения" Width="1100" Height="780" MinWidth="940" MinHeight="680" WindowStartupLocation="CenterScreen" Closing="Window_Closing" Style="{StaticResource {x:Type Window}}">
+ <Grid Background="{Binding Background, RelativeSource={RelativeSource AncestorType=Window}}">
+  <Grid.ColumnDefinitions><ColumnDefinition Width="290"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+  <Border Background="#E7EDE6" BorderBrush="#CBD6CC" BorderThickness="0,0,1,0">
+   <Grid Margin="24,30,20,20"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+    <StackPanel><TextBlock Text="OneTunnel" FontSize="29" FontWeight="SemiBold"/><TextBlock Text="Одна оболочка. Твои подключения." Margin="0,7,0,30" Foreground="{StaticResource Muted}"/></StackPanel>
+    <Grid Grid.Row="1" Margin="0,0,0,14"><TextBlock Text="Подключения" FontWeight="SemiBold" VerticalAlignment="Center"/><Button Content="Добавить" HorizontalAlignment="Right" Padding="10,7" Margin="0" Click="Add_Click"/></Grid>
+    <ListBox x:Name="ProfilesList" Grid.Row="2" SelectionChanged="Profiles_SelectionChanged" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch">
+     <ListBox.GroupStyle><GroupStyle><GroupStyle.ContainerStyle><Style TargetType="GroupItem"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupItem"><Expander IsExpanded="True" Loaded="Group_Loaded" Expanded="Group_Changed" Collapsed="Group_Changed" Margin="0,6,0,6"><Expander.Header><StackPanel Orientation="Horizontal"><ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" MaxWidth="170" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding ItemCount, StringFormat=({0})}" Margin="6,0,0,0" Foreground="{StaticResource Muted}"/></StackPanel></Expander.Header><ItemsPresenter/></Expander></ControlTemplate></Setter.Value></Setter></Style></GroupStyle.ContainerStyle></GroupStyle></ListBox.GroupStyle>
+     <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="5,10"><ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Name}"/><TextBlock Text="{Binding Protocol}" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,5,0,0"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
+    </ListBox>
+    <StackPanel Grid.Row="3"><TextBlock Text="Windows · 0.1.0" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,20,0,12"/><Button Content="Движки и восстановление" Margin="0" Click="Engines_Click"/></StackPanel>
+   </Grid>
+  </Border>
+  <Grid Grid.Column="1" Margin="34,30,34,22"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+   <Grid Margin="0,0,0,22"><TextBlock Text="Подключение" FontSize="24" FontWeight="SemiBold"/><Border Background="#E2EAE4" CornerRadius="4" Padding="10,6" HorizontalAlignment="Right"><TextBlock x:Name="StatusLabel" Text="Отключено" FontSize="12" MaxWidth="390"/></Border></Grid>
+   <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <StackPanel>
+     <StackPanel x:Name="ConnectionPanel">
+      <ui:EmojiText x:Name="ProfileTitle" Value="Добавь первое подключение" FontSize="30" FontWeight="SemiBold" Margin="0,6,0,12"/>
+      <TextBlock x:Name="ProfileDescription" Text="Импортируй WG/AWG-конфигурацию, ссылку подключения или HTTPS-подписку. Профили хранятся на этом компьютере в зашифрованном виде." Foreground="{StaticResource Muted}" LineHeight="23" Margin="0,0,0,26"/>
+      <StackPanel x:Name="ModePanel" Visibility="Collapsed"><TextBlock Text="Куда направлять трафик" FontWeight="SemiBold" Margin="0,0,0,8"/><ComboBox x:Name="ModeBox" SelectedIndex="0" MaxWidth="450" HorizontalAlignment="Left" MinWidth="380" SelectionChanged="Mode_Changed"><ComboBoxItem Content="Локальный прокси · только выбранные приложения"/><ComboBoxItem Content="Всё устройство · системный туннель"/></ComboBox><TextBlock x:Name="ModeHelp" Foreground="{StaticResource Muted}" Margin="0,10,0,22"/></StackPanel>
+      <WrapPanel Margin="0,0,0,20"><Button x:Name="ConnectButton" Content="Подключить" Background="{StaticResource Accent}" Foreground="White" IsEnabled="False" Click="Connect_Click"/><Button x:Name="ProbeButton" Content="Проверить доступ" IsEnabled="False" Click="Probe_Click"/><Button x:Name="EditButton" Content="Изменить" IsEnabled="False" Click="Edit_Click"/><Button x:Name="DeleteButton" Content="Удалить" IsEnabled="False" Click="Delete_Click"/></WrapPanel>
+      <Border Background="#EAF0E9" Padding="18" CornerRadius="6" Margin="0,0,0,24"><StackPanel><TextBlock x:Name="ConnectionInfo" Text="AmneziaWG · WireGuard · VLESS · SOCKS5 · Hysteria2 · Shadowsocks" FontWeight="SemiBold"/><TextBlock x:Name="ConnectionHint" Text="Серверы не входят в приложение. Используй собственную конфигурацию или данные своего провайдера." Foreground="{StaticResource Muted}" Margin="0,7,0,0" LineHeight="21"/></StackPanel></Border>
+     </StackPanel>
+     <StackPanel x:Name="EditorPanel" Visibility="Collapsed">
+      <TextBlock x:Name="EditorTitle" Text="Новое подключение" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,20"/>
+      <Grid Margin="0,0,0,6"><TextBlock Text="Название" VerticalAlignment="Center"/><Button x:Name="EmojiPickerButton" Content="Эмодзи и флаги" HorizontalAlignment="Right" Padding="10,5" Margin="0" Click="EmojiPicker_Click"/></Grid><TextBox x:Name="NameBox" MaxLength="4096" Margin="0,0,0,6" FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"/><ui:EmojiText x:Name="NamePreview" Value="{Binding Text, ElementName=NameBox}" FontSize="16" MinHeight="20" Margin="0,0,0,12"/>
+      <TextBlock Text="Группа (для подписки — название группы)" Margin="0,0,0,6"/><ComboBox x:Name="GroupBox" IsEditable="True" Margin="0,0,0,14"/>
+      <TextBlock x:Name="DetectedProtocol" Text="Протокол определится по конфигурации" Foreground="{StaticResource Muted}" Margin="0,0,0,14"/><ComboBox x:Name="ProtocolBox" Visibility="Collapsed"/>
+      <TextBlock Text="Конфигурация, ссылка подключения или HTTPS-подписка" Margin="0,0,0,6"/><TextBox x:Name="SourceBox" TextChanged="Source_Changed" AcceptsReturn="True" Height="185" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" SpellCheck.IsEnabled="False" MaxLength="4194304"/>
+      <TextBlock Text="Здесь видны приватные ключи. Не отправляй скриншоты этого поля." FontSize="12" Foreground="{StaticResource Muted}" Margin="0,7,0,14"/>
+      <WrapPanel Margin="0,0,0,14"><Button Content="Из файла" Click="Import_Click"/><Button Content="Вставить из буфера" Click="Paste_Click"/></WrapPanel>
+      <Expander x:Name="TransportExpander" Header="Фрагментация, шумы и MUX" Margin="0,4,0,18">
+       <StackPanel Margin="0,14,0,0">
+        <TextBlock Text="Настройки этого профиля сохраняются при обновлении подписки. По умолчанию выключены; применяются при следующем подключении." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,16"/>
+        <CheckBox x:Name="FragmentCheck" Content="Фрагментация TLS" FontWeight="SemiBold" Margin="0,0,0,6"/>
+        <TextBlock Text="VLESS с TLS/REALITY поверх TCP. Делит приветствие TLS на части; может замедлить подключение." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/>
+        <WrapPanel IsEnabled="{Binding IsChecked, ElementName=FragmentCheck}" Margin="0,0,0,18">
+         <StackPanel Margin="0,0,20,0"><Label Content="Размер частей, байт" Target="{Binding ElementName=FragmentLengthBox}"/><TextBox x:Name="FragmentLengthBox" Text="100-200" Width="140" MaxLength="12"/></StackPanel>
+         <StackPanel><Label Content="Интервал, мс" Target="{Binding ElementName=FragmentIntervalBox}"/><TextBox x:Name="FragmentIntervalBox" Text="10-20" Width="140" MaxLength="12"/></StackPanel>
+        </WrapPanel>
+        <CheckBox x:Name="NoiseCheck" Content="Шумы UDP" FontWeight="SemiBold" Margin="0,0,0,6"/>
+        <TextBlock Text="Случайный пакет перед UDP-соединением: Hysteria2 или VLESS KCP/Hysteria. Сервер должен принимать такой трафик." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/>
+        <WrapPanel IsEnabled="{Binding IsChecked, ElementName=NoiseCheck}" Margin="0,0,0,18">
+         <StackPanel Margin="0,0,20,0"><Label Content="Размер пакета, байт" Target="{Binding ElementName=NoiseLengthBox}"/><TextBox x:Name="NoiseLengthBox" Text="50-150" Width="140" MaxLength="12"/></StackPanel>
+         <StackPanel><Label Content="Задержка, мс" Target="{Binding ElementName=NoiseDelayBox}"/><TextBox x:Name="NoiseDelayBox" Text="10-20" Width="140" MaxLength="12"/></StackPanel>
+        </WrapPanel>
+        <CheckBox x:Name="MuxCheck" Content="MUX · несколько потоков в одном соединении" FontWeight="SemiBold" Margin="0,0,0,6"/>
+        <TextBlock Text="VLESS TCP/WS/HTTPUpgrade без Vision, с поддержкой MUX на сервере. У XHTTP, gRPC и Hysteria объединение потоков встроено. WG, AWG, SOCKS5 и Shadowsocks эти настройки не используют." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/>
+        <StackPanel IsEnabled="{Binding IsChecked, ElementName=MuxCheck}" HorizontalAlignment="Left"><Label Content="Одновременных потоков (1–128)" Target="{Binding ElementName=MuxConcurrencyBox}"/><TextBox x:Name="MuxConcurrencyBox" Text="8" Width="140" MaxLength="3" HorizontalAlignment="Left"/></StackPanel>
+       </StackPanel>
+      </Expander>
+      <TextBlock Text="Подписка: импорт отдельных серверов без маршрутизации и балансировщиков Xray. Повторный импорт пропускает дубликаты; автопроверки обновлений нет." Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,12"/>
+     </StackPanel>
+     <StackPanel x:Name="EnginesPanel" Visibility="Collapsed">
+      <TextBlock Text="Движки и восстановление" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,18"/>
+      <TextBlock x:Name="EngineDetails" LineHeight="26" Margin="0,0,0,18"/>
+      <TextBlock Text="Компоненты поставляются рядом с приложением, в папке engines. Если папка пуста, запусти scripts\Setup-Engines.ps1 из исходного проекта и пересобери приложение." Foreground="{StaticResource Muted}" Margin="0,0,0,18"/>
+      <Button Content="Установить / обновить службу" HorizontalAlignment="Left" Click="InstallService_Click" Margin="0,0,0,12"/>
+      <Button Content="Запустить службу" HorizontalAlignment="Left" Click="StartService_Click" Margin="0,0,0,12"/>
+      <TextBlock Text="Служба управляет подключением. Закрытие окна сохраняет VPN; для возврата обычной сети нажми «Отключить». Установка требует подтверждения Windows один раз." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,12"/>
+      <Button Content="Восстановить подключение прежней версии от администратора" HorizontalAlignment="Left" Click="Elevate_Click" Margin="0,0,0,16"/>
+      <TextBlock Text="После аварийного завершения восстановление удалит только туннель OneTunnel и его временные настройки. Системный прокси Windows приложение не меняет." Foreground="{StaticResource Muted}" LineHeight="22" Margin="0,0,0,12"/>
+      <WrapPanel Margin="0,0,0,24"><Button x:Name="RecoveryButton" Content="Очистить оставшееся подключение" Click="Recovery_Click"/><Button Content="Назад к подключению" Click="Cancel_Click"/></WrapPanel>
+     </StackPanel>
+     <TextBlock Text="События" FontSize="15" FontWeight="SemiBold" Margin="0,5,0,8"/>
+     <TextBox x:Name="EventLog" IsReadOnly="True" Height="110" FontSize="12" Background="Transparent" BorderThickness="0" Padding="0" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"/>
+    </StackPanel>
+   </ScrollViewer>
+   <WrapPanel x:Name="EditorActions" Grid.Row="2" Visibility="Collapsed" Margin="0,12,0,0"><Button x:Name="SaveProfileButton" Content="Сохранить / импортировать" Background="{StaticResource Accent}" Foreground="White" Click="Save_Click"/><Button Content="Отмена" Click="Cancel_Click"/></WrapPanel>
+   <Border Grid.Row="3" BorderBrush="#D4DDD4" BorderThickness="0,1,0,0" Padding="0,12,0,0" Margin="0,14,0,0"><TextBlock x:Name="Feedback" Text="Готов к настройке" Foreground="{StaticResource Muted}" FontSize="12" MaxHeight="66"/></Border>
+  </Grid>
+ </Grid>
+</Window>
