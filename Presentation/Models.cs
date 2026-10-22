@@ -12,17 +12,17 @@ public sealed record Profile(Guid Id,string Name,Protocol Protocol,string Source
 public sealed record TransportOptions
 {
     public bool Fragment {get;init;}
-    public string FragmentLength {get;init;}="100-200";
-    public string FragmentInterval {get;init;}="10-20";
+    public string FragmentLength {get;init;}="";
+    public string FragmentInterval {get;init;}="";
     public bool Noise {get;init;}
-    public string NoiseLength {get;init;}="50-150";
-    public string NoiseDelay {get;init;}="10-20";
+    public string NoiseLength {get;init;}="";
+    public string NoiseDelay {get;init;}="";
     public bool Mux {get;init;}
-    public int MuxConcurrency {get;init;}=8;
-    public void Validate(Profile p)=>ProfileBackend.Validate(p);
+    public int MuxConcurrency {get;init;}
+
 }
 public sealed record ImportResult(List<Profile> Profiles,int Duplicates,int Skipped);
 public sealed record SubscriptionMergeResult(List<Profile> Profiles,int Added,int Updated,int Removed);
 public sealed record ProfileDocument(int Version,List<Profile> Profiles,HashSet<string> CollapsedGroups,Dictionary<string,string> SubscriptionSources);
 public sealed record AppliedProfiles(ProfileDocument Document,Profile? Selected,int Added,int Updated,int Removed,int Duplicates,int Skipped,bool Batch,bool Offline,bool Retired);
-public sealed record DesktopState(string Root,bool Administrator,bool NeedsRecovery,bool Awg,bool Xray,bool SingBox);
+public sealed record DesktopState(string Root,bool Administrator,bool NeedsRecovery,bool Awg,bool Xray,bool SingBox,int MaxImportBytes=0);
