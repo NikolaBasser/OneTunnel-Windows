@@ -11,5 +11,7 @@ try{
     New-Item -ItemType Directory -Path (Split-Path $output) -Force | Out-Null
     & $go build -mod=readonly -trimpath -ldflags '-s -w' -o $output ./cmd/onetunnel-profiles
     if($LASTEXITCODE -ne 0){throw 'Go profile host build failed'}
-    Copy-Item -LiteralPath (Join-Path $env:GOMODCACHE 'github.com\rivo\uniseg@v0.4.7\LICENSE.txt') -Destination (Join-Path $project 'assets\LICENSE.uniseg.txt') -Force
+    $unicodeModule=& $go list -m -mod=readonly -f '{{.Dir}}' github.com/rivo/uniseg
+    if($LASTEXITCODE -ne 0 -or !$unicodeModule){throw 'Unicode dependency directory unavailable'}
+    Copy-Item -LiteralPath (Join-Path $unicodeModule 'LICENSE.txt') -Destination (Join-Path $project 'assets\LICENSE.uniseg.txt') -Force
 }finally{Pop-Location}

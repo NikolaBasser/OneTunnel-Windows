@@ -13,6 +13,11 @@ $env:CGO_ENABLED = '0'
 New-Item -ItemType Directory -Path $target -Force | Out-Null
 Push-Location (Join-Path $project 'GoCore')
 try {
+    function Module-Directory([string]$Name) {
+        $directory = & $go list -m -mod=readonly -f '{{.Dir}}' $Name
+        if ($LASTEXITCODE -ne 0 -or !$directory -or !(Test-Path -LiteralPath $directory)) { throw "Dependency directory unavailable: $Name" }
+        return $directory
+    }
     $tags = @(); if ($EmbeddedXray) { $tags += 'embeddedxray' }; if ($EmbeddedSingBox) { $tags += 'embeddedsingbox'; $tags += 'with_quic' }
     if ($EmbeddedTun) { $tags += 'embeddedtun'; $tags += 'with_gvisor' }
     if ($EmbeddedAWG) { $tags += 'embeddedawg' }
@@ -25,12 +30,12 @@ try {
     if ($EmbeddedTun) { $scope = 'full-device-experimental-unverified' }
     if ($EmbeddedAWG) { $scope = 'native-and-proxy-partial' }
     if ($EmbeddedAWG -and $EmbeddedXray -and $EmbeddedSingBox -and $EmbeddedTun) { $scope = 'embedded-native-and-proxy' }
-    @{Runtime='go';Version='0.3.0';ApiVersion=1;AdapterRequired=$false;EmbeddedXray=[bool]$EmbeddedXray;EmbeddedSingBox=[bool]$EmbeddedSingBox;EmbeddedTun=[bool]$EmbeddedTun;EmbeddedAWG=[bool]$EmbeddedAWG;EmbeddedScope=$scope;EmbeddedInternalNtp=[bool]$EmbeddedSingBox} | ConvertTo-Json | Set-Content (Join-Path $target 'go-runtime.json') -Encoding UTF8
+    @{Runtime='go';Version='0.3.1';ApiVersion=1;AdapterRequired=$false;EmbeddedXray=[bool]$EmbeddedXray;EmbeddedSingBox=[bool]$EmbeddedSingBox;EmbeddedTun=[bool]$EmbeddedTun;EmbeddedAWG=[bool]$EmbeddedAWG;EmbeddedScope=$scope;EmbeddedInternalNtp=[bool]$EmbeddedSingBox} | ConvertTo-Json | Set-Content (Join-Path $target 'go-runtime.json') -Encoding UTF8
     if ($EmbeddedXray) {
-        Copy-Item (Join-Path $env:GOMODCACHE 'github.com\xtls\xray-core@v1.260327.0\LICENSE') (Join-Path $target 'LICENSE.embedded-xray.txt') -Force
+        Copy-Item (Join-Path (Module-Directory 'github.com/xtls/xray-core') 'LICENSE') (Join-Path $target 'LICENSE.embedded-xray.txt') -Force
     }
     if ($EmbeddedSingBox) {
-        Copy-Item (Join-Path $env:GOMODCACHE 'github.com\sagernet\sing-box@v1.14.3\LICENSE') (Join-Path $target 'LICENSE.embedded-sing-box.txt') -Force
+        Copy-Item (Join-Path (Module-Directory 'github.com/sagernet/sing-box') 'LICENSE') (Join-Path $target 'LICENSE.embedded-sing-box.txt') -Force
     }
     if ($EmbeddedTun -or $EmbeddedAWG) {
         Copy-Item (Join-Path $project 'third-party\notices\LICENSE.wintun.txt') (Join-Path $target 'LICENSE.embedded-wintun.txt') -Force
@@ -52,8 +57,8 @@ try {
         $notices | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $target 'embedded-dependencies.json') -Encoding UTF8
     }
     Copy-Item (Join-Path (Split-Path (Split-Path $go)) 'LICENSE') (Join-Path $target 'LICENSE.go.txt') -Force
-    Copy-Item (Join-Path $env:GOMODCACHE 'github.com\!microsoft\go-winio@v0.6.2\LICENSE') (Join-Path $target 'LICENSE.go-winio.txt') -Force
-    Copy-Item (Join-Path $env:GOMODCACHE 'golang.org\x\sys@v0.49.0\LICENSE') (Join-Path $target 'LICENSE.x-sys.txt') -Force
-    Copy-Item (Join-Path $env:GOMODCACHE 'golang.org\x\net@v0.61.0\LICENSE') (Join-Path $target 'LICENSE.x-net.txt') -Force
-    Copy-Item (Join-Path $env:GOMODCACHE 'golang.org\x\text@v0.43.0\LICENSE') (Join-Path $target 'LICENSE.x-text.txt') -Force
+    Copy-Item (Join-Path (Module-Directory 'github.com/Microsoft/go-winio') 'LICENSE') (Join-Path $target 'LICENSE.go-winio.txt') -Force
+    Copy-Item (Join-Path (Module-Directory 'golang.org/x/sys') 'LICENSE') (Join-Path $target 'LICENSE.x-sys.txt') -Force
+    Copy-Item (Join-Path (Module-Directory 'golang.org/x/net') 'LICENSE') (Join-Path $target 'LICENSE.x-net.txt') -Force
+    Copy-Item (Join-Path (Module-Directory 'golang.org/x/text') 'LICENSE') (Join-Path $target 'LICENSE.x-text.txt') -Force
 } finally { Pop-Location }
