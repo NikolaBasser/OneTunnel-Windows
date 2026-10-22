@@ -1,0 +1,30 @@
+OneTunnel — Windows x64
+
+BUILD REQUIREMENTS
+Windows 10/11 x64, .NET 10 SDK and PowerShell.
+The pinned Go toolchain is prepared by scripts/Setup-Go.ps1.
+Assets and dependency license notices are included in the source tree.
+
+BUILD
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build.ps1 -Name OneTunnel-win-x64
+
+OUTPUT
+dist/OneTunnel-win-x64/
+dist/OneTunnel-win-x64.zip
+
+SERVICE INSTALLATION
+The package contains scripts/Install-Service.ps1.
+Administrative PowerShell:
+  ./scripts/Install-Service.ps1 -OwnerSid <interactive-user-SID>
+The owner's SID is available from whoami /user in the intended user's session.
+The installer accepts updates only when the service has no active session
+or pending traffic protection.
+
+RUN
+OneTunnel.exe in the package directory.
+The package includes the .NET runtime, user profile host and Go service.
+Servers and access credentials are configured separately in the application.
+
+LICENSES
+THIRD-PARTY-NOTICES.txt, assets/LICENSE*.txt, third-party/notices/,
+and the service dependency notices in the generated package.
