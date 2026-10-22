@@ -2,9 +2,9 @@ $ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $output = Join-Path $project 'artifacts\wg-via-awg'
 New-Item -ItemType Directory -Path $output -Force | Out-Null
-$awg = Join-Path $project 'engines\awg.exe'
-$engine = Join-Path $project 'engines\amneziawg.exe'
-$sing = Join-Path $project 'engines\sing-box.exe'
+$awg = Join-Path $project 'artifacts\external-engines\awg.exe'
+$engine = Join-Path $project 'artifacts\external-engines\amneziawg.exe'
+$sing = Join-Path $project 'artifacts\external-engines\sing-box.exe'
 $tunnel = 'OneTunnel' + [Guid]::NewGuid().ToString('N').Substring(0,12)
 $config = Join-Path $output ($tunnel + '.conf')
 $serverFile = Join-Path $output 'server.json'

@@ -1,4 +1,4 @@
-param([string]$Destination = (Join-Path $PSScriptRoot '..\engines'))
+param([string]$Destination = (Join-Path $PSScriptRoot '..\artifacts\external-engines'))
 $ErrorActionPreference = 'Stop'
 $Destination = [IO.Path]::GetFullPath($Destination)
 New-Item -ItemType Directory -Path $Destination -Force | Out-Null
