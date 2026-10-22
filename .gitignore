@@ -3,9 +3,7 @@
 **/obj/
 /dist/
 /artifacts/
-/engines/*
-!/engines/provenance.json
-!/engines/LICENSE*.txt
+/engines/
 /assets/downloads/
 /.vs/
 /.idea/

@@ -33,7 +33,7 @@ try {
         Copy-Item (Join-Path $env:GOMODCACHE 'github.com\sagernet\sing-box@v1.14.3\LICENSE') (Join-Path $target 'LICENSE.embedded-sing-box.txt') -Force
     }
     if ($EmbeddedTun -or $EmbeddedAWG) {
-        Copy-Item (Join-Path $project 'engines\LICENSE.wintun.txt') (Join-Path $target 'LICENSE.embedded-wintun.txt') -Force
+        Copy-Item (Join-Path $project 'third-party\notices\LICENSE.wintun.txt') (Join-Path $target 'LICENSE.embedded-wintun.txt') -Force
     }
     if ($EmbeddedXray -or $EmbeddedSingBox -or $EmbeddedAWG) {
         $modules = @(& $go list -mod=readonly @buildTags -deps -f '{{with .Module}}{{.Path}}|{{.Version}}|{{.Dir}}{{end}}' ./cmd/onetunnel-service | Where-Object { $_ -match '\|' } | Sort-Object -Unique)
