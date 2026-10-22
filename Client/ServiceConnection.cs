@@ -1,12 +1,16 @@
-using System.IO.Pipes;
-using System.Runtime.InteropServices;
 using OneTunnel.Core;
 
 namespace OneTunnel.Client;
 
+// View state and transport glue only. Go authenticates/controls the service,
+// prepares profiles, evaluates errors and owns connection sequencing.
 public sealed class ServiceConnection : IConnectionController
 {
     private CoreStatus state = new(false, false, false, false, false, false, 0, "Проверка службы…", null);
+    private string instance = "";
+    private ulong revision;
+    private long epoch;
+    private readonly object gate = new();
     public bool Available { get; private set; }
     public bool Active => state.Active;
     public bool NeedsRecovery => state.NeedsRecovery;
@@ -16,104 +20,51 @@ public sealed class ServiceConnection : IConnectionController
     public bool ClockSynchronized => state.ClockSynchronized;
     public int LocalPort => state.LocalPort;
     public string Status => Available ? state.Status : "Служба недоступна · состояние сети не подтверждено";
-    public event Action? Changed;
     public Guid? ProfileId => state.ProfileId;
-    public async Task RefreshAsync() { try { await CallAsync("status", timeout: 5); } catch { } }
-    public async Task StartAsync(Profile profile, bool fullDevice)
+    public AppliedProfiles? Prepared { get; private set; }
+    public event Action? Changed;
+    private void Apply(DesktopReply reply)
     {
-        profile.Transport?.Validate(profile);
-        await CallAsync("start", profile, fullDevice);
-    }
-    public async Task StopAsync() => await CallAsync("stop");
-    public async Task RecoverAsync() => await CallAsync("recover");
-    public async Task<string> ProbeAsync() => (await CallAsync("probe")).Result ?? "Проверка не завершена.";
-    public async Task<CoreResponse> CallAsync(string command, Profile? profile = null, bool fullDevice = false, int timeout = 180)
-    {
-        try
+        bool notify = false;
+        lock(gate)
         {
-            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(timeout));
-            using var pipe = new NamedPipeClientStream(".", CoreProtocol.PipeName, PipeDirection.InOut, PipeOptions.Asynchronous, System.Security.Principal.TokenImpersonationLevel.Identification);
-            await pipe.ConnectAsync(2000, cancellation.Token);
-            ServicePeer.Verify(pipe);
-            await CoreWire.WriteAsync(pipe, new CoreRequest(CoreProtocol.Version, command, profile, fullDevice), cancellation.Token);
-            var reply = await CoreWire.ReadAsync<CoreResponse>(pipe, cancellation.Token);
-            if (reply.Version != CoreProtocol.Version) throw new InvalidDataException("Несовместимая версия службы.");
-            state = reply.State; Available = true; Changed?.Invoke();
-            if (reply.Error != null) throw new CoreCommandException(reply.Error);
-            return reply;
+        if (reply.Environment != null) DesktopEnvironment.Accept(reply.Environment);
+        if (reply.Prepared != null) Prepared = reply.Prepared;
+        if (!reply.Available) { Available = false; notify = true; }
+        else if (!(reply.PeerStarted < epoch || reply.PeerStarted == epoch && reply.Response.Instance == instance && reply.Response.Revision > 0 && reply.Response.Revision < revision))
+        {
+        if (epoch != reply.PeerStarted || instance != reply.Response.Instance) revision = 0;
+        epoch = reply.PeerStarted; instance = reply.Response.Instance; if (reply.Response.Revision > 0) revision = reply.Response.Revision;
+        state = reply.Response.State; Available = true; notify = true;
         }
-        catch (CoreCommandException) { throw; }
-        catch (Exception ex)
+        }
+        if (notify) Changed?.Invoke();
+    }
+    private async Task<DesktopReply> Call(string command, Guid? id = null, bool fullDevice = false)
+    {
+        var reply = await DesktopBackend.CallAsync(command, id, fullDevice);
+        Apply(reply);
+        if (reply.Response.Error != null) throw new CoreCommandException(reply.Response.Error, reply.Message);
+        return reply;
+    }
+    public async Task RefreshAsync() { try { await Call("connection.status"); } catch { } }
+    public async Task StartAsync(Profile profile, bool fullDevice) { Prepared = null; await Call("connection.start", profile.Id, fullDevice); }
+    public async Task StopAsync() => await Call("connection.stop");
+    public async Task RecoverAsync() => await Call("connection.recover");
+    public async Task<string> ProbeAsync() => (await Call("connection.probe")).Response.Result ?? "Проверка не завершена.";
+    public async Task StartServiceAsync() => await Call("service.start");
+    public async Task InstallServiceAsync() => await Call("service.install");
+    public async Task ObserveAsync(CancellationToken cancellation)
+    {
+        while (!cancellation.IsCancellationRequested)
         {
-            Available = false; Changed?.Invoke();
-            throw new InvalidOperationException("Нет связи со службой OneTunnel. Открой «Движки и восстановление» и установи или обнови службу. Последнее состояние подключения сохранено; блокировка может оставаться активной.", ex);
+            try { await DesktopBackend.WatchAsync(reply => { Apply(reply); return Task.CompletedTask; }, cancellation); }
+            catch (OperationCanceledException) when (cancellation.IsCancellationRequested) { return; }
+            catch { Available = false; Changed?.Invoke(); }
+            try { await Task.Delay(1000, cancellation); } catch (OperationCanceledException) { return; }
         }
     }
 }
 
-public sealed class CoreCommandException(string code) : InvalidOperationException(code switch
-{
-    "incompatible_version" => "Обнови службу: её версия несовместима с интерфейсом.",
-    "invalid_configuration" => "Служба отклонила конфигурацию. Проверь профиль.",
-    "operation_timeout" => "Операция не завершилась вовремя. Проверь состояние службы.",
-    "network_timeout" => "Сервер не ответил на проверку вовремя. Проверь доступность подключения и повтори проверку.",
-    "network_error" => "Проверочный запрос не прошёл. Проверь доступность сервера и DNS.",
-    "backend_unavailable" => "Сетевой адаптер ядра остановился. Для восстановления используй «Очистить оставшееся подключение»; защита не снимается автоматически.",
-    "recovery_required" => "Сначала отключи активное подключение или выполни восстановление.",
-    _ => "Служба не выполнила операцию. Проверь состояние подключения, доступность сервера и необходимость восстановления."
-}) { public string Code { get; } = code; }
-
-internal static class ServicePeer
-{
-    [StructLayout(LayoutKind.Sequential)] private struct ProcessStatus { public uint Type, State, Accepted, Error, Specific, Checkpoint, WaitHint, Pid, Flags; }
-    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetNamedPipeServerProcessId(Microsoft.Win32.SafeHandles.SafePipeHandle pipe, out uint pid);
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr OpenSCManagerW(string? machine, string? database, uint access);
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr OpenServiceW(IntPtr manager, string name, uint access);
-    [DllImport("advapi32.dll", SetLastError = true)] private static extern bool QueryServiceStatusEx(IntPtr service, int level, out ProcessStatus status, int size, out int needed);
-    [DllImport("advapi32.dll")] private static extern bool CloseServiceHandle(IntPtr handle);
-    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool StartServiceW(IntPtr service, int argc, IntPtr argv);
-    internal static async Task StartAsync()
-    {
-        var manager = OpenSCManagerW(null, null, 1);
-        if (manager == IntPtr.Zero) throw new InvalidOperationException("Не удалось открыть управление службой.");
-        try
-        {
-            var service = OpenServiceW(manager, CoreProtocol.ServiceName, 0x14);
-            if (service == IntPtr.Zero) throw new InvalidOperationException("Сначала установи службу OneTunnel.");
-            try
-            {
-                if (!StartServiceW(service, 0, IntPtr.Zero) && Marshal.GetLastWin32Error() != 1056) throw new InvalidOperationException("Не удалось запустить службу OneTunnel.");
-                for (int i = 0; i < 100; i++)
-                {
-                    if (QueryServiceStatusEx(service, 0, out var status, Marshal.SizeOf<ProcessStatus>(), out _) && status.State == 4) return;
-                    await Task.Delay(200);
-                }
-                throw new TimeoutException("Служба не запустилась вовремя.");
-            }
-            finally { CloseServiceHandle(service); }
-        }
-        finally { CloseServiceHandle(manager); }
-    }
-    internal static void Verify(NamedPipeClientStream pipe)
-    {
-        uint expected = RunningProcessId();
-        if (!GetNamedPipeServerProcessId(pipe.SafePipeHandle, out uint pid) || pid != expected) throw new IOException("Untrusted IPC server.");
-    }
-    internal static uint RunningProcessId()
-    {
-        var manager = OpenSCManagerW(null, null, 1);
-        if (manager == IntPtr.Zero) throw new IOException("SCM unavailable.");
-        try
-        {
-            var service = OpenServiceW(manager, CoreProtocol.ServiceName, 4);
-            if (service == IntPtr.Zero) throw new IOException("Service not installed.");
-            try
-            {
-                if (!QueryServiceStatusEx(service, 0, out var s, Marshal.SizeOf<ProcessStatus>(), out _) || s.State != 4 || s.Pid == 0) throw new IOException("Service not running.");
-                return s.Pid;
-            }
-            finally { CloseServiceHandle(service); }
-        }
-        finally { CloseServiceHandle(manager); }
-    }
-}
+public sealed class CoreCommandException(string code, string message) : InvalidOperationException(message)
+{ public string Code { get; } = code; }

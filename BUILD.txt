@@ -13,9 +13,9 @@ dist/OneTunnel-win-x64/
 dist/OneTunnel-win-x64.zip
 
 SERVICE INSTALLATION
-The package contains scripts/Install-Service.ps1.
+The package contains a native Go installer; scripts/Install-Service.ps1 is a compatibility launcher.
 Administrative PowerShell:
-  ./scripts/Install-Service.ps1 -OwnerSid <interactive-user-SID>
+  ./OneTunnel.Profiles.exe --install-service <interactive-user-SID>
 The owner's SID is available from whoami /user in the intended user's session.
 The installer accepts updates only when the service has no active session
 or pending traffic protection.

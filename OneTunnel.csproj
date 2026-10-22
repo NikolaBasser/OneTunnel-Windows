@@ -3,8 +3,8 @@
     <OutputType>WinExe</OutputType><TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF><Nullable>enable</Nullable><ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest><AssemblyName>OneTunnel</AssemblyName>
-	<Version>0.1.0</Version>
-    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;dist\**;assets\downloads\**</DefaultItemExcludes>
+	<Version>0.2.0</Version>
+    <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;dist\**;artifacts\**;assets\downloads\**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup><Compile Remove="Core\**;Service\**;GoCore\**;Presentation\**;Client\obj\**;Client\bin\**"/><ProjectReference Include="Presentation\OneTunnel.Presentation.csproj"/></ItemGroup>
   <Target Name="BuildGoProfileHost" BeforeTargets="PrepareForBuild"><Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\Build-ProfileHost.ps1&quot;"/></Target>
