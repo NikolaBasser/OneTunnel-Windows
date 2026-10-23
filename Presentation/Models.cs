@@ -7,6 +7,7 @@ public sealed record Profile(Guid Id,string Name,Protocol Protocol,string Source
     public ReliabilityOptions? Reliability {get;init;}
     public string Group {get;init;}="Без группы";
     public TransportOptions? Transport {get;init;}
+    public NetworkOptions? Network {get;init;}
     public string Label=>$"{Name}  ·  {Protocol}";
     public override string ToString()=>Label;
 }
@@ -42,3 +43,9 @@ public sealed record GroupCheckResult(string Group,string CheckedAt,List<GroupCh
 public sealed record GroupResultsView(string Group,string CheckedAt,List<GroupResultDisplayRow> Rows,bool HasResults,bool Stale,bool CanSelectFastest,string Token,string Message);
 public sealed record GroupResultDisplayRow(string ID,string Name,string Message,bool Success,bool NetworkTest,long Milliseconds,string TimingLabel);
 public sealed record ProfileOrganizationView(string ID,string Name,string Group,string SuggestedName,string SuggestedGroup,string Token,List<string> ManualTargets,bool CanDuplicate,bool CanMove);
+
+public sealed record DNSOptions(string Transport,string ServerIP,string ServerName,int Port,string Path);
+public sealed record NetworkRule(string Kind,string Value,string Action);
+public sealed record NetworkOptions(DNSOptions? DNS,List<NetworkRule> Rules);
+public sealed record NetworkPreferencesView(string ID,string Token,string Message,string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,bool Supported,bool CanSave);
+public sealed record NetworkInput(string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText);

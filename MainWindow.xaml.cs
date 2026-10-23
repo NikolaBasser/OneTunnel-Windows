@@ -57,6 +57,11 @@ public partial class MainWindow : Window
     private Guid? profileOrganizationRequestedId;
     private Guid? profileOrganizationFieldsId;
     private string? profileOrganizationFieldsToken;
+    private NetworkPreferencesView? networkPreferencesView;
+    private bool networkPreferencesPending, networkPreferencesSavePending;
+    private int networkPreferencesRequestVersion;
+    private Guid? networkPreferencesRequestedId, networkPreferencesFieldsId;
+    private string? networkPreferencesFieldsToken;
     private TrayShell? tray;
     private WindowState previousWindowState = WindowState.Normal;
     private IntPtr windowHandle;
@@ -196,6 +201,7 @@ public partial class MainWindow : Window
         UpdateGroupControls();
         UpdateGroupResultControls();
         UpdateProfileOrganizationControls();
+        UpdateNetworkPreferencesControls();
     }
     private void UpdateTray()
     {
@@ -337,13 +343,24 @@ public partial class MainWindow : Window
         if (!applyingLibrarySelection && e.AddedItems.Count > 0) pendingLibrarySelection = null;
         if (!IsInitialized || ProfileTitle == null) return;
         var p = selected;
-        if (!applyingProfileDocument && p == null) InvalidateProfileOrganization("Выбери профиль, чтобы управлять копией или группой.");
-        else if (!applyingProfileDocument && p != null && (profileOrganizationView?.ID != p.Id.ToString() || profileOrganizationRequestedId != p.Id))
+        if (!applyingProfileDocument && p == null)
         {
-            InvalidateProfileOrganization("Сведения профиля обновляются…");
-            _ = LoadProfileOrganizationAsync(p.Id);
+            InvalidateProfileOrganization("Выбери профиль, чтобы управлять копией или группой.");
+            InvalidateNetworkPreferences("Выбери профиль, чтобы настроить DNS и маршрутизацию.");
         }
-        UpdateLibraryControls();
+        else if (!applyingProfileDocument && p != null)
+        {
+            if (profileOrganizationView?.ID != p.Id.ToString() || profileOrganizationRequestedId != p.Id)
+            {
+                InvalidateProfileOrganization("Сведения профиля обновляются…");
+                _ = LoadProfileOrganizationAsync(p.Id);
+            }
+            if (networkPreferencesView?.ID != p.Id.ToString() || networkPreferencesRequestedId != p.Id)
+            {
+                InvalidateNetworkPreferences("Загрузка настроек сети…");
+                _ = LoadNetworkPreferencesAsync(p.Id);
+            }
+        }        UpdateLibraryControls();
         ProfileTitle.Value = p?.Name ?? (profiles.Count == 0 ? "Добавь первое подключение" : "Выбери профиль из списка");
         ProfileDescription.Text = p == null ? "Импорт конфигурации или подписки" : $"{p.Protocol} · профиль сохранён локально";
         ModePanel.Visibility = p != null ? Visibility.Visible : Visibility.Collapsed;
@@ -744,6 +761,7 @@ public partial class MainWindow : Window
     {
         InvalidateGroupSummaries();
         InvalidateProfileOrganization("Сведения профиля обновляются…", clearFields: false);
+        InvalidateNetworkPreferences("Настройки сети обновляются…", clearFields: false);
         Storage.Accept(document);RefreshGroups(document.Profiles);
         applyingProfileDocument = true;
         try
@@ -762,7 +780,7 @@ public partial class MainWindow : Window
             if (GroupsPanel.Visibility == Visibility.Visible) _ = RefreshGroupSummariesAsync();
         }
         if (groupResultsView?.HasResults == true) _ = RefreshGroupResultsAsync();
-        if (selected is { } currentProfile) _ = LoadProfileOrganizationAsync(currentProfile.Id);
+        if (selected is { } currentProfile) { _ = LoadProfileOrganizationAsync(currentProfile.Id); _ = LoadNetworkPreferencesAsync(currentProfile.Id); }
     }
     private void PresentApplied(AppliedProfiles result)
     {
@@ -922,6 +940,7 @@ public partial class MainWindow : Window
         }
         ProfileOrganizationStatus.Text = message;
         UpdateProfileOrganizationControls();
+        UpdateNetworkPreferencesControls();
     }
     private async Task LoadProfileOrganizationAsync(Guid id)
     {
@@ -931,6 +950,7 @@ public partial class MainWindow : Window
         profileOrganizationPending = true;
         ProfileOrganizationStatus.Text = "Загрузка сведений профиля…";
         UpdateProfileOrganizationControls();
+        UpdateNetworkPreferencesControls();
         try
         {
             await connection.SetContextAsync(new(busy, storageReady, id.ToString(), groupCheck != null));
@@ -970,6 +990,7 @@ public partial class MainWindow : Window
         ProfileOrganizationGroupBox.ItemsSource = view.ManualTargets;
         ProfileOrganizationStatus.Text = "";
         UpdateProfileOrganizationControls();
+        UpdateNetworkPreferencesControls();
     }
     private async Task RefreshProfileOrganizationAsync()
     {
@@ -1047,6 +1068,134 @@ public partial class MainWindow : Window
             pendingLibrarySelection = id;
         }
         RefreshProfileFilter(true);
+    }
+    private void UpdateNetworkPreferencesControls()
+    {
+        if (!IsInitialized || NetworkDNSModeBox == null) return;
+        var view = networkPreferencesView;
+        bool matching = view != null && Guid.TryParse(view.ID, out var id) && selected?.Id == id;
+        bool pending = networkPreferencesPending || networkPreferencesSavePending || busy;
+        bool supported = matching && view!.Supported;
+        bool customDNS = supported && GetNetworkDNSMode() != "default";
+        NetworkDNSModeBox.IsEnabled = supported && !pending;
+        NetworkServerIPBox.IsEnabled = NetworkServerNameBox.IsEnabled = NetworkPortBox.IsEnabled = customDNS && !pending;
+        NetworkPathBox.IsEnabled = supported && GetNetworkDNSMode() == "https" && !pending;
+        NetworkRulesBox.IsEnabled = supported && !pending;
+        SaveNetworkPreferencesButton.IsEnabled = matching && view!.CanSave && supported && connection.Actions.CanSave && !pending;
+        ReloadNetworkPreferencesButton.IsEnabled = selected != null && !pending;
+    }
+    private string GetNetworkDNSMode()
+    {
+        return NetworkDNSModeBox.SelectedItem is ComboBoxItem item && item.Tag is string value ? value : "default";
+    }
+    private void InvalidateNetworkPreferences(string message, bool clearFields = true)
+    {
+        networkPreferencesRequestVersion++;
+        networkPreferencesRequestedId = null;
+        networkPreferencesPending = false;
+        networkPreferencesView = null;
+        if (clearFields)
+        {
+            networkPreferencesFieldsId = null;
+            networkPreferencesFieldsToken = null;
+            NetworkDNSModeBox.SelectedIndex = 0;
+            NetworkServerIPBox.Clear(); NetworkServerNameBox.Clear(); NetworkPortBox.Clear(); NetworkPathBox.Clear(); NetworkRulesBox.Clear();
+        }
+        NetworkPreferencesStatus.Text = message;
+        UpdateNetworkPreferencesControls();
+    }
+    private async Task LoadNetworkPreferencesAsync(Guid id, bool resetFields = false)
+    {
+        if (networkPreferencesPending && networkPreferencesRequestedId == id) return;
+        int request = ++networkPreferencesRequestVersion;
+        networkPreferencesRequestedId = id;
+        networkPreferencesPending = true;
+        NetworkPreferencesStatus.Text = "Загрузка настроек сети…";
+        UpdateNetworkPreferencesControls();
+        try
+        {
+            await connection.SetContextAsync(new(busy, storageReady, id.ToString(), groupCheck != null));
+            if (request != networkPreferencesRequestVersion || lifetime.IsCancellationRequested || selected?.Id != id) return;
+            var view = await ProfileBackend.NetworkPreferencesAsync(id);
+            if (request != networkPreferencesRequestVersion || lifetime.IsCancellationRequested || selected?.Id != id) return;
+            if (!Guid.TryParse(view.ID, out var returnedId) || returnedId != id) throw new InvalidDataException();
+            PresentNetworkPreferences(view, resetFields);
+        }
+        catch
+        {
+            if (request != networkPreferencesRequestVersion || lifetime.IsCancellationRequested) return;
+            networkPreferencesView = null;
+            NetworkPreferencesStatus.Text = "Не удалось обновить настройки сети. Обнови сведения перед сохранением.";
+        }
+        finally
+        {
+            if (request == networkPreferencesRequestVersion)
+            {
+                networkPreferencesPending = false;
+                if (!lifetime.IsCancellationRequested) UpdateNetworkPreferencesControls();
+            }
+        }
+    }
+    private void PresentNetworkPreferences(NetworkPreferencesView view, bool resetFields = false)
+    {
+        bool sameSnapshot = Guid.TryParse(view.ID, out var id) && networkPreferencesFieldsId == id && networkPreferencesFieldsToken == view.Token;
+        if (resetFields || !sameSnapshot)
+        {
+            int modeIndex = view.Mode switch { "https" => 1, "tls" => 2, _ => 0 };
+            NetworkDNSModeBox.SelectedIndex = modeIndex;
+            NetworkServerIPBox.Text = view.ServerIP;
+            NetworkServerNameBox.Text = view.ServerName;
+            NetworkPortBox.Text = view.Port;
+            NetworkPathBox.Text = view.Path;
+            NetworkRulesBox.Text = view.RulesText;
+        }
+        networkPreferencesFieldsId = Guid.TryParse(view.ID, out id) ? id : null;
+        networkPreferencesFieldsToken = view.Token;
+        networkPreferencesView = view;
+        networkPreferencesRequestedId = Guid.TryParse(view.ID, out id) ? id : null;
+        NetworkPreferencesStatus.Text = view.Supported ? view.Message : (string.IsNullOrWhiteSpace(view.Message) ? "Настройки DNS и маршрутизации недоступны для этого профиля или режима." : view.Message);
+        UpdateNetworkPreferencesControls();
+    }
+    private void NetworkDNSMode_Changed(object sender, SelectionChangedEventArgs e) => UpdateNetworkPreferencesControls();
+    private async void ReloadNetworkPreferences_Click(object sender, RoutedEventArgs e)
+    {
+        if (selected is { } profile) await LoadNetworkPreferencesAsync(profile.Id, resetFields: true);
+    }
+    private async void SaveNetworkPreferences_Click(object sender, RoutedEventArgs e) => await SaveNetworkPreferencesAsync();
+    private async Task SaveNetworkPreferencesAsync()
+    {
+        if (networkPreferencesView is not { } view || !Guid.TryParse(view.ID, out var id) || selected?.Id != id ||
+            !view.Supported || !view.CanSave || !connection.Actions.CanSave || busy || networkPreferencesPending || networkPreferencesSavePending) return;
+        string mode = GetNetworkDNSMode();
+        var input = new NetworkInput(mode, mode == "default" ? "" : NetworkServerIPBox.Text,
+            mode == "default" ? "" : NetworkServerNameBox.Text, mode == "default" ? "" : NetworkPortBox.Text,
+            mode == "https" ? NetworkPathBox.Text : "", NetworkRulesBox.Text);
+        string token = view.Token;
+        networkPreferencesSavePending = true;
+        busy = true;
+        NetworkPreferencesStatus.Text = "Сохранение настроек сети…";
+        RefreshControls();
+        try
+        {
+            var document = await ProfileBackend.SaveNetworkPreferencesAsync(id, token, input);
+            if (lifetime.IsCancellationRequested) return;
+            PresentDocument(document, selected?.Id ?? id, refreshLibrary: false);
+            await RefreshLibraryProjectionAsync();
+            NetworkPreferencesStatus.Text = "Настройки сохранены. Чтобы применить их, вручную обнови установленную службу OneTunnel.";
+            Feedback.Text = "Настройки DNS и маршрутизации сохранены. Подключение не запускалось; службу нужно обновить вручную.";
+        }
+        catch
+        {
+            InvalidateNetworkPreferences("Не удалось подтвердить сохранение. Обнови сведения перед повтором.", clearFields: false);
+            NetworkPreferencesStatus.Text = "Не удалось подтвердить сохранение. Обнови сведения перед повтором.";
+            Feedback.Text = "Не удалось подтвердить сохранение DNS и правил. Проверь профиль перед повтором.";
+        }
+        finally
+        {
+            networkPreferencesSavePending = false;
+            busy = false;
+            if (!lifetime.IsCancellationRequested) RefreshControls();
+        }
     }
     private sealed class ProfileRankComparer(Dictionary<Guid, int> ranks) : IComparer
     {
@@ -1218,7 +1367,7 @@ public partial class MainWindow : Window
         if (Storage.CollapsedGroups.Contains(name) == !exp.IsExpanded) return;
         var before = Storage.CollapsedGroups.ToHashSet();
         if (exp.IsExpanded) Storage.CollapsedGroups.Remove(name); else Storage.CollapsedGroups.Add(name);
-        try { Storage.Accept(ProfileBackend.SetGroupExpanded(name,exp.IsExpanded)); InvalidateGroupSummaries(); InvalidateProfileOrganization("Сведения профиля обновляются…", clearFields: false); if (selected is { } currentProfile) _ = LoadProfileOrganizationAsync(currentProfile.Id); } catch { Storage.CollapsedGroups.Clear(); Storage.CollapsedGroups.UnionWith(before); Feedback.Text = "Не удалось сохранить состояние группы."; }
+        try { Storage.Accept(ProfileBackend.SetGroupExpanded(name,exp.IsExpanded)); InvalidateGroupSummaries(); InvalidateProfileOrganization("Сведения профиля обновляются…", clearFields: false); InvalidateNetworkPreferences("Настройки сети обновляются…", clearFields: false); if (selected is { } currentProfile) { _ = LoadProfileOrganizationAsync(currentProfile.Id); _ = LoadNetworkPreferencesAsync(currentProfile.Id); } } catch { Storage.CollapsedGroups.Clear(); Storage.CollapsedGroups.UnionWith(before); Feedback.Text = "Не удалось сохранить состояние группы."; }
     }
     private async void Import_Click(object sender, RoutedEventArgs e)
     {
