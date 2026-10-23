@@ -14,6 +14,9 @@ public static class ProfileBackend
     public static Task<GroupResultsView> GroupResultsAsync(string sort,string filter)=>ProfileHost.CallAsync<GroupResultsView>("group.results.view",new{Sort=sort,Filter=filter});
     public static Task<Guid> FastestGroupResultAsync(string token)=>ProfileHost.CallAsync<Guid>("group.results.fastest",new{Token=token});
     public static Task ClearGroupResultsAsync()=>ProfileHost.CallAsync<object?>("group.results.clear");
+    public static Task<ProfileOrganizationView> ProfileOrganizationAsync(Guid id)=>ProfileHost.CallAsync<ProfileOrganizationView>("profile.organization",new{ID=id.ToString()});
+    public static Task<AppliedProfiles> DuplicateProfileAsync(Guid id,string name,string group,string token)=>ProfileHost.CallAsync<AppliedProfiles>("ui.profile.duplicate",new{ID=id.ToString(),Name=name,Group=group,Token=token});
+    public static Task<AppliedProfiles> MoveProfileAsync(Guid id,string group,string token)=>ProfileHost.CallAsync<AppliedProfiles>("ui.profile.move",new{ID=id.ToString(),Group=group,Token=token});
     public static Task<Profile> LoadEditorAsync(Guid id)=>ProfileHost.CallAsync<Profile>("editor.load",new{ID=id.ToString()});
     public static Task<ImportPreview> PreviewAsync(string source,CancellationToken cancellation)=>ProfileHost.CallAsync<ImportPreview>("editor.preview",new{Source=source},cancellation:cancellation);
     public static Task<ImportPreview> ImportFileAsync(string path)=>ProfileHost.CallAsync<ImportPreview>("editor.import",new{Path=path});

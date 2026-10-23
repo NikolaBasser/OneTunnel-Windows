@@ -426,6 +426,77 @@ internal static class Program
         RenderResults(syntheticResults); Click("ClearGroupResultsButton"); Wait(ResultsIdle);
         Assert(Find<ItemsControl>("GroupResults").Items.Count == 0 && !Find<Button>("SelectFastestResultButton").IsEnabled, "Explicit clear resets result presentation through real IPC");
         Assert(resultBytes.SequenceEqual(File.ReadAllBytes(profileFile)), "All result tools leave encrypted settings and profile order unchanged");
+        bool OrganizationIdle() => !(bool)typeof(MainWindow).GetField("profileOrganizationPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)! && !(bool)typeof(MainWindow).GetField("profileOrganizationMutationPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+        search.Clear(); favoritesBox.IsChecked = false; Wait(LibraryIdle);
+        list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == targetResult.Id);
+        Find<Expander>("ProfileOrganizationPanel").IsExpanded = true;
+        Wait(() => OrganizationIdle() && Find<Button>("DuplicateProfileButton").IsEnabled);
+        var organizationDraft = Find<TextBox>("NameBox").Text;
+        var originalOrganizationProfile = Raw<JsonElement>("store.load").GetProperty("Profiles").EnumerateArray().First(p => p.GetProperty("Id").GetString() == targetResult.Id.ToString());
+        Find<TextBox>("ProfileOrganizationNameBox").Text = "Synthetic local copy";
+        Find<ComboBox>("ProfileOrganizationGroupBox").Text = "Local test copies";
+        Click("DuplicateProfileButton");
+        Wait(() => OrganizationIdle() && LibraryIdle() && list.Items.Count == 3 && Find<Button>("MoveProfileButton").IsEnabled);
+        var copiedOrganizationProfile = list.Items.OfType<Profile>().Single(p => p.Name == "Synthetic local copy");
+        var organizationRaw = Raw<JsonElement>("store.load");
+        var copiedRaw = organizationRaw.GetProperty("Profiles").EnumerateArray().First(p => p.GetProperty("Id").GetString() == copiedOrganizationProfile.Id.ToString());
+        Assert(copiedOrganizationProfile.Id != targetResult.Id && ((Profile?)list.SelectedItem)?.Id == copiedOrganizationProfile.Id && copiedOrganizationProfile.Group == "Local test copies", "Copy creates and selects a new profile in the requested manual group");
+        Assert(copiedRaw.GetProperty("Source").GetString() == originalOrganizationProfile.GetProperty("Source").GetString() && copiedRaw.GetProperty("Protocol").GetInt32() == originalOrganizationProfile.GetProperty("Protocol").GetInt32() && !Storage.FavoriteIDs.Contains(copiedOrganizationProfile.Id), "Copy retains protocol/source and starts without a favorite");
+        Assert(Find<TextBox>("NameBox").Text == organizationDraft, "Profile organization preserves the unfinished editor draft");
+        Find<ComboBox>("ProfileOrganizationGroupBox").Text = "Work profiles";
+        Click("MoveProfileButton");
+        Wait(() => OrganizationIdle() && LibraryIdle() && list.Items.OfType<Profile>().Any(p => p.Id == copiedOrganizationProfile.Id && p.Group == "Work profiles") && Find<Button>("MoveProfileButton").IsEnabled);
+        Assert(Storage.Load().Select(p => p.Id).SequenceEqual(new[] { targetResult.Id, imported.Selected!.Id, copiedOrganizationProfile.Id }), "Move retains profile IDs and the stored fallback order");
+        var organizationNoOpBytes = File.ReadAllBytes(profileFile);
+        Find<ComboBox>("ProfileOrganizationGroupBox").Text = "Work profiles"; Click("MoveProfileButton");
+        Wait(() => OrganizationIdle() && LibraryIdle() && Find<Button>("MoveProfileButton").IsEnabled);
+        Assert(organizationNoOpBytes.SequenceEqual(File.ReadAllBytes(profileFile)), "Moving to the current group avoids rewriting encrypted storage");
+        Find<ComboBox>("ProfileOrganizationGroupBox").Text = "Invalid\nGroup"; Click("MoveProfileButton"); Wait(OrganizationIdle);
+        Assert(organizationNoOpBytes.SequenceEqual(File.ReadAllBytes(profileFile)), "Rejected organization input preserves encrypted settings");
+        Click("ReloadProfileOrganizationButton"); Wait(() => OrganizationIdle() && Find<Button>("DuplicateProfileButton").IsEnabled);
+        Find<TextBox>("ProfileOrganizationNameBox").Text = "Unfinished copy name";
+        Find<ComboBox>("ProfileOrganizationGroupBox").Text = "Unfinished manual group";
+        Click("ReloadProfileOrganizationButton"); Wait(() => OrganizationIdle() && Find<Button>("DuplicateProfileButton").IsEnabled);
+        Assert(Find<TextBox>("ProfileOrganizationNameBox").Text == "Unfinished copy name" && Find<ComboBox>("ProfileOrganizationGroupBox").Text == "Unfinished manual group", "Same-snapshot metadata refresh preserves typed organization fields");
+        var organizationValidBytes = File.ReadAllBytes(profileFile);
+        try {
+            File.WriteAllText(profileFile, "SYNTHETIC-ORGANIZATION-READ-FAILURE");
+            Click("ReloadProfileOrganizationButton"); Wait(OrganizationIdle);
+            Assert(!Find<Button>("DuplicateProfileButton").IsEnabled && !Find<Button>("MoveProfileButton").IsEnabled && !Find<TextBlock>("ProfileOrganizationStatus").Text.Contains("SYNTHETIC"), "Metadata failure disables stale actions without exposing store errors");
+            Assert(File.ReadAllText(profileFile) == "SYNTHETIC-ORGANIZATION-READ-FAILURE", "Failed metadata load does not overwrite corrupt synthetic storage");
+        }
+        finally { File.WriteAllBytes(profileFile, organizationValidBytes); }
+        Click("ReloadProfileOrganizationButton"); Wait(() => OrganizationIdle() && Find<Button>("DuplicateProfileButton").IsEnabled);
+        Assert(hostGate.Wait(2000), "Test can delay profile metadata without networking");
+        try {
+            list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == imported.Selected!.Id);
+            list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == targetResult.Id);
+        }
+        finally { hostGate.Release(); }
+        Wait(() => OrganizationIdle() && Find<Button>("DuplicateProfileButton").IsEnabled);
+        var renderedOrganization = (ProfileOrganizationView)typeof(MainWindow).GetField("profileOrganizationView", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+        Assert(renderedOrganization.ID == targetResult.Id.ToString(), "Delayed metadata cannot overwrite the newer selected profile");
+        var managedDocument = JsonNode.Parse(Raw<JsonElement>("store.load").GetRawText())!.AsObject();
+        managedDocument["SubscriptionSources"]!["Imported"] = "https://subscription.example/synthetic-organization-only";
+        Raw<object?>("store.save", new { Document = managedDocument });
+        var managedPresentation = ProfileBackend.LoadDocumentAsync().GetAwaiter().GetResult();
+        typeof(MainWindow).GetMethod("PresentDocument", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [managedPresentation, imported.Selected!.Id, true]);
+        Wait(() => OrganizationIdle() && LibraryIdle() && Find<Button>("DuplicateProfileButton").IsEnabled);
+        Assert(!Find<Button>("MoveProfileButton").IsEnabled, "Go-managed subscription member disables moving while retaining local copy action");
+        Capture(window, "profile-organization-default.png");
+        window.Width = window.MinWidth; window.Height = window.MinHeight; Pump();
+        Assert(Find<TextBox>("ProfileOrganizationNameBox").ActualWidth > 100 && Find<ComboBox>("ProfileOrganizationGroupBox").ActualWidth > 100, "Profile organization inputs retain usable minimum-size layout");
+        Capture(window, "profile-organization-minimum.png");
+        window.Width = 1240; window.Height = 850; Pump();
+        var beforeStaleOrganization = File.ReadAllBytes(profileFile);
+        Raw<object?>("favorite.set", new { ID = targetResult.Id.ToString(), Favorite = true });
+        var afterExternalOrganization = File.ReadAllBytes(profileFile);
+        Find<TextBox>("ProfileOrganizationNameBox").Text = "Stale copy must fail";
+        Find<ComboBox>("ProfileOrganizationGroupBox").Text = "Local copies"; Click("DuplicateProfileButton"); Wait(OrganizationIdle);
+        Assert(afterExternalOrganization.SequenceEqual(File.ReadAllBytes(profileFile)) && Storage.Load().Count == 3, "Changed-store organization token cannot create an unreviewed copy");
+        Raw<object?>("favorite.set", new { ID = targetResult.Id.ToString(), Favorite = false });
+        Click("ReloadProfileOrganizationButton"); Wait(() => OrganizationIdle() && Find<Button>("DuplicateProfileButton").IsEnabled);
+        Assert(Find<TextBox>("NameBox").Text == organizationDraft && Raw<JsonElement>("store.load").GetProperty("FavoriteIDs").GetArrayLength() == 1, "Organization failures and reload preserve drafts and unrelated favorites");
         typeof(MainWindow).GetField("allowClose", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(window, true);
         window.Close();
         Assert(tray!.StatusItem.IsDisposed && tray.ExitItem.IsDisposed, "Window Close disposes the tray even on the capture/test close path");

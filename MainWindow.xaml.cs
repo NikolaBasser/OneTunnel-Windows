@@ -50,6 +50,13 @@ public partial class MainWindow : Window
     private bool groupResultsPending, fastestSelectionPending;
     private int groupResultsRequestVersion;
     private string groupResultsSort = "stored", groupResultsFilter = "all";
+    private ProfileOrganizationView? profileOrganizationView;
+    private bool profileOrganizationPending, profileOrganizationMutationPending;
+    private bool applyingProfileDocument;
+    private int profileOrganizationRequestVersion;
+    private Guid? profileOrganizationRequestedId;
+    private Guid? profileOrganizationFieldsId;
+    private string? profileOrganizationFieldsToken;
     private TrayShell? tray;
     private WindowState previousWindowState = WindowState.Normal;
     private IntPtr windowHandle;
@@ -188,6 +195,7 @@ public partial class MainWindow : Window
         UpdateLibraryControls();
         UpdateGroupControls();
         UpdateGroupResultControls();
+        UpdateProfileOrganizationControls();
     }
     private void UpdateTray()
     {
@@ -329,6 +337,12 @@ public partial class MainWindow : Window
         if (!applyingLibrarySelection && e.AddedItems.Count > 0) pendingLibrarySelection = null;
         if (!IsInitialized || ProfileTitle == null) return;
         var p = selected;
+        if (!applyingProfileDocument && p == null) InvalidateProfileOrganization("Выбери профиль, чтобы управлять копией или группой.");
+        else if (!applyingProfileDocument && p != null && (profileOrganizationView?.ID != p.Id.ToString() || profileOrganizationRequestedId != p.Id))
+        {
+            InvalidateProfileOrganization("Сведения профиля обновляются…");
+            _ = LoadProfileOrganizationAsync(p.Id);
+        }
         UpdateLibraryControls();
         ProfileTitle.Value = p?.Name ?? (profiles.Count == 0 ? "Добавь первое подключение" : "Выбери профиль из списка");
         ProfileDescription.Text = p == null ? "Импорт конфигурации или подписки" : $"{p.Protocol} · профиль сохранён локально";
@@ -729,19 +743,26 @@ public partial class MainWindow : Window
     private void PresentDocument(ProfileDocument document,Guid? selectedId=null,bool refreshLibrary=true)
     {
         InvalidateGroupSummaries();
+        InvalidateProfileOrganization("Сведения профиля обновляются…", clearFields: false);
         Storage.Accept(document);RefreshGroups(document.Profiles);
-        profiles.Clear();foreach(var profile in document.Profiles)profiles.Add(profile);
-        pendingLibrarySelection = selectedId;
-        RefreshProfileFilter(true);
-        applyingLibrarySelection = true;
-        try { ProfilesList.SelectedItem=profiles.FirstOrDefault(p=>p.Id==selectedId)??profiles.FirstOrDefault(); }
-        finally { applyingLibrarySelection = false; }
+        applyingProfileDocument = true;
+        try
+        {
+            profiles.Clear();foreach(var profile in document.Profiles)profiles.Add(profile);
+            pendingLibrarySelection = selectedId;
+            RefreshProfileFilter(true);
+            applyingLibrarySelection = true;
+            try { ProfilesList.SelectedItem=profiles.FirstOrDefault(p=>p.Id==selectedId)??profiles.FirstOrDefault(); }
+            finally { applyingLibrarySelection = false; }
+        }
+        finally { applyingProfileDocument = false; }
         UpdateLibraryControls();
         if (refreshLibrary) {
             _ = RefreshLibraryProjectionAsync();
             if (GroupsPanel.Visibility == Visibility.Visible) _ = RefreshGroupSummariesAsync();
         }
         if (groupResultsView?.HasResults == true) _ = RefreshGroupResultsAsync();
+        if (selected is { } currentProfile) _ = LoadProfileOrganizationAsync(currentProfile.Id);
     }
     private void PresentApplied(AppliedProfiles result)
     {
@@ -871,6 +892,161 @@ public partial class MainWindow : Window
         GroupResultSortBox.IsEnabled = GroupResultFilterBox.IsEnabled = !locked;
         SelectFastestResultButton.IsEnabled = !pending && groupResultsView is { HasResults: true, CanSelectFastest: true } && connection.Actions.CanSelect;
         ClearGroupResultsButton.IsEnabled = !pending && groupResultsView != null;
+    }
+    private void UpdateProfileOrganizationControls()
+    {
+        if (!IsInitialized || ProfileOrganizationNameBox == null) return;
+        var view = profileOrganizationView;
+        bool pending = profileOrganizationPending || profileOrganizationMutationPending;
+        bool matchesSelection = view != null && Guid.TryParse(view.ID, out var id) && selected?.Id == id;
+        bool canEdit = matchesSelection && connection.Actions.CanEdit && !busy && !pending;
+        ProfileOrganizationNameBox.IsEnabled = canEdit && view?.CanDuplicate == true;
+        ProfileOrganizationGroupBox.IsEnabled = canEdit && (view?.CanDuplicate == true || view?.CanMove == true);
+        DuplicateProfileButton.IsEnabled = canEdit && view?.CanDuplicate == true;
+        MoveProfileButton.IsEnabled = canEdit && view?.CanMove == true;
+        ReloadProfileOrganizationButton.IsEnabled = selected != null && !busy && !pending;
+    }
+    private void InvalidateProfileOrganization(string message, bool clearFields = true)
+    {
+        profileOrganizationRequestVersion++;
+        profileOrganizationRequestedId = null;
+        profileOrganizationPending = false;
+        profileOrganizationView = null;
+        ProfileOrganizationGroupBox.ItemsSource = null;
+        if (clearFields)
+        {
+            profileOrganizationFieldsId = null;
+            profileOrganizationFieldsToken = null;
+            ProfileOrganizationNameBox.Clear();
+            ProfileOrganizationGroupBox.Text = "";
+        }
+        ProfileOrganizationStatus.Text = message;
+        UpdateProfileOrganizationControls();
+    }
+    private async Task LoadProfileOrganizationAsync(Guid id)
+    {
+        if (profileOrganizationPending && profileOrganizationRequestedId == id) return;
+        int request = ++profileOrganizationRequestVersion;
+        profileOrganizationRequestedId = id;
+        profileOrganizationPending = true;
+        ProfileOrganizationStatus.Text = "Загрузка сведений профиля…";
+        UpdateProfileOrganizationControls();
+        try
+        {
+            await connection.SetContextAsync(new(busy, storageReady, id.ToString(), groupCheck != null));
+            if (request != profileOrganizationRequestVersion || lifetime.IsCancellationRequested || selected?.Id != id) return;
+            var view = await ProfileBackend.ProfileOrganizationAsync(id);
+            if (request != profileOrganizationRequestVersion || lifetime.IsCancellationRequested || selected?.Id != id) return;
+            if (!Guid.TryParse(view.ID, out var returnedId) || returnedId != id) throw new InvalidDataException();
+            PresentProfileOrganization(view);
+        }
+        catch
+        {
+            if (request != profileOrganizationRequestVersion || lifetime.IsCancellationRequested) return;
+            profileOrganizationView = null;
+            ProfileOrganizationStatus.Text = "Не удалось обновить сведения профиля. Повтори попытку.";
+        }
+        finally
+        {
+            if (request == profileOrganizationRequestVersion)
+            {
+                profileOrganizationPending = false;
+                if (!lifetime.IsCancellationRequested) UpdateProfileOrganizationControls();
+            }
+        }
+    }
+    private void PresentProfileOrganization(ProfileOrganizationView view)
+    {
+        bool sameSnapshot = Guid.TryParse(view.ID, out var viewId) && profileOrganizationFieldsId == viewId && profileOrganizationFieldsToken == view.Token;
+        if (!sameSnapshot)
+        {
+            ProfileOrganizationNameBox.Text = view.SuggestedName;
+            ProfileOrganizationGroupBox.Text = view.SuggestedGroup;
+        }
+        profileOrganizationFieldsId = Guid.TryParse(view.ID, out viewId) ? viewId : null;
+        profileOrganizationFieldsToken = view.Token;
+        profileOrganizationView = view;
+        profileOrganizationRequestedId = Guid.TryParse(view.ID, out var id) ? id : null;
+        ProfileOrganizationGroupBox.ItemsSource = view.ManualTargets;
+        ProfileOrganizationStatus.Text = "";
+        UpdateProfileOrganizationControls();
+    }
+    private async Task RefreshProfileOrganizationAsync()
+    {
+        if (selected is { } profile) await LoadProfileOrganizationAsync(profile.Id);
+        else InvalidateProfileOrganization("Выбери профиль, чтобы управлять копией или группой.");
+    }
+    private async void ReloadProfileOrganization_Click(object sender, RoutedEventArgs e) => await RefreshProfileOrganizationAsync();
+    private async void DuplicateProfile_Click(object sender, RoutedEventArgs e) => await DuplicateSelectedProfileAsync();
+    private async void MoveProfile_Click(object sender, RoutedEventArgs e) => await MoveSelectedProfileAsync();
+    private Task DuplicateSelectedProfileAsync() => ApplyProfileOrganizationAsync(duplicate: true);
+    private Task MoveSelectedProfileAsync() => ApplyProfileOrganizationAsync(duplicate: false);
+    private async Task ApplyProfileOrganizationAsync(bool duplicate)
+    {
+        if (profileOrganizationView is not { } view || !Guid.TryParse(view.ID, out var id) || selected?.Id != id ||
+            busy || profileOrganizationPending || profileOrganizationMutationPending || !connection.Actions.CanEdit ||
+            (duplicate ? !view.CanDuplicate : !view.CanMove)) return;
+        string name = ProfileOrganizationNameBox.Text;
+        string group = ProfileOrganizationGroupBox.Text;
+        string token = view.Token;
+        profileOrganizationMutationPending = true;
+        busy = true;
+        RefreshControls();
+        try
+        {
+            var applied = duplicate
+                ? await ProfileBackend.DuplicateProfileAsync(id, name, group, token)
+                : await ProfileBackend.MoveProfileAsync(id, group, token);
+            if (lifetime.IsCancellationRequested) return;
+            Guid? currentSelection = selected?.Id;
+            Guid? copyId = duplicate ? applied.Selected?.Id ?? throw new InvalidDataException() : null;
+            Guid? selectionToPreserve = currentSelection != id ? currentSelection : duplicate ? copyId : applied.Selected?.Id ?? id;
+            PresentDocument(applied.Document, selectionToPreserve, refreshLibrary: false);
+            bool revealCopy = duplicate && selectionToPreserve == copyId && copyId is not null;
+            if (revealCopy) PrepareOrganizationProfileReveal(copyId!.Value);
+            await RefreshLibraryProjectionAsync();
+            if (GroupsPanel.Visibility == Visibility.Visible) await RefreshGroupSummariesAsync();
+            bool copyVisible = copyId is { } newCopyId && profiles.Any(p => p.Id == newCopyId) && MatchesProfile(profiles.First(p => p.Id == newCopyId));
+            Feedback.Text = duplicate
+                ? (!revealCopy || copyVisible ? "Копия профиля создана. Подключение не запускалось." : "Копия создана, но список не удалось обновить. Проверь список профилей перед повтором.")
+                : "Профиль перемещён. Порядок хранения сохранён.";
+        }
+        catch
+        {
+            InvalidateProfileOrganization("Сведения могут быть устаревшими. Обнови их перед повтором.", clearFields: false);
+            try
+            {
+                var document = await ProfileBackend.LoadDocumentAsync();
+                if (!lifetime.IsCancellationRequested)
+                {
+                    PresentDocument(document, selected?.Id ?? id, refreshLibrary: false);
+                    await RefreshLibraryProjectionAsync();
+                    if (GroupsPanel.Visibility == Visibility.Visible) await RefreshGroupSummariesAsync();
+                }
+            }
+            catch { }
+            Feedback.Text = "Не удалось подтвердить результат операции. Проверь список профилей перед повтором.";
+            ProfileOrganizationStatus.Text = "Сведения могут быть устаревшими. Обнови их перед повтором.";
+        }
+        finally
+        {
+            profileOrganizationMutationPending = false;
+            busy = false;
+            if (!lifetime.IsCancellationRequested) RefreshControls();
+        }
+    }
+    private void PrepareOrganizationProfileReveal(Guid id)
+    {
+        bool reloadLibrary = favoritesOnly || FavoritesOnlyBox.IsChecked == true;
+        if (!string.IsNullOrWhiteSpace(SearchBox.Text)) SearchBox.Clear();
+        if (reloadLibrary)
+        {
+            updatingLibraryControls = true;
+            try { favoritesOnly = false; FavoritesOnlyBox.IsChecked = false; }
+            finally { updatingLibraryControls = false; }
+            pendingLibrarySelection = id;
+        }
+        RefreshProfileFilter(true);
     }
     private sealed class ProfileRankComparer(Dictionary<Guid, int> ranks) : IComparer
     {
@@ -1042,7 +1218,7 @@ public partial class MainWindow : Window
         if (Storage.CollapsedGroups.Contains(name) == !exp.IsExpanded) return;
         var before = Storage.CollapsedGroups.ToHashSet();
         if (exp.IsExpanded) Storage.CollapsedGroups.Remove(name); else Storage.CollapsedGroups.Add(name);
-        try { Storage.Accept(ProfileBackend.SetGroupExpanded(name,exp.IsExpanded)); InvalidateGroupSummaries(); } catch { Storage.CollapsedGroups.Clear(); Storage.CollapsedGroups.UnionWith(before); Feedback.Text = "Не удалось сохранить состояние группы."; }
+        try { Storage.Accept(ProfileBackend.SetGroupExpanded(name,exp.IsExpanded)); InvalidateGroupSummaries(); InvalidateProfileOrganization("Сведения профиля обновляются…", clearFields: false); if (selected is { } currentProfile) _ = LoadProfileOrganizationAsync(currentProfile.Id); } catch { Storage.CollapsedGroups.Clear(); Storage.CollapsedGroups.UnionWith(before); Feedback.Text = "Не удалось сохранить состояние группы."; }
     }
     private async void Import_Click(object sender, RoutedEventArgs e)
     {
