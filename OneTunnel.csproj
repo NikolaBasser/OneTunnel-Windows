@@ -7,8 +7,17 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;dist\**;artifacts\**;assets\downloads\**</DefaultItemExcludes>
   </PropertyGroup>
   <ItemGroup><Compile Remove="Core\**;Service\**;GoCore\**;Presentation\**;Client\obj\**;Client\bin\**"/><ProjectReference Include="Presentation\OneTunnel.Presentation.csproj"/></ItemGroup>
-  <Target Name="BuildGoProfileHost" BeforeTargets="PrepareForBuild"><Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\Build-ProfileHost.ps1&quot;"/></Target>
-  <ItemGroup><Content Include="artifacts\profile-host\OneTunnel.Profiles.exe" Link="OneTunnel.Profiles.exe" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
+  <PropertyGroup Condition="'$(CoreBundlePath)' != ''">
+    <CoreBundlePath>$([System.IO.Path]::GetFullPath('$(CoreBundlePath)', '$(MSBuildProjectDirectory)'))</CoreBundlePath>
+  </PropertyGroup>
+  <Target Name="ValidateCoreBundle" BeforeTargets="PrepareForBuild">
+    <Error Condition="'$(CoreBundlePath)' == ''" Text="Set CoreBundlePath to a trusted core bundle. Build it explicitly with scripts/Build-Core.ps1 first." />
+    <Error Condition="'$(RuntimeIdentifier)' != '' and '$(RuntimeIdentifier)' != 'win-x64'" Text="Only Windows x64 core bundles are supported. Native ARM64 dependencies have not been validated." />
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\Validate-CoreBundle.ps1&quot; -Bundle &quot;$(CoreBundlePath)&quot; -Quiet" />
+  </Target>
+  <ItemGroup Condition="'$(CoreBundlePath)' != ''">
+    <Content Include="$(CoreBundlePath)\**\*" Link="%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
+  </ItemGroup>
   <ItemGroup><Content Include="third-party\notices\*.txt;third-party\provenance.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
   <ItemGroup><Content Include="assets\emoji\*.png;assets\LICENSE.twemoji.txt;assets\LICENSE.uniseg.txt;assets\emoji-provenance.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
 </Project>

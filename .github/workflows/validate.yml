@@ -1,0 +1,81 @@
+name: Validate core and Windows boundary
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  portable:
+    name: Portable packages (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.3'
+          cache-dependency-path: GoCore/go.sum
+      - name: Test portable contracts and configuration compilers
+        working-directory: GoCore
+        run: go test -mod=readonly -count=1 ./internal/control ./internal/protocol ./internal/profiles
+      - name: Check portable packages
+        working-directory: GoCore
+        run: go vet -mod=readonly ./internal/control ./internal/protocol ./internal/profiles
+
+  windows:
+    name: Windows x64 core and WPF package
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: '1.27.3'
+          cache-dependency-path: GoCore/go.sum
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: '10.0.x'
+      - name: Test contracts with production engine build tags
+        working-directory: GoCore
+        run: >-
+          go test -mod=readonly -p 1 -count=1
+          -tags embeddedxray,embeddedsingbox,embeddedtun,embeddedawg,with_quic,with_gvisor,with_naive_outbound,with_purego
+          ./...
+      - name: Check Windows contracts and profile storage
+        working-directory: GoCore
+        run: >-
+          go vet -mod=readonly
+          -tags embeddedxray,embeddedsingbox,embeddedtun,embeddedawg,with_quic,with_gvisor,with_naive_outbound,with_purego
+          ./...
+      - name: Build standalone core without the UI toolchain
+        run: ./GoCore/build.ps1 -GoExecutable (Get-Command go).Source -Output "$PWD/artifacts/core-bundle"
+      - name: Test bundle validation with synthetic data
+        run: ./tests/CoreBundle.Tests.ps1
+      - name: Package Windows against the selected core bundle
+        run: ./scripts/Build.ps1 -Name OneTunnel-ci-win-x64 -CoreBundlePath "$PWD/artifacts/core-bundle"
+      - name: Verify selected core replaces stale development binaries
+        run: ./tests/CoreBoundary.Integration.ps1 -CoreBundlePath "$PWD/artifacts/core-bundle"
+      - name: Record unsupported application targets
+        run: |
+          @'
+          Windows ARM64 application packaging is unsupported: the pinned Cronet native dependency is Windows amd64.
+          Linux checks cover portable packages only; no Linux service or application package exists at this stage.
+          This workflow does not install a service, connect a VPN, or modify routes, DNS, or firewall rules.
+          '@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY

@@ -5,8 +5,25 @@ Windows 10/11 x64, .NET 10 SDK and PowerShell.
 The pinned Go toolchain is prepared by scripts/Setup-Go.ps1.
 Assets and dependency license notices are included in the source tree.
 
-BUILD
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build.ps1 -Name OneTunnel-win-x64
+BUILD THE CORE EXPLICITLY
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build-Core.ps1
+The core builder requires Go and does not use .NET or Windows UI sources.
+Use a new or empty output directory for each bundle.
+
+BUILD THE WINDOWS APPLICATION
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build.ps1 -Name OneTunnel-win-x64 -CoreBundlePath artifacts/core-bundle
+For a development build:
+dotnet build OneTunnel.csproj -p:CoreBundlePath=C:\path\to\trusted-core-bundle
+Application builds never compile or download Go binaries implicitly.
+Bundle validation checks API, platform, native architecture and file integrity before packaging.
+Use bundles produced from reviewed source; self-reported hashes do not authenticate a publisher.
+The selected core version and source revision are recorded in core-bundle.json.
+
+SUPPORTED TARGETS
+The complete application and embedded native dependencies currently support Windows x64.
+CI also checks portable control/protocol packages on Linux amd64 and arm64; these checks
+do not constitute Linux VPN application support. Windows ARM64 requires matching native
+dependencies and runtime validation before it can be packaged. No release is produced by CI.
 
 OUTPUT
 dist/OneTunnel-win-x64/
