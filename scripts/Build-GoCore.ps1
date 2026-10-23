@@ -30,7 +30,7 @@ try {
     if ($EmbeddedTun) { $scope = 'full-device-experimental-unverified' }
     if ($EmbeddedAWG) { $scope = 'native-and-proxy-partial' }
     if ($EmbeddedAWG -and $EmbeddedXray -and $EmbeddedSingBox -and $EmbeddedTun) { $scope = 'embedded-native-and-proxy' }
-    @{Runtime='go';Version='0.4.0';ApiVersion=1;AdapterRequired=$false;EmbeddedXray=[bool]$EmbeddedXray;EmbeddedSingBox=[bool]$EmbeddedSingBox;EmbeddedTun=[bool]$EmbeddedTun;EmbeddedAWG=[bool]$EmbeddedAWG;EmbeddedScope=$scope;EmbeddedInternalNtp=[bool]$EmbeddedSingBox;EmbeddedNaive=[bool]$EmbeddedSingBox} | ConvertTo-Json | Set-Content (Join-Path $target 'go-runtime.json') -Encoding UTF8
+    @{Runtime='go';Version='0.5.0';ApiVersion=1;AdapterRequired=$false;EmbeddedXray=[bool]$EmbeddedXray;EmbeddedSingBox=[bool]$EmbeddedSingBox;EmbeddedTun=[bool]$EmbeddedTun;EmbeddedAWG=[bool]$EmbeddedAWG;EmbeddedScope=$scope;EmbeddedInternalNtp=[bool]$EmbeddedSingBox;EmbeddedNaive=[bool]$EmbeddedSingBox} | ConvertTo-Json | Set-Content (Join-Path $target 'go-runtime.json') -Encoding UTF8
     if ($EmbeddedXray) {
         Copy-Item (Join-Path (Module-Directory 'github.com/xtls/xray-core') 'LICENSE') (Join-Path $target 'LICENSE.embedded-xray.txt') -Force
     }
