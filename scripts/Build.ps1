@@ -5,7 +5,7 @@ Push-Location $project
 try {
     if ($Name -notmatch '^OneTunnel[-a-zA-Z0-9.]+$') { throw 'Invalid package name' }
     $bundle = [IO.Path]::GetFullPath($CoreBundlePath)
-    $null = & (Join-Path $PSScriptRoot 'Validate-CoreBundle.ps1') -Bundle $bundle
+    $null = & (Join-Path $PSScriptRoot 'Validate-CoreBundle.ps1') -Bundle $bundle -Reference (Join-Path $project 'core-reference.json')
     if (!(Test-Path -LiteralPath '.\assets\emoji\1f1f7-1f1fa.png')) { throw 'Run scripts\Setup-Emoji.ps1 before packaging.' }
     $output = Join-Path '.\dist' $Name
     if (Test-Path -LiteralPath $output) { throw 'Package output already exists. Choose a new package name to prevent stale files.' }

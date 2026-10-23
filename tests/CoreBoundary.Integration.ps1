@@ -7,7 +7,7 @@ if (!$Project) { $Project = Join-Path $PSScriptRoot '..\OneTunnel.csproj' }
 $projectPath = [IO.Path]::GetFullPath($Project)
 $projectRoot = Split-Path -Parent $projectPath
 $bundle = [IO.Path]::GetFullPath($CoreBundlePath)
-$manifest = & (Join-Path $projectRoot 'scripts\Validate-CoreBundle.ps1') -Bundle $bundle
+$manifest = & (Join-Path $projectRoot 'scripts\Validate-CoreBundle.ps1') -Bundle $bundle -Reference (Join-Path $projectRoot 'core-reference.json')
 $output = Join-Path $projectRoot ('artifacts\core-copy-check-' + [guid]::NewGuid().ToString('N'))
 function Build-Consumer {
     & dotnet build $projectPath --no-restore -c Release -r win-x64 -o $output "-p:CoreBundlePath=$bundle" --nologo
