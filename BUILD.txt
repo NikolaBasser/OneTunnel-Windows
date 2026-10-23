@@ -91,6 +91,11 @@ Use the selected-profile favorite action to add or remove a favorite. Favorites
 are encrypted by the Go profile host and follow stable profile IDs. The favorites
 filter and stored/name/protocol sort affect the view only and reset per session.
 Groups stay contiguous; sorting does not change stored fallback server priority.
+The Groups page manages manual and subscription groups. Rename preserves IDs and
+settings; deletion requires confirmation and also removes the locally saved source.
+Changed snapshots are rejected, so reload the group list before retrying.
+Expand/collapse-all on the connection page includes search/favorites-hidden groups.
+These features need no service update and do not connect or disconnect a tunnel.
 
 LICENSES
 THIRD-PARTY-NOTICES.txt, assets/LICENSE*.txt, third-party/notices/,

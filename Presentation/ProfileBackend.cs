@@ -5,6 +5,10 @@ public static class ProfileBackend
     public static Task<string> DiagnosticsAsync()=>ProfileHost.CallAsync<string>("diagnostics.report");
     public static Task<ProfileDocument> FavoriteAsync(Guid id,bool favorite)=>ProfileHost.CallAsync<ProfileDocument>("ui.favorite.set",new{ID=id.ToString(),Favorite=favorite});
     public static Task<ProfileLibraryView> LibraryAsync(string sort,bool favoritesOnly)=>ProfileHost.CallAsync<ProfileLibraryView>("library.view",new{Sort=sort,FavoritesOnly=favoritesOnly});
+    public static Task<List<GroupSummary>> GroupsAsync()=>ProfileHost.CallAsync<List<GroupSummary>>("group.list");
+    public static Task<ProfileDocument> RenameGroupAsync(string group,string name,string token)=>ProfileHost.CallAsync<ProfileDocument>("ui.group.rename",new{Group=group,Name=name,Token=token});
+    public static Task<ProfileDocument> DeleteGroupAsync(string group,string token)=>ProfileHost.CallAsync<ProfileDocument>("ui.group.delete",new{Group=group,Token=token});
+    public static Task<ProfileDocument> SetAllGroupsExpandedAsync(bool expanded)=>ProfileHost.CallAsync<ProfileDocument>("ui.group.expansion.all",new{Expanded=expanded});
     public static Task<AppliedProfiles> SaveEditorAsync(string name,string source,string group,Guid? id,TransportInput transport,ReliabilityOptions? reliability=null)=>ProfileHost.CallAsync<AppliedProfiles>("ui.editor.save",new{Name=name,Source=source,Group=group,ID=id?.ToString()??"",TransportInput=transport,Reliability=reliability});
     public static Task<GroupCheckResult> CheckGroupAsync(string group,CancellationToken cancellation=default)=>ProfileHost.CallAsync<GroupCheckResult>("group.check",new{Group=group},1000,cancellation:cancellation);
     public static Task<Profile> LoadEditorAsync(Guid id)=>ProfileHost.CallAsync<Profile>("editor.load",new{ID=id.ToString()});

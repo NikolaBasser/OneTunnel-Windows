@@ -32,6 +32,7 @@ public sealed record ProfileDocument(int Version,List<Profile> Profiles,HashSet<
     public HashSet<Guid> FavoriteIDs {get;init;}=[];
 }
 public sealed record ProfileLibraryView([property: System.Text.Json.Serialization.JsonPropertyName("ids")] List<Guid> IDs);
+public sealed record GroupSummary(string Name,int ProfileCount,bool IsSubscription,string Token);
 public sealed record AppliedProfiles(ProfileDocument Document,Profile? Selected,int Added,int Updated,int Removed,int Duplicates,int Skipped,bool Batch,bool Offline,bool Retired);
 public sealed record DesktopState(string Root,bool Administrator,bool NeedsRecovery,bool Awg,bool Xray,bool SingBox,int MaxImportBytes=0);
 

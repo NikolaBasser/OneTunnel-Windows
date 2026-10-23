@@ -23,6 +23,8 @@ HTTPS proxies, Trojan, TUIC, AnyTLS, and NaiveProxy.
 - User profiles encrypted with Windows DPAPI.
 - Persistent favorites, a favorites-only filter, and stored/name/protocol view
   sorting powered by Go. Collapsible groups remain contiguous.
+- A Groups workspace for renaming and confirmed deletion, plus expand/collapse-all
+  controls that also apply to groups hidden by search or favorites.
 - Go-generated diagnostics preview with explicit copy or JSON save, excluding
   profile credentials, names, server addresses and subscription URLs.
 
@@ -42,6 +44,11 @@ Favorite choices survive application restarts and subscription updates that reta
 profile IDs. Filters and sort choices reset per session; the stored server order
 used by fallback connections remains unchanged. Name sorting compares lowercase
 Unicode values within groups; it does not provide locale-specific collation.
+Group renaming keeps profile IDs, favorites and saved subscription details.
+Deleting a group removes its profiles and local subscription refresh source; it
+does not delete a remote subscription. Rename/delete reject a changed store
+snapshot and require a reload before retry. Group changes follow the existing
+Go editing policy and remain unavailable while a connection needs protection.
 Its recovery entry opens the recovery view without executing recovery automatically.
 Persistent traffic protection remains active after a connection failure and during
 reconnection. Explicit disconnect/recovery controls release owned protection.

@@ -17,6 +17,7 @@ public partial class MainWindow : Window
     private const uint WmHotkey = 0x0312;
     private readonly ObservableCollection<Profile> profiles = [];
     private readonly ObservableCollection<SubscriptionSummary> subscriptions = [];
+    private readonly ObservableCollection<GroupSummary> groupSummaries = [];
     private readonly OneTunnel.Client.ServiceConnection connection = new();
     private bool refreshing;
     private readonly CancellationTokenSource lifetime = new();
@@ -28,6 +29,7 @@ public partial class MainWindow : Window
     private Guid? appliedSession;
     private Profile? selected => ProfilesList.SelectedItem as Profile;
     private SubscriptionSummary? selectedSubscription => SubscriptionGroupsList.SelectedItem as SubscriptionSummary;
+    private GroupSummary? selectedGroup => ConfigurationGroupsList.SelectedItem as GroupSummary;
     private SubscriptionPreview? pendingSubscriptionPreview;
     private CancellationTokenSource? subscriptionDownload;
     private int subscriptionLoadVersion;
@@ -42,6 +44,8 @@ public partial class MainWindow : Window
     private Guid? pendingLibrarySelection;
     private System.Windows.Data.ListCollectionView? profileCollectionView;
     private bool diagnosticsPending;
+    private bool groupsPending, groupMutationPending, applyingGroupSelection, applyingBulkGroupExpansion, groupsLoaded;
+    private int groupRequestVersion;
     private TrayShell? tray;
     private WindowState previousWindowState = WindowState.Normal;
     private IntPtr windowHandle;
@@ -60,6 +64,7 @@ public partial class MainWindow : Window
         ProtocolBox.ItemsSource = Enum.GetValues<Protocol>(); ProtocolBox.SelectedIndex = 0;
         ProfilesList.ItemsSource = profiles;
         SubscriptionGroupsList.ItemsSource = subscriptions;
+        ConfigurationGroupsList.ItemsSource = groupSummaries;
         var profileItems = System.Windows.Data.CollectionViewSource.GetDefaultView(profiles);
         profileCollectionView = profileItems as System.Windows.Data.ListCollectionView;
         profileItems.Filter = MatchesProfile;
@@ -132,10 +137,11 @@ public partial class MainWindow : Window
         EditorActions.Visibility = panel == "editor" ? Visibility.Visible : Visibility.Collapsed;
         EnginesPanel.Visibility = panel == "engines" ? Visibility.Visible : Visibility.Collapsed;
         ActivityPanel.Visibility = panel == "activity" ? Visibility.Visible : Visibility.Collapsed;
+        GroupsPanel.Visibility = panel == "groups" ? Visibility.Visible : Visibility.Collapsed;
         SubscriptionsPanel.Visibility = panel == "subscriptions" ? Visibility.Visible : Visibility.Collapsed;
         ImportConnectionButton.Visibility = panel == "connection" ? Visibility.Visible : Visibility.Collapsed;
-        PageTitle.Text = panel switch { "editor" => "Импорт / подписка", "subscriptions" => "Подписки", "engines" => "Движки и восстановление", "activity" => "События", _ => "Подключения" };
-        PageDescription.Text = panel switch { "editor" => "Импортируй профиль или обнови его из источника", "subscriptions" => "Сохранённые группы и ручное обновление профилей", "engines" => "Состояние компонентов и восстановление соединения", "activity" => "Журнал событий приложения", _ => "Профили, сохранённые на этом компьютере" };
+        PageTitle.Text = panel switch { "editor" => "Импорт / подписка", "subscriptions" => "Подписки", "groups" => "Группы", "engines" => "Движки и восстановление", "activity" => "События", _ => "Подключения" };
+        PageDescription.Text = panel switch { "editor" => "Импортируй профиль или обнови его из источника", "subscriptions" => "Сохранённые группы и ручное обновление профилей", "groups" => "Управление группами профилей и подписок", "engines" => "Состояние компонентов и восстановление соединения", "activity" => "Журнал событий приложения", _ => "Профили, сохранённые на этом компьютере" };
         if (panel == "subscriptions") _ = LoadSubscriptionsAsync();
         if (panel == "engines")
         {
@@ -157,7 +163,7 @@ public partial class MainWindow : Window
         AddProfileButton.IsEnabled=actions.CanAdd;
         ImportConnectionButton.IsEnabled=ImportSubscriptionButton.IsEnabled=actions.CanAdd;
         SubscriptionButton.IsEnabled=ReloadSubscriptionsButton.IsEnabled=!busy;
-        HomeNavigationButton.IsEnabled=EventsNavigationButton.IsEnabled=!busy;
+        HomeNavigationButton.IsEnabled=GroupsNavigationButton.IsEnabled=EventsNavigationButton.IsEnabled=!busy;
         CancelSubscriptionDownloadButton.Visibility=subscriptionDownload != null ? Visibility.Visible : Visibility.Collapsed;
         CancelSubscriptionDownloadButton.IsEnabled=subscriptionDownload != null && !subscriptionDownload.IsCancellationRequested;
         SubscriptionGroupsList.IsEnabled=pendingSubscriptionPreview == null && !busy;
@@ -176,6 +182,7 @@ public partial class MainWindow : Window
         UpdateTray();
         UpdateDiagnosticsControls();
         UpdateLibraryControls();
+        UpdateGroupControls();
     }
     private void UpdateTray()
     {
@@ -547,6 +554,7 @@ public partial class MainWindow : Window
     }
     private void PresentDocument(ProfileDocument document,Guid? selectedId=null,bool refreshLibrary=true)
     {
+        InvalidateGroupSummaries();
         Storage.Accept(document);RefreshGroups(document.Profiles);
         profiles.Clear();foreach(var profile in document.Profiles)profiles.Add(profile);
         pendingLibrarySelection = selectedId;
@@ -555,7 +563,10 @@ public partial class MainWindow : Window
         try { ProfilesList.SelectedItem=profiles.FirstOrDefault(p=>p.Id==selectedId)??profiles.FirstOrDefault(); }
         finally { applyingLibrarySelection = false; }
         UpdateLibraryControls();
-        if (refreshLibrary) _ = RefreshLibraryProjectionAsync();
+        if (refreshLibrary) {
+            _ = RefreshLibraryProjectionAsync();
+            if (GroupsPanel.Visibility == Visibility.Visible) _ = RefreshGroupSummariesAsync();
+        }
     }
     private void PresentApplied(AppliedProfiles result)
     {
@@ -693,22 +704,161 @@ public partial class MainWindow : Window
             return int.MaxValue;
         }
     }
+    private bool CanMutateGroups => connection.Actions.CanAdd && !busy && !groupsPending && !groupMutationPending;
+    private void InvalidateGroupSummaries()
+    {
+        groupsLoaded = false;
+        ++groupRequestVersion;
+        groupsPending = false;
+    }
+    private void UpdateGroupControls()
+    {
+        if (!IsInitialized || ConfigurationGroupsList == null) return;
+        bool canMutate = CanMutateGroups && selectedGroup != null;
+        ConfigurationGroupsList.IsEnabled = !groupsPending && !groupMutationPending;
+        ReloadGroupsButton.IsEnabled = !busy && !groupsPending && !groupMutationPending;
+        RenameGroupBox.IsEnabled = RenameGroupButton.IsEnabled = DeleteGroupButton.IsEnabled = canMutate;
+        ExpandAllGroupsButton.IsEnabled = CollapseAllGroupsButton.IsEnabled = connection.Actions.CanAdd && !busy && !groupsPending && !groupMutationPending;
+    }
+    private async Task RefreshGroupSummariesAsync(string? preferredName = null)
+    {
+        int request = ++groupRequestVersion;
+        string? preserveName = preferredName ?? selectedGroup?.Name;
+        groupsPending = true;
+        UpdateGroupControls();
+        try
+        {
+            var result = await ProfileBackend.GroupsAsync();
+            if (request != groupRequestVersion || lifetime.IsCancellationRequested) return;
+            applyingGroupSelection = true;
+            try
+            {
+                groupSummaries.Clear();
+                foreach (var group in result) groupSummaries.Add(group);
+                var keep = groupSummaries.FirstOrDefault(group => group.Name == preserveName) ?? groupSummaries.FirstOrDefault();
+                ConfigurationGroupsList.SelectedItem = keep;
+                RenameGroupBox.Text = keep?.Name ?? "";
+            }
+            finally { applyingGroupSelection = false; }
+            groupsLoaded = true;
+            GroupsEmptyHint.Visibility = groupSummaries.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            GroupsStatus.Text = "";
+            UpdateGroupControls();
+        }
+        catch
+        {
+            if (request != groupRequestVersion || lifetime.IsCancellationRequested) return;
+            GroupsStatus.Text = "Не удалось обновить список. Показан прежний список.";
+            Feedback.Text = "Не удалось подтвердить список групп. Обнови его перед повтором.";
+        }
+        finally
+        {
+            if (request == groupRequestVersion)
+            {
+                groupsPending = false;
+                if (!lifetime.IsCancellationRequested) UpdateGroupControls();
+            }
+        }
+    }
+    private void ConfigurationGroupsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (applyingGroupSelection) return;
+        RenameGroupBox.Text = selectedGroup?.Name ?? "";
+        UpdateGroupControls();
+    }
+    private void Groups_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy) return;
+        ShowPanel("groups");
+        if (!groupsLoaded) _ = RefreshGroupSummariesAsync();
+    }
+    private void ReloadGroups_Click(object sender, RoutedEventArgs e)
+    {
+        if (!busy && !groupsPending && !groupMutationPending) _ = RefreshGroupSummariesAsync();
+    }
+    private async void RenameGroup_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanMutateGroups || selectedGroup is not { } group) return;
+        string targetName = RenameGroupBox.Text;
+        await ApplyGroupMutationAsync(() => ProfileBackend.RenameGroupAsync(group.Name, targetName, group.Token), targetName.Trim(), "Группа переименована.");
+    }
+    private async void DeleteGroup_Click(object sender, RoutedEventArgs e)
+    {
+        if (!CanMutateGroups || selectedGroup is not { } group) return;
+        string subscriptionNote = group.IsSubscription ? " Локальный источник обновления подписки тоже будет удалён." : "";
+        string prompt = $"Удалить группу «{group.Name}» и {group.ProfileCount} проф.?{subscriptionNote}\n\nЭто действие нельзя отменить.";
+        if (MessageBox.Show(this, prompt, "Удалить группу", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        await DeleteSelectedGroupAsync(group);
+    }
+    private async Task DeleteSelectedGroupAsync(GroupSummary group)
+    {
+        if (!CanMutateGroups) return;
+        await ApplyGroupMutationAsync(() => ProfileBackend.DeleteGroupAsync(group.Name, group.Token), null, "Группа удалена.");
+    }
+    private async Task ApplyGroupMutationAsync(Func<Task<ProfileDocument>> mutation, string? preferredGroup, string successMessage)
+    {
+        if (!CanMutateGroups) return;
+        Guid? preserveProfile = selected?.Id;
+        groupMutationPending = true; busy = true;
+        UpdateGroupControls(); RefreshControls();
+        try
+        {
+            var document = await mutation();
+            if (lifetime.IsCancellationRequested) return;
+            PresentDocument(document, preserveProfile, refreshLibrary: false);
+            Feedback.Text = successMessage;
+            await RefreshLibraryProjectionAsync();
+            await RefreshGroupSummariesAsync(preferredGroup);
+        }
+        catch { Feedback.Text = "Не удалось подтвердить изменение группы. Обнови список перед повтором."; GroupsStatus.Text = "Результат не подтверждён. Обнови список групп."; }
+        finally
+        {
+            groupMutationPending = false; busy = false;
+            if (!lifetime.IsCancellationRequested) { RefreshControls(); UpdateGroupControls(); }
+        }
+    }
+    private async void ExpandAllGroups_Click(object sender, RoutedEventArgs e) => await SetAllGroupsExpandedAsync(true);
+    private async void CollapseAllGroups_Click(object sender, RoutedEventArgs e) => await SetAllGroupsExpandedAsync(false);
+    private async Task SetAllGroupsExpandedAsync(bool expanded)
+    {
+        if (!CanMutateGroups) return;
+        bool wasRestoringGroupExpansion = restoringGroupExpansion;
+        groupMutationPending = true; busy = true; applyingBulkGroupExpansion = true;
+        restoringGroupExpansion = true;
+        UpdateGroupControls(); RefreshControls();
+        try
+        {
+            var document = await ProfileBackend.SetAllGroupsExpandedAsync(expanded);
+            if (lifetime.IsCancellationRequested) return;
+            PresentDocument(document, selected?.Id, refreshLibrary: false);
+            await RefreshLibraryProjectionAsync();
+            Feedback.Text = expanded ? "Все группы развёрнуты." : "Все группы свёрнуты.";
+        }
+        catch { Feedback.Text = "Не удалось подтвердить изменение групп. Обнови список и повтори действие."; }
+        finally
+        {
+            restoringGroupExpansion = wasRestoringGroupExpansion;
+            applyingBulkGroupExpansion = false; groupMutationPending = false; busy = false;
+            if (!lifetime.IsCancellationRequested) { RefreshControls(); UpdateGroupControls(); }
+        }
+    }
     private void RefreshGroups(IEnumerable<Profile>? items = null) => GroupBox.ItemsSource = (items ?? profiles).Select(p => p.Group).Distinct().ToList();
     private void Group_Loaded(object sender, RoutedEventArgs e)
     {
         if (sender is not Expander exp || exp.DataContext is not System.Windows.Data.CollectionViewGroup group) return;
+        bool wasRestoring = restoringGroupExpansion;
         restoringGroupExpansion = true;
         try { exp.IsExpanded = !Storage.CollapsedGroups.Contains(group.Name.ToString()!); }
-        finally { restoringGroupExpansion = false; }
+        finally { restoringGroupExpansion = wasRestoring; }
     }
     private void Group_Changed(object sender, RoutedEventArgs e)
     {
-        if (restoringGroupExpansion || sender is not Expander exp || !exp.IsLoaded || !storageReady || exp.DataContext is not System.Windows.Data.CollectionViewGroup group) return;
+        if (restoringGroupExpansion || applyingBulkGroupExpansion || sender is not Expander exp || !exp.IsLoaded || !storageReady || exp.DataContext is not System.Windows.Data.CollectionViewGroup group) return;
         string name = group.Name.ToString()!;
         if (Storage.CollapsedGroups.Contains(name) == !exp.IsExpanded) return;
         var before = Storage.CollapsedGroups.ToHashSet();
         if (exp.IsExpanded) Storage.CollapsedGroups.Remove(name); else Storage.CollapsedGroups.Add(name);
-        try { Storage.Accept(ProfileBackend.SetGroupExpanded(name,exp.IsExpanded)); } catch { Storage.CollapsedGroups.Clear(); Storage.CollapsedGroups.UnionWith(before); Feedback.Text = "Не удалось сохранить состояние группы."; }
+        try { Storage.Accept(ProfileBackend.SetGroupExpanded(name,exp.IsExpanded)); InvalidateGroupSummaries(); } catch { Storage.CollapsedGroups.Clear(); Storage.CollapsedGroups.UnionWith(before); Feedback.Text = "Не удалось сохранить состояние группы."; }
     }
     private async void Import_Click(object sender, RoutedEventArgs e)
     {
