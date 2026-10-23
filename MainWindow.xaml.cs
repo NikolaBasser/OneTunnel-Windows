@@ -1327,6 +1327,7 @@ public partial class MainWindow : Window
         NetworkServerIPBox.IsEnabled = NetworkServerNameBox.IsEnabled = NetworkPortBox.IsEnabled = customDNS && !pending;
         NetworkPathBox.IsEnabled = supported && GetNetworkDNSMode() == "https" && !pending;
         NetworkRulesBox.IsEnabled = supported && !pending;
+        NetworkResolversBox.IsEnabled = NetworkDNSRulesBox.IsEnabled = NetworkAllowLANBox.IsEnabled = supported && !pending;
         SaveNetworkPreferencesButton.IsEnabled = matching && view!.CanSave && supported && connection.Actions.CanSave && !pending;
         ReloadNetworkPreferencesButton.IsEnabled = selected != null && !pending;
     }
@@ -1346,6 +1347,7 @@ public partial class MainWindow : Window
             networkPreferencesFieldsToken = null;
             NetworkDNSModeBox.SelectedIndex = 0;
             NetworkServerIPBox.Clear(); NetworkServerNameBox.Clear(); NetworkPortBox.Clear(); NetworkPathBox.Clear(); NetworkRulesBox.Clear();
+            NetworkResolversBox.Clear(); NetworkDNSRulesBox.Clear(); NetworkAllowLANBox.IsChecked = false;
         }
         NetworkPreferencesStatus.Text = message;
         UpdateNetworkPreferencesControls();
@@ -1394,6 +1396,9 @@ public partial class MainWindow : Window
             NetworkPortBox.Text = view.Port;
             NetworkPathBox.Text = view.Path;
             NetworkRulesBox.Text = view.RulesText;
+            NetworkResolversBox.Text = view.ResolversText;
+            NetworkDNSRulesBox.Text = view.DNSRulesText;
+            NetworkAllowLANBox.IsChecked = view.AllowLAN;
         }
         networkPreferencesFieldsId = Guid.TryParse(view.ID, out id) ? id : null;
         networkPreferencesFieldsToken = view.Token;
@@ -1415,7 +1420,8 @@ public partial class MainWindow : Window
         string mode = GetNetworkDNSMode();
         var input = new NetworkInput(mode, mode == "default" ? "" : NetworkServerIPBox.Text,
             mode == "default" ? "" : NetworkServerNameBox.Text, mode == "default" ? "" : NetworkPortBox.Text,
-            mode == "https" ? NetworkPathBox.Text : "", NetworkRulesBox.Text);
+            mode == "https" ? NetworkPathBox.Text : "", NetworkRulesBox.Text, NetworkResolversBox.Text,
+            NetworkDNSRulesBox.Text, NetworkAllowLANBox.IsChecked == true);
         string token = view.Token;
         networkPreferencesSavePending = true;
         busy = true;

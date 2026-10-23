@@ -50,9 +50,15 @@ public sealed record ProfileOrganizationView(string ID,string Name,string Group,
 
 public sealed record DNSOptions(string Transport,string ServerIP,string ServerName,int Port,string Path);
 public sealed record NetworkRule(string Kind,string Value,string Action);
-public sealed record NetworkOptions(DNSOptions? DNS,List<NetworkRule> Rules);
-public sealed record NetworkPreferencesView(string ID,string Token,string Message,string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,bool Supported,bool CanSave);
-public sealed record NetworkInput(string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText);
+public sealed record DNSRule(string Kind,string Value,int ResolverIndex);
+public sealed record NetworkOptions(DNSOptions? DNS,List<NetworkRule> Rules)
+{
+    public List<DNSOptions> Resolvers { get; init; } = [];
+    public List<DNSRule> DNSRules { get; init; } = [];
+    public bool AllowLAN { get; init; }
+}
+public sealed record NetworkPreferencesView(string ID,string Token,string Message,string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN,bool Supported,bool CanSave);
+public sealed record NetworkInput(string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN);
 public sealed record BackupExportResult(int ProfileCount);
 public sealed record BackupRestorePreview(string Token,int CurrentProfiles,int ReplacementProfiles,int EnabledSchedules,bool CanApply,string ExpiresAt);
 public sealed record TrayProfileItem(string ID,string Name,string Group);
