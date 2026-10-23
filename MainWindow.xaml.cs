@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Collections;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
@@ -32,6 +33,14 @@ public partial class MainWindow : Window
     private int subscriptionLoadVersion;
     private Guid? editing;
     private bool busy, allowClose, storageReady;
+    private bool libraryPending, favoritePending, libraryProjectionLoaded, updatingLibraryControls, applyingLibrarySelection;
+    private bool favoritesOnly, appliedFavoritesOnly;
+    private string librarySort = "stored", appliedLibrarySort = "stored";
+    private int libraryRequestVersion;
+    private HashSet<Guid> libraryIDs = [];
+    private Dictionary<Guid, int> libraryRanks = [];
+    private Guid? pendingLibrarySelection;
+    private System.Windows.Data.ListCollectionView? profileCollectionView;
     private bool diagnosticsPending;
     private TrayShell? tray;
     private WindowState previousWindowState = WindowState.Normal;
@@ -52,6 +61,7 @@ public partial class MainWindow : Window
         ProfilesList.ItemsSource = profiles;
         SubscriptionGroupsList.ItemsSource = subscriptions;
         var profileItems = System.Windows.Data.CollectionViewSource.GetDefaultView(profiles);
+        profileCollectionView = profileItems as System.Windows.Data.ListCollectionView;
         profileItems.Filter = MatchesProfile;
         profileItems.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(Profile.Group)));
         try { foreach (var p in Storage.Load()) profiles.Add(p); storageReady = true; }
@@ -64,6 +74,7 @@ public partial class MainWindow : Window
         Log("Приложение готово. Подключения не запускаются автоматически."); RefreshControls();
         Loaded += async (_, _) =>
         {
+            _ = RefreshLibraryProjectionAsync();
             try {
                 tray = new TrayShell(RestoreWindow, MinimizeWindow, () => Connect_Click(this, new RoutedEventArgs()), () => { RestoreWindow(); Engines_Click(this, new RoutedEventArgs()); }, Close);
                 tray.NotificationsItem.CheckedChanged += TrayNotificationsItem_Changed;
@@ -164,6 +175,7 @@ public partial class MainWindow : Window
         SaveProfileButton.IsEnabled=actions.CanSave;
         UpdateTray();
         UpdateDiagnosticsControls();
+        UpdateLibraryControls();
     }
     private void UpdateTray()
     {
@@ -302,8 +314,10 @@ public partial class MainWindow : Window
     }
     private async void Profiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (!applyingLibrarySelection && e.AddedItems.Count > 0) pendingLibrarySelection = null;
         if (!IsInitialized || ProfileTitle == null) return;
         var p = selected;
+        UpdateLibraryControls();
         ProfileTitle.Value = p?.Name ?? (profiles.Count == 0 ? "Добавь первое подключение" : "Выбери профиль из списка");
         ProfileDescription.Text = p == null ? "Импорт конфигурации или подписки" : $"{p.Protocol} · профиль сохранён локально";
         ModePanel.Visibility = p != null ? Visibility.Visible : Visibility.Collapsed;
@@ -531,12 +545,17 @@ public partial class MainWindow : Window
             PresentApplied(result);
         });
     }
-    private void PresentDocument(ProfileDocument document,Guid? selectedId=null)
+    private void PresentDocument(ProfileDocument document,Guid? selectedId=null,bool refreshLibrary=true)
     {
         Storage.Accept(document);RefreshGroups(document.Profiles);
         profiles.Clear();foreach(var profile in document.Profiles)profiles.Add(profile);
+        pendingLibrarySelection = selectedId;
         RefreshProfileFilter(true);
-        ProfilesList.SelectedItem=profiles.FirstOrDefault(p=>p.Id==selectedId)??profiles.FirstOrDefault();
+        applyingLibrarySelection = true;
+        try { ProfilesList.SelectedItem=profiles.FirstOrDefault(p=>p.Id==selectedId)??profiles.FirstOrDefault(); }
+        finally { applyingLibrarySelection = false; }
+        UpdateLibraryControls();
+        if (refreshLibrary) _ = RefreshLibraryProjectionAsync();
     }
     private void PresentApplied(AppliedProfiles result)
     {
@@ -548,6 +567,7 @@ public partial class MainWindow : Window
     {
         if (item is not Profile profile) return false;
         if (connection.ProfileId == profile.Id) return true;
+        if (libraryProjectionLoaded && !libraryIDs.Contains(profile.Id)) return false;
         string query = SearchBox?.Text.Trim() ?? "";
         return query.Length == 0 || profile.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || profile.Group.Contains(query, StringComparison.OrdinalIgnoreCase) || profile.Protocol.ToString().Contains(query, StringComparison.OrdinalIgnoreCase);
     }
@@ -564,8 +584,114 @@ public partial class MainWindow : Window
         view.Refresh();
         int visible = view.Cast<Profile>().Count();
         ProfileCount.Text = profiles.Count == visible ? $"{profiles.Count} проф." : $"{visible} из {profiles.Count} проф.";
-        EmptyProfilesHint.Text = profiles.Count == 0 ? "Профилей пока нет. Импортируй подключение, чтобы начать." : "Профили не найдены. Очисти поиск или импортируй подключение.";
+        EmptyProfilesHint.Text = profiles.Count == 0 ? "Профилей пока нет. Импортируй подключение, чтобы начать." : FavoritesOnlyBox.IsChecked == true && query.Length == 0 ? "В избранном пока нет подключений. Добавь профиль в избранное." : "Профили не найдены. Очисти поиск или измени условия списка.";
         EmptyProfilesHint.Visibility = visible == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
+    private void LibraryFilter_Changed(object sender, RoutedEventArgs e)
+    {
+        if (!IsInitialized || updatingLibraryControls) return;
+        favoritesOnly = FavoritesOnlyBox.IsChecked == true;
+        _ = RefreshLibraryProjectionAsync();
+    }
+    private void LibrarySort_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsInitialized || updatingLibraryControls) return;
+        librarySort = (LibrarySortBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "stored";
+        _ = RefreshLibraryProjectionAsync();
+    }
+    private async void Favorite_Click(object sender, RoutedEventArgs e)
+    {
+        if (favoritePending || libraryPending || selected is not { } profile || busy || !connection.Actions.CanEdit) return;
+        favoritePending = true;
+        UpdateLibraryControls();
+        try
+        {
+            var result = await ProfileBackend.FavoriteAsync(profile.Id, !Storage.FavoriteIDs.Contains(profile.Id));
+            if (lifetime.IsCancellationRequested) return;
+            PresentDocument(result, profile.Id, refreshLibrary: false);
+            Feedback.Text = "Избранное обновлено.";
+            await RefreshLibraryProjectionAsync();
+        }
+        catch { Feedback.Text = "Не удалось подтвердить изменение избранного. Повтори действие, чтобы обновить состояние."; }
+        finally
+        {
+            favoritePending = false;
+            if (!lifetime.IsCancellationRequested) UpdateLibraryControls();
+        }
+    }
+    private async Task RefreshLibraryProjectionAsync()
+    {
+        int request = ++libraryRequestVersion;
+        libraryPending = true;
+        UpdateLibraryControls();
+        try
+        {
+            var projection = await ProfileBackend.LibraryAsync(librarySort, favoritesOnly);
+            if (request != libraryRequestVersion || lifetime.IsCancellationRequested) return;
+            libraryIDs = projection.IDs.ToHashSet();
+            libraryRanks = projection.IDs.Select((id, rank) => (id, rank)).ToDictionary(pair => pair.id, pair => pair.rank);
+            libraryProjectionLoaded = true;
+            appliedLibrarySort = librarySort;
+            appliedFavoritesOnly = favoritesOnly;
+            var selectionToRestore = pendingLibrarySelection ?? selected?.Id;
+            if (profileCollectionView != null) profileCollectionView.CustomSort = new ProfileRankComparer(libraryRanks);
+            LibraryStatus.Text = "";
+            RefreshProfileFilter(true);
+            if (selectionToRestore is { } selectedId && profiles.FirstOrDefault(p => p.Id == selectedId) is { } requested && MatchesProfile(requested))
+            {
+                applyingLibrarySelection = true;
+                try { ProfilesList.SelectedItem = requested; }
+                finally { applyingLibrarySelection = false; }
+            }
+            pendingLibrarySelection = null;
+        }
+        catch
+        {
+            if (request != libraryRequestVersion || lifetime.IsCancellationRequested) return;
+            librarySort = appliedLibrarySort;
+            favoritesOnly = appliedFavoritesOnly;
+            updatingLibraryControls = true;
+            try
+            {
+                FavoritesOnlyBox.IsChecked = appliedFavoritesOnly;
+                LibrarySortBox.SelectedItem = LibrarySortBox.Items.OfType<ComboBoxItem>().FirstOrDefault(item => item.Tag?.ToString() == appliedLibrarySort);
+            }
+            finally { updatingLibraryControls = false; }
+            LibraryStatus.Text = "Не удалось обновить список. Показан предыдущий вариант.";
+            Feedback.Text = "Не удалось обновить список профилей. Показан предыдущий вариант.";
+            RefreshProfileFilter(true);
+        }
+        finally
+        {
+            if (request == libraryRequestVersion)
+            {
+                libraryPending = false;
+                if (!lifetime.IsCancellationRequested) UpdateLibraryControls();
+            }
+        }
+    }
+    private void UpdateLibraryControls()
+    {
+        if (!IsInitialized || LibrarySortBox == null) return;
+        FavoritesOnlyBox.IsEnabled = LibrarySortBox.IsEnabled = !libraryPending && !favoritePending;
+        FavoriteButton.Content = selected != null && Storage.FavoriteIDs.Contains(selected.Id) ? "Убрать из избранного" : "Добавить в избранное";
+        FavoriteButton.IsEnabled = selected != null && connection.Actions.CanEdit && !busy && !libraryPending && !favoritePending;
+    }
+    private sealed class ProfileRankComparer(Dictionary<Guid, int> ranks) : IComparer
+    {
+        public int Compare(object? left, object? right)
+        {
+            int leftRank = Rank(left);
+            int rightRank = Rank(right);
+            return leftRank.CompareTo(rightRank);
+        }
+        private int Rank(object? value)
+        {
+            if (value is Profile profile && ranks.TryGetValue(profile.Id, out var rank)) return rank;
+            if (value is System.Windows.Data.CollectionViewGroup group)
+                return group.Items.OfType<Profile>().Select(item => ranks.TryGetValue(item.Id, out var itemRank) ? itemRank : int.MaxValue).DefaultIfEmpty(int.MaxValue).Min();
+            return int.MaxValue;
+        }
     }
     private void RefreshGroups(IEnumerable<Profile>? items = null) => GroupBox.ItemsSource = (items ?? profiles).Select(p => p.Group).Distinct().ToList();
     private void Group_Loaded(object sender, RoutedEventArgs e)

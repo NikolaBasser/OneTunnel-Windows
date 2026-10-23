@@ -21,6 +21,8 @@ HTTPS proxies, Trojan, TUIC, AnyTLS, and NaiveProxy.
 - An explicit minimize-to-tray button with a temporary Ctrl+Shift+O restore shortcut and window recovery after an Explorer restart.
 - Import/update subscriptions through the existing import editor; navigation preserves unfinished edits.
 - User profiles encrypted with Windows DPAPI.
+- Persistent favorites, a favorites-only filter, and stored/name/protocol view
+  sorting powered by Go. Collapsible groups remain contiguous.
 - Go-generated diagnostics preview with explicit copy or JSON save, excluding
   profile credentials, names, server addresses and subscription URLs.
 
@@ -36,6 +38,10 @@ The Events page can generate a local diagnostics report. Review it before copyin
 or saving. Its identity describes the bundled profile host; engine availability
 is a package hint. It does not inspect the installed service or test connectivity,
 the kill switch or DNS/IPv6 leaks. Reports are not generated or uploaded automatically.
+Favorite choices survive application restarts and subscription updates that retain
+profile IDs. Filters and sort choices reset per session; the stored server order
+used by fallback connections remains unchanged. Name sorting compares lowercase
+Unicode values within groups; it does not provide locale-specific collation.
 Its recovery entry opens the recovery view without executing recovery automatically.
 Persistent traffic protection remains active after a connection failure and during
 reconnection. Explicit disconnect/recovery controls release owned protection.

@@ -3,6 +3,8 @@ namespace OneTunnel.Core;
 public static class ProfileBackend
 {
     public static Task<string> DiagnosticsAsync()=>ProfileHost.CallAsync<string>("diagnostics.report");
+    public static Task<ProfileDocument> FavoriteAsync(Guid id,bool favorite)=>ProfileHost.CallAsync<ProfileDocument>("ui.favorite.set",new{ID=id.ToString(),Favorite=favorite});
+    public static Task<ProfileLibraryView> LibraryAsync(string sort,bool favoritesOnly)=>ProfileHost.CallAsync<ProfileLibraryView>("library.view",new{Sort=sort,FavoritesOnly=favoritesOnly});
     public static Task<AppliedProfiles> SaveEditorAsync(string name,string source,string group,Guid? id,TransportInput transport,ReliabilityOptions? reliability=null)=>ProfileHost.CallAsync<AppliedProfiles>("ui.editor.save",new{Name=name,Source=source,Group=group,ID=id?.ToString()??"",TransportInput=transport,Reliability=reliability});
     public static Task<GroupCheckResult> CheckGroupAsync(string group,CancellationToken cancellation=default)=>ProfileHost.CallAsync<GroupCheckResult>("group.check",new{Group=group},1000,cancellation:cancellation);
     public static Task<Profile> LoadEditorAsync(Guid id)=>ProfileHost.CallAsync<Profile>("editor.load",new{ID=id.ToString()});
@@ -30,7 +32,8 @@ public static class Storage
 {
     public static string Root=>DesktopEnvironment.State.Root;
     public static HashSet<string> CollapsedGroups {get;}=[];
+    public static HashSet<Guid> FavoriteIDs {get;}=[];
     public static void Initialize()=>_ = Load();
-    public static void Accept(ProfileDocument d){CollapsedGroups.Clear();CollapsedGroups.UnionWith(d.CollapsedGroups);}
+    public static void Accept(ProfileDocument d){CollapsedGroups.Clear();CollapsedGroups.UnionWith(d.CollapsedGroups);FavoriteIDs.Clear();if(d.FavoriteIDs!=null)FavoriteIDs.UnionWith(d.FavoriteIDs);}
     public static List<Profile> Load(){var d=ProfileHost.Call<ProfileDocument>("ui.store.load");Accept(d);return d.Profiles;}
 }

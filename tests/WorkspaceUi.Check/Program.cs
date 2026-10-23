@@ -50,7 +50,8 @@ internal static class Program
         void Wait(Func<bool> condition) { var until = DateTime.UtcNow.AddSeconds(25); while (!condition() && DateTime.UtcNow < until) Pump(); if (!condition()) throw new Exception("UI condition timed out"); }
         void Click(string name) => Find<Button>(name).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         void Panel(string value) => typeof(MainWindow).GetMethod("ShowPanel", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [value]);
-        Wait(() => Find<Button>("AddProfileButton").IsEnabled && Find<Button>("EditButton").IsEnabled);
+        bool LibraryIdle() => !(bool)typeof(MainWindow).GetField("libraryPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)! && !(bool)typeof(MainWindow).GetField("favoritePending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+        Wait(() => Find<Button>("AddProfileButton").IsEnabled && Find<Button>("EditButton").IsEnabled && LibraryIdle());
         var list = Find<ListBox>("ProfilesList");
         Assert(list.Items.Count == 3, "Synthetic profiles loaded");
         var snapshot = Storage.Load();
@@ -68,7 +69,7 @@ internal static class Program
         Capture(window, "workspace-default.png");
         window.Width = window.MinWidth; window.Height = window.MinHeight; Pump();
         Capture(window, "workspace-minimum.png");
-        foreach (var name in new[] { "AddProfileButton", "ConnectButton", "SearchBox", "ProfilesList", "HideToTrayButton", "TrayNotificationsBox" }) {
+        foreach (var name in new[] { "AddProfileButton", "ConnectButton", "SearchBox", "ProfilesList", "HideToTrayButton", "TrayNotificationsBox", "FavoriteButton", "LibrarySortBox", "FavoritesOnlyBox" }) {
             var element = Find<FrameworkElement>(name); Assert(element.IsVisible && element.ActualWidth > 20 && element.ActualHeight > 10, name + " remains visible at minimum size");
         }
         window.Width = 1240; window.Height = 850; Pump();
@@ -182,7 +183,7 @@ internal static class Program
         search.Text = "no-synthetic-match"; Pump();
         var imported = ProfileBackend.SaveEditorAsync("Synthetic imported profile", "socks5://192.0.2.4:1080", "Imported", null, transport, new()).GetAwaiter().GetResult();
         typeof(MainWindow).GetMethod("PresentApplied", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [imported]);
-        Wait(() => Find<Button>("EditButton").IsEnabled);
+        Wait(() => Find<Button>("EditButton").IsEnabled && LibraryIdle());
         Assert(search.Text.Length == 0 && ((Profile)list.SelectedItem).Id == imported.Selected!.Id, "Import clears stale search and selects the imported profile");
         var tray = (TrayShell?)typeof(MainWindow).GetField("tray", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window);
         Assert(tray != null, "Tray initialization coexists with WPF on the STA dispatcher");
@@ -212,6 +213,77 @@ internal static class Program
         Panel("connection");
         window.ShowInTaskbar = false;
         Assert(Storage.Load().Count == 4, "Tray window actions preserve profile storage");
+        Wait(LibraryIdle);
+        var storedIDs = Storage.Load().Select(p => p.Id).ToArray();
+        var libraryBefore = Raw<JsonElement>("store.load").GetProperty("Profiles").GetRawText();
+        var sortBox = Find<ComboBox>("LibrarySortBox");
+        var favoritesBox = Find<CheckBox>("FavoritesOnlyBox");
+        Assert(sortBox.SelectedIndex == 0 && favoritesBox.IsChecked == false && Storage.FavoriteIDs.Count == 0, "Legacy store opens with stored order and no favorites");
+        list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == imported.Selected!.Id);
+        Wait(() => Find<Button>("FavoriteButton").IsEnabled);
+        Click("FavoriteButton"); Wait(LibraryIdle);
+        Assert(Storage.FavoriteIDs.SetEquals([imported.Selected!.Id]), "Favorite toggle persists the selected ID through Go");
+        Assert(Raw<JsonElement>("store.load").GetProperty("Profiles").GetRawText() == libraryBefore, "Favorite metadata preserves profiles, transport and reliability settings");
+        favoritesBox.IsChecked = true; Wait(LibraryIdle);
+        Assert(list.Items.Count == 1 && ((Profile)list.Items[0]).Id == imported.Selected!.Id, "Favorites filter renders the Go membership projection");
+        Assert(((Profile?)list.SelectedItem)?.Id == imported.Selected!.Id, "Filtering retains the selected profile while it remains visible");
+        string draftBeforeLibrary = Find<TextBox>("NameBox").Text;
+        search.Text = "no-synthetic-match"; Pump(); Assert(list.Items.Count == 0, "Local search combines with the favorites projection");
+        search.Clear(); Pump(); Assert(list.Items.Count == 1, "Clearing search restores the favorite without another library request");
+        Capture(window, "library-favorites.png");
+        favoritesBox.IsChecked = false; Wait(LibraryIdle);
+        sortBox.SelectedIndex = 1; sortBox.SelectedIndex = 2; sortBox.SelectedIndex = 0; Wait(LibraryIdle);
+        Assert(list.Items.OfType<Profile>().Select(p => p.Id).SequenceEqual(storedIDs), "Rapid sort changes cannot replace the final stored-order projection");
+        sortBox.SelectedIndex = 1; Wait(LibraryIdle);
+        var nameProjection = ProfileBackend.LibraryAsync("name", false).GetAwaiter().GetResult();
+        bool GroupOrderMatches(List<Guid> ids) { var ranks = ids.Select((id, index) => (id, index)).ToDictionary(pair => pair.id, pair => pair.index); return list.Items.OfType<Profile>().GroupBy(p => p.Group).All(group => group.Select(p => p.Id).SequenceEqual(group.OrderBy(p => ranks[p.Id]).Select(p => p.Id))); }
+        Assert(GroupOrderMatches(nameProjection.IDs), "Name sort renders Go order within contiguous groups");
+        sortBox.SelectedIndex = 2; Wait(LibraryIdle);
+        var protocolProjection = ProfileBackend.LibraryAsync("protocol", false).GetAwaiter().GetResult();
+        Assert(GroupOrderMatches(protocolProjection.IDs), "Protocol sort renders Go order within contiguous groups");
+        Assert(Storage.Load().Select(p => p.Id).SequenceEqual(storedIDs), "Display sorting never reorders stored fallback candidates");
+        Assert(Find<TextBox>("NameBox").Text == draftBeforeLibrary, "Library controls preserve the editor draft");
+        var libraryBytes = File.ReadAllBytes(profileFile);
+        var visibleBeforeFailure = list.Items.OfType<Profile>().Select(p => p.Id).ToArray();
+        try {
+            File.WriteAllText(profileFile, "SYNTHETIC-LIBRARY-READ-FAILURE");
+            favoritesBox.IsChecked = true; Wait(LibraryIdle);
+            Assert(favoritesBox.IsChecked == false && list.Items.OfType<Profile>().Select(p => p.Id).SequenceEqual(visibleBeforeFailure), "Projection failure retains the prior view and restores its controls");
+            Assert(Find<TextBlock>("LibraryStatus").Text.Length > 0, "Projection failure is visible and permits retry");
+            list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == imported.Selected!.Id);
+            Wait(() => Find<Button>("FavoriteButton").IsEnabled);
+            Click("FavoriteButton"); Wait(LibraryIdle);
+            Assert(Storage.FavoriteIDs.Contains(imported.Selected!.Id), "Failed favorite mutation retains the last confirmed visible state");
+            Assert(File.ReadAllText(profileFile) == "SYNTHETIC-LIBRARY-READ-FAILURE", "Failure paths do not rewrite corrupt synthetic storage");
+        }
+        finally { File.WriteAllBytes(profileFile, libraryBytes); }
+        favoritesBox.IsChecked = true; Wait(LibraryIdle);
+        Assert(list.Items.Count == 1, "Filter retries successfully after the storage error is resolved");
+        Capture(window, "library-filter-retry.png");
+        window.Width = window.MinWidth; window.Height = window.MinHeight; Pump(); Capture(window, "library-minimum.png");
+        window.Width = 1240; window.Height = 850;
+        Assert(libraryBytes.SequenceEqual(File.ReadAllBytes(profileFile)), "Filter, sort, search and retry do not write profiles");
+        Assert(ProfileBackend.DiagnosticsAsync().GetAwaiter().GetResult().IndexOf("FavoriteIDs", StringComparison.OrdinalIgnoreCase) < 0, "Diagnostics still excludes favorite metadata");
+        list.SelectedItem = list.Items[0]; Wait(() => Find<Button>("FavoriteButton").IsEnabled);
+        Click("FavoriteButton"); Wait(LibraryIdle);
+        Assert(list.Items.Count == 0 && Storage.FavoriteIDs.Count == 0, "Removing the last favorite produces the favorites empty state");
+        favoritesBox.IsChecked = false; Wait(LibraryIdle);
+        sortBox.SelectedIndex = 0; Wait(LibraryIdle);
+        var requestedID = storedIDs[0];
+        var newerSelectionID = storedIDs[1];
+        var currentDocument = ProfileBackend.LoadDocumentAsync().GetAwaiter().GetResult();
+        var hostGate = (SemaphoreSlim)typeof(ProfileBackend).Assembly.GetType("OneTunnel.Core.ProfileHost")!.GetField("Gate", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
+        Assert(hostGate.Wait(2000), "Test can delay a local library projection without networking");
+        try {
+            typeof(MainWindow).GetMethod("PresentDocument", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [currentDocument, requestedID, true]);
+            list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == newerSelectionID);
+        }
+        finally { hostGate.Release(); }
+        Wait(LibraryIdle);
+        Assert(((Profile?)list.SelectedItem)?.Id == newerSelectionID, "Delayed projection cannot override a newer user selection");
+        list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == imported.Selected!.Id);
+        Wait(() => Find<Button>("FavoriteButton").IsEnabled);
+        Click("FavoriteButton"); Wait(LibraryIdle);
         typeof(MainWindow).GetField("allowClose", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(window, true);
         window.Close();
         Assert(tray!.StatusItem.IsDisposed && tray.ExitItem.IsDisposed, "Window Close disposes the tray even on the capture/test close path");
@@ -291,6 +363,7 @@ internal static class Program
         window.Show();
         try {
             Assert(((CheckBox)window.FindName("TrayNotificationsBox")).IsChecked == false, "A new window starts with notifications disabled");
+            Assert(Storage.FavoriteIDs.Count == 1 && ((ComboBox)window.FindName("LibrarySortBox")).SelectedIndex == 0 && ((CheckBox)window.FindName("FavoritesOnlyBox")).IsChecked == false, "Favorites survive a new window while view preferences reset");
             ((Button)window.FindName("HideToTrayButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
             Assert(!window.IsVisible, "A new session can hide using the released restore shortcut");
             typeof(MainWindow).GetField("allowClose", flags)!.SetValue(window, true);
