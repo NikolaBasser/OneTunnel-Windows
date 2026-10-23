@@ -15,6 +15,8 @@ HTTPS proxies, Trojan, TUIC, AnyTLS, and NaiveProxy.
 - Profile and subscription import, collapsible configuration groups, and country flags/emoji.
 - Optional automatic reconnection and compatible backup servers within a group.
 - Group availability checks with cancellation and per-server results.
+- Desktop workspace with profile search by name, group or protocol, and a separate event log.
+- Import/update subscriptions through the existing import editor; navigation preserves unfinished edits.
 - User profiles encrypted with Windows DPAPI.
 
 The interface runs in the user session. A separate authenticated Go service manages
@@ -48,6 +50,8 @@ compile or download Go binaries implicitly.
 ## Verification and notices
 
 CI distinguishes synthetic source checks from full builds against the pinned core.
+The pinned-core integration job also runs isolated WPF workspace checks with
+synthetic profiles. These checks do not connect a tunnel or modify the installed service.
 An availability result is not a blanket guarantee about a remote server, and native
 WireGuard/AmneziaWG group checks validate configuration rather than establishing a tunnel.
 

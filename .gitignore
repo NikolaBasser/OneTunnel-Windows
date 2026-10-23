@@ -8,6 +8,10 @@
 /tests/*
 !/tests/CoreBundle.Tests.ps1
 !/tests/CoreBoundary.Integration.ps1
+!/tests/WorkspaceUi.Check/
+/tests/WorkspaceUi.Check/*
+!/tests/WorkspaceUi.Check/WorkspaceUiCheck.csproj
+!/tests/WorkspaceUi.Check/Program.cs
 /scripts/Analyze-*
 /scripts/Test-*
 /scripts/Setup-Engines.ps1

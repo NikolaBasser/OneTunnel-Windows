@@ -36,6 +36,12 @@ Before running it, configure ONETUNNEL_CORE_REPOSITORY as the trusted owner/repo
 CORE_READ_TOKEN as a read-only token for that private repository. Missing configuration fails
 the build job. No remote repository is assumed or created by this local split.
 
+ISOLATED WORKSPACE CHECK
+Run with the service idle (or absent). The check does not disconnect an existing session.
+powershell -NoProfile -Command "dotnet run --project tests/WorkspaceUi.Check/WorkspaceUiCheck.csproj -c Release -r win-x64 -p:CoreBundlePath=C:\path\to\trusted-core-bundle"
+The check creates a new temporary synthetic profile store and prints its capture directory.
+It does not connect a tunnel, probe servers, install a service or change the real profile store.
+
 OUTPUT
 dist/OneTunnel-0.1.0-win-x64/
 dist/OneTunnel-0.1.0-win-x64.zip

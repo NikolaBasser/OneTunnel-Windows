@@ -76,3 +76,5 @@ jobs:
         run: ./scripts/Build.ps1 -Name OneTunnel-ci-win-x64 -CoreBundlePath "$PWD/artifacts/core-bundle"
       - name: Verify actual core output selection
         run: ./tests/CoreBoundary.Integration.ps1 -CoreBundlePath "$PWD/artifacts/core-bundle"
+      - name: Check the workspace with isolated synthetic profiles
+        run: powershell.exe -NoProfile -Command "dotnet run --project tests/WorkspaceUi.Check/WorkspaceUiCheck.csproj -c Release -r win-x64 -p:CoreBundlePath=$PWD/artifacts/core-bundle"

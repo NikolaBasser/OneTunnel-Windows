@@ -15,6 +15,9 @@ public partial class MainWindow : Window
     private CancellationTokenSource? preview;
     private CancellationTokenSource? groupCheck;
     private ProfileView? profileView;
+    private bool restoringGroupExpansion;
+    private string? appliedSearch;
+    private Guid? appliedSession;
     private Profile? selected => ProfilesList.SelectedItem as Profile;
     private Guid? editing;
     private bool busy, allowClose, storageReady;
@@ -24,10 +27,13 @@ public partial class MainWindow : Window
         ModeHelp.Text = "После подключения укажи локальный адрес прокси в браузере или другом приложении.";
         ProtocolBox.ItemsSource = Enum.GetValues<Protocol>(); ProtocolBox.SelectedIndex = 0;
         ProfilesList.ItemsSource = profiles;
-        System.Windows.Data.CollectionViewSource.GetDefaultView(profiles).GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(Profile.Group)));
+        var profileItems = System.Windows.Data.CollectionViewSource.GetDefaultView(profiles);
+        profileItems.Filter = MatchesProfile;
+        profileItems.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(Profile.Group)));
         try { foreach (var p in Storage.Load()) profiles.Add(p); storageReady = true; }
         catch { Feedback.Text = "Не удалось прочитать хранилище профилей. Файл сохранён; новые записи заблокированы. Проверь права доступа и учётную запись Windows."; }
         RefreshGroups();
+        RefreshProfileFilter(true);
         connection.Changed += () => { if (!lifetime.IsCancellationRequested) Dispatcher.BeginInvoke(new Action(() => { StatusLabel.Text = connection.Status; PresentConnectionState(); RefreshControls(); })); };
         if (profiles.Count > 0) ProfilesList.SelectedIndex = 0;
         if (storageReady && DesktopEnvironment.NeedsRecovery) { ShowPanel("engines"); Feedback.Text = "Найдено подключение прежней версии. Перед установкой службы отключи его в прежней версии приложения либо используй восстановление от администратора."; }
@@ -59,6 +65,7 @@ public partial class MainWindow : Window
     {
         var display=connection.Display;
         StatusLabel.Text=display.Status;
+        RefreshProfileFilter();
         if (connection.ProfileId is { } id && profiles.FirstOrDefault(p => p.Id == id) is { } active) ProfilesList.SelectedItem = active;
         if(display.ShowSession) {
             ModeBox.SelectedIndex=display.ModeIndex;
@@ -78,7 +85,10 @@ public partial class MainWindow : Window
         EditorPanel.Visibility = panel == "editor" ? Visibility.Visible : Visibility.Collapsed;
         EditorActions.Visibility = panel == "editor" ? Visibility.Visible : Visibility.Collapsed;
         EnginesPanel.Visibility = panel == "engines" ? Visibility.Visible : Visibility.Collapsed;
-        if (panel != "editor") { SourceBox.Clear(); NameBox.Clear(); editing = null; }
+        ActivityPanel.Visibility = panel == "activity" ? Visibility.Visible : Visibility.Collapsed;
+        ImportConnectionButton.Visibility = panel == "connection" ? Visibility.Visible : Visibility.Collapsed;
+        PageTitle.Text = panel switch { "editor" => "Импорт / подписка", "engines" => "Движки и восстановление", "activity" => "События", _ => "Подключения" };
+        PageDescription.Text = panel switch { "editor" => "Импортируй профиль или обнови его из источника", "engines" => "Состояние компонентов и восстановление соединения", "activity" => "Журнал событий приложения", _ => "Профили, сохранённые на этом компьютере" };
         if (panel == "engines")
         {
             var state=DesktopEnvironment.State;
@@ -97,6 +107,7 @@ public partial class MainWindow : Window
  CancelGroupButton.IsEnabled=actions.CanCancelGroup;CancelGroupButton.Visibility=actions.CanCancelGroup?Visibility.Visible:Visibility.Collapsed;
         EditButton.IsEnabled=actions.CanEdit; DeleteButton.IsEnabled=actions.CanDelete;
         AddProfileButton.IsEnabled=actions.CanAdd;
+        ImportConnectionButton.IsEnabled=SubscriptionButton.IsEnabled=actions.CanAdd;
         ProfilesList.IsEnabled=actions.CanSelect;
         ModeBox.IsEnabled=actions.CanChangeMode;
         RecoveryButton.IsEnabled=LegacyRecoveryButton.IsEnabled=actions.CanRecover;
@@ -109,7 +120,7 @@ public partial class MainWindow : Window
     {
         if (!IsInitialized || ProfileTitle == null) return;
         var p = selected;
-        ProfileTitle.Value = p?.Name ?? "Добавь первое подключение";
+        ProfileTitle.Value = p?.Name ?? (profiles.Count == 0 ? "Добавь первое подключение" : "Выбери профиль из списка");
         ProfileDescription.Text = p == null ? "Импорт конфигурации или подписки" : $"{p.Protocol} · профиль сохранён локально";
         ModePanel.Visibility = p != null ? Visibility.Visible : Visibility.Collapsed;
         profileView = null;
@@ -138,8 +149,28 @@ public partial class MainWindow : Window
     private void Add_Click(object sender, RoutedEventArgs e)
     {
         if (!connection.Actions.CanAdd) return;
+        if (HasEditorContent()) { ShowPanel("editor"); Feedback.Text = "Продолжи или отмени текущий профиль перед созданием нового."; return; }
+        BeginNewProfile(false);
+    }
+    private void Subscription_Click(object sender, RoutedEventArgs e)
+    {
+        if (!connection.Actions.CanAdd) return;
+        if (HasEditorContent()) { ShowPanel("editor"); Feedback.Text = "Продолжи или отмени текущий профиль перед импортом другого."; return; }
+        BeginNewProfile(true);
+    }
+    private bool HasEditorContent() => editing != null || NameBox.Text.Length > 0 || SourceBox.Text.Length > 0 || GroupBox.Text.Length > 0 || AutoReconnectCheck.IsChecked == true || FallbackCheck.IsChecked == true || FragmentCheck.IsChecked == true || NoiseCheck.IsChecked == true || MuxCheck.IsChecked == true;
+    private void ClearEditorContent()
+    {
+        editing = null; NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; AutoReconnectCheck.IsChecked = false; FallbackCheck.IsChecked = false;
+        FragmentCheck.IsChecked = false; NoiseCheck.IsChecked = false; MuxCheck.IsChecked = false;
+    }
+    private void BeginNewProfile(bool subscription)
+    {
         AutoReconnectCheck.IsChecked=false;FallbackCheck.IsChecked=false;
- editing = null; LoadTransport(null); NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; ProtocolBox.SelectedIndex = 0; EditorTitle.Text = "Новое подключение"; ShowPanel("editor"); NameBox.Focus();
+        editing = null; LoadTransport(null); NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; ProtocolBox.SelectedIndex = 0;
+        EditorTitle.Text = subscription ? "Импорт / обновление подписки" : "Новое подключение";
+        SaveProfileButton.Content = subscription ? "Импортировать / обновить" : "Сохранить / импортировать";
+        ShowPanel("editor"); NameBox.Focus();
     }
     private void EmojiPicker_Click(object sender, RoutedEventArgs e)
     {
@@ -170,6 +201,7 @@ public partial class MainWindow : Window
     private async void Edit_Click(object sender, RoutedEventArgs e)
     {
         if (!connection.Actions.CanEdit || selected is not { } p) return;
+        if (HasEditorContent()) { ShowPanel("editor"); Feedback.Text = "Продолжи или отмени текущий профиль перед редактированием другого."; return; }
         await Execute(async () => {
             var edit = await ProfileBackend.LoadEditorAsync(p.Id);
             LoadTransport(edit.Transport);
@@ -198,23 +230,51 @@ public partial class MainWindow : Window
     {
         Storage.Accept(document);RefreshGroups(document.Profiles);
         profiles.Clear();foreach(var profile in document.Profiles)profiles.Add(profile);
+        RefreshProfileFilter(true);
         ProfilesList.SelectedItem=profiles.FirstOrDefault(p=>p.Id==selectedId)??profiles.FirstOrDefault();
     }
     private void PresentApplied(AppliedProfiles result)
     {
-        PresentDocument(result.Document,result.Selected?.Id??selected?.Id);ShowPanel("connection");
+        SearchBox.Clear();PresentDocument(result.Document,result.Selected?.Id??selected?.Id);ClearEditorContent();ShowPanel("connection");
         Feedback.Text=result.Batch?$"Подписка обновлена / импортирована. Обновлено: {result.Updated}. Добавлено: {result.Added}. Устаревших удалено: {result.Removed}. Повторов: {result.Duplicates}. Неподдерживаемых: {result.Skipped}.":"Профиль сохранён. Ключи защищены учётной записью Windows.";
         Log(result.Batch?"Импорт завершён Go-ядром.":"Профиль сохранён.");
+    }
+    private bool MatchesProfile(object item)
+    {
+        if (item is not Profile profile) return false;
+        if (connection.ProfileId == profile.Id) return true;
+        string query = SearchBox?.Text.Trim() ?? "";
+        return query.Length == 0 || profile.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || profile.Group.Contains(query, StringComparison.OrdinalIgnoreCase) || profile.Protocol.ToString().Contains(query, StringComparison.OrdinalIgnoreCase);
+    }
+    private void Search_Changed(object sender, TextChangedEventArgs e) => RefreshProfileFilter();
+    private void RefreshProfileFilter(bool force = false)
+    {
+        if (!IsInitialized || SearchBox == null || ProfilesList == null || EmptyProfilesHint == null) return;
+        string query = SearchBox.Text.Trim();
+        if (!force && appliedSearch == query && appliedSession == connection.ProfileId) return;
+        // Record inputs before Refresh raises synchronous selection events.
+        appliedSearch = query;
+        appliedSession = connection.ProfileId;
+        var view = System.Windows.Data.CollectionViewSource.GetDefaultView(profiles);
+        view.Refresh();
+        int visible = view.Cast<Profile>().Count();
+        ProfileCount.Text = profiles.Count == visible ? $"{profiles.Count} проф." : $"{visible} из {profiles.Count} проф.";
+        EmptyProfilesHint.Text = profiles.Count == 0 ? "Профилей пока нет. Импортируй подключение, чтобы начать." : "Профили не найдены. Очисти поиск или импортируй подключение.";
+        EmptyProfilesHint.Visibility = visible == 0 ? Visibility.Visible : Visibility.Collapsed;
     }
     private void RefreshGroups(IEnumerable<Profile>? items = null) => GroupBox.ItemsSource = (items ?? profiles).Select(p => p.Group).Distinct().ToList();
     private void Group_Loaded(object sender, RoutedEventArgs e)
     {
-        if (sender is Expander exp && exp.DataContext is System.Windows.Data.CollectionViewGroup group) exp.IsExpanded = !Storage.CollapsedGroups.Contains(group.Name.ToString()!);
+        if (sender is not Expander exp || exp.DataContext is not System.Windows.Data.CollectionViewGroup group) return;
+        restoringGroupExpansion = true;
+        try { exp.IsExpanded = !Storage.CollapsedGroups.Contains(group.Name.ToString()!); }
+        finally { restoringGroupExpansion = false; }
     }
     private void Group_Changed(object sender, RoutedEventArgs e)
     {
-        if (sender is not Expander exp || !exp.IsLoaded || !storageReady || exp.DataContext is not System.Windows.Data.CollectionViewGroup group) return;
+        if (restoringGroupExpansion || sender is not Expander exp || !exp.IsLoaded || !storageReady || exp.DataContext is not System.Windows.Data.CollectionViewGroup group) return;
         string name = group.Name.ToString()!;
+        if (Storage.CollapsedGroups.Contains(name) == !exp.IsExpanded) return;
         var before = Storage.CollapsedGroups.ToHashSet();
         if (exp.IsExpanded) Storage.CollapsedGroups.Remove(name); else Storage.CollapsedGroups.Add(name);
         try { Storage.Accept(ProfileBackend.SetGroupExpanded(name,exp.IsExpanded)); } catch { Storage.CollapsedGroups.Clear(); Storage.CollapsedGroups.UnionWith(before); Feedback.Text = "Не удалось сохранить состояние группы."; }
@@ -282,7 +342,10 @@ public partial class MainWindow : Window
     private async void Probe_Click(object sender, RoutedEventArgs e) => await Execute(async () => { Feedback.Text = "Проверка…"; Feedback.Text = await connection.ProbeAsync(); Log("Проверка завершена."); });
     private async void Recovery_Click(object sender, RoutedEventArgs e) => await Execute(async () => { await connection.RecoverAsync(); Feedback.Text = "Подключение очищено, блокировка kill switch снята. Обычная сеть восстановлена."; Log("Восстановление завершено."); });
     private void Cancel_Click(object sender, RoutedEventArgs e) { ShowPanel("connection"); }
+    private void CancelEditor_Click(object sender, RoutedEventArgs e) { ClearEditorContent(); ShowPanel("connection"); }
     private void Engines_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("engines"); }
+    private void Home_Click(object sender, RoutedEventArgs e) { ShowPanel("connection"); }
+    private void Events_Click(object sender, RoutedEventArgs e) { ShowPanel("activity"); }
     private async void StartService_Click(object sender, RoutedEventArgs e) => await Execute(async () =>
     {
         await connection.StartServiceAsync(); Feedback.Text = "Служба запущена. Автоматическое подключение не выполняется.";
