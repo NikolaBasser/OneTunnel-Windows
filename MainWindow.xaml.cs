@@ -9,6 +9,7 @@ namespace OneTunnel;
 public partial class MainWindow : Window
 {
     private readonly ObservableCollection<Profile> profiles = [];
+    private readonly ObservableCollection<SubscriptionSummary> subscriptions = [];
     private readonly OneTunnel.Client.ServiceConnection connection = new();
     private bool refreshing;
     private readonly CancellationTokenSource lifetime = new();
@@ -19,6 +20,10 @@ public partial class MainWindow : Window
     private string? appliedSearch;
     private Guid? appliedSession;
     private Profile? selected => ProfilesList.SelectedItem as Profile;
+    private SubscriptionSummary? selectedSubscription => SubscriptionGroupsList.SelectedItem as SubscriptionSummary;
+    private SubscriptionPreview? pendingSubscriptionPreview;
+    private CancellationTokenSource? subscriptionDownload;
+    private int subscriptionLoadVersion;
     private Guid? editing;
     private bool busy, allowClose, storageReady;
     public MainWindow()
@@ -27,6 +32,7 @@ public partial class MainWindow : Window
         ModeHelp.Text = "После подключения укажи локальный адрес прокси в браузере или другом приложении.";
         ProtocolBox.ItemsSource = Enum.GetValues<Protocol>(); ProtocolBox.SelectedIndex = 0;
         ProfilesList.ItemsSource = profiles;
+        SubscriptionGroupsList.ItemsSource = subscriptions;
         var profileItems = System.Windows.Data.CollectionViewSource.GetDefaultView(profiles);
         profileItems.Filter = MatchesProfile;
         profileItems.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(Profile.Group)));
@@ -86,9 +92,11 @@ public partial class MainWindow : Window
         EditorActions.Visibility = panel == "editor" ? Visibility.Visible : Visibility.Collapsed;
         EnginesPanel.Visibility = panel == "engines" ? Visibility.Visible : Visibility.Collapsed;
         ActivityPanel.Visibility = panel == "activity" ? Visibility.Visible : Visibility.Collapsed;
+        SubscriptionsPanel.Visibility = panel == "subscriptions" ? Visibility.Visible : Visibility.Collapsed;
         ImportConnectionButton.Visibility = panel == "connection" ? Visibility.Visible : Visibility.Collapsed;
-        PageTitle.Text = panel switch { "editor" => "Импорт / подписка", "engines" => "Движки и восстановление", "activity" => "События", _ => "Подключения" };
-        PageDescription.Text = panel switch { "editor" => "Импортируй профиль или обнови его из источника", "engines" => "Состояние компонентов и восстановление соединения", "activity" => "Журнал событий приложения", _ => "Профили, сохранённые на этом компьютере" };
+        PageTitle.Text = panel switch { "editor" => "Импорт / подписка", "subscriptions" => "Подписки", "engines" => "Движки и восстановление", "activity" => "События", _ => "Подключения" };
+        PageDescription.Text = panel switch { "editor" => "Импортируй профиль или обнови его из источника", "subscriptions" => "Сохранённые группы и ручное обновление профилей", "engines" => "Состояние компонентов и восстановление соединения", "activity" => "Журнал событий приложения", _ => "Профили, сохранённые на этом компьютере" };
+        if (panel == "subscriptions") _ = LoadSubscriptionsAsync();
         if (panel == "engines")
         {
             var state=DesktopEnvironment.State;
@@ -107,7 +115,17 @@ public partial class MainWindow : Window
  CancelGroupButton.IsEnabled=actions.CanCancelGroup;CancelGroupButton.Visibility=actions.CanCancelGroup?Visibility.Visible:Visibility.Collapsed;
         EditButton.IsEnabled=actions.CanEdit; DeleteButton.IsEnabled=actions.CanDelete;
         AddProfileButton.IsEnabled=actions.CanAdd;
-        ImportConnectionButton.IsEnabled=SubscriptionButton.IsEnabled=actions.CanAdd;
+        ImportConnectionButton.IsEnabled=ImportSubscriptionButton.IsEnabled=actions.CanAdd;
+        SubscriptionButton.IsEnabled=ReloadSubscriptionsButton.IsEnabled=!busy;
+        HomeNavigationButton.IsEnabled=EventsNavigationButton.IsEnabled=!busy;
+        CancelSubscriptionDownloadButton.Visibility=subscriptionDownload != null ? Visibility.Visible : Visibility.Collapsed;
+        CancelSubscriptionDownloadButton.IsEnabled=subscriptionDownload != null && !subscriptionDownload.IsCancellationRequested;
+        SubscriptionGroupsList.IsEnabled=pendingSubscriptionPreview == null && !busy;
+        RefreshSubscriptionButton.IsEnabled=actions.CanAdd && selectedSubscription?.CanRefresh == true && pendingSubscriptionPreview == null && !busy;
+        SubscriptionRefreshUnavailable.Visibility=selectedSubscription != null && (!selectedSubscription.CanRefresh || !actions.CanAdd) ? Visibility.Visible : Visibility.Collapsed;
+        ApplySubscriptionButton.IsEnabled=actions.CanSave && pendingSubscriptionPreview?.CanApply == true && !busy;
+        CancelSubscriptionPreviewButton.IsEnabled=pendingSubscriptionPreview != null && !busy;
+        SubscriptionApplyUnavailable.Visibility=pendingSubscriptionPreview != null && (!pendingSubscriptionPreview.CanApply || !actions.CanSave) ? Visibility.Visible : Visibility.Collapsed;
         ProfilesList.IsEnabled=actions.CanSelect;
         ModeBox.IsEnabled=actions.CanChangeMode;
         RecoveryButton.IsEnabled=LegacyRecoveryButton.IsEnabled=actions.CanRecover;
@@ -157,6 +175,127 @@ public partial class MainWindow : Window
         if (!connection.Actions.CanAdd) return;
         if (HasEditorContent()) { ShowPanel("editor"); Feedback.Text = "Продолжи или отмени текущий профиль перед импортом другого."; return; }
         BeginNewProfile(true);
+    }
+    private void Subscriptions_Click(object sender, RoutedEventArgs e)
+    {
+        if (!busy) ShowPanel("subscriptions");
+    }
+    private async Task LoadSubscriptionsAsync()
+    {
+        if (!IsInitialized || busy) return;
+        int version = ++subscriptionLoadVersion;
+        string? selectedGroup = selectedSubscription?.Group;
+        try
+        {
+            var result = await ProfileBackend.SubscriptionsAsync();
+            if (version != subscriptionLoadVersion || !IsInitialized) return;
+            subscriptions.Clear(); foreach (var item in result) subscriptions.Add(item);
+            SubscriptionEmptyHint.Text = "Сохранённых подписок пока нет. Импортируй подписку, чтобы добавить группу.";
+            SubscriptionEmptyHint.Visibility = subscriptions.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            SubscriptionDetails.Visibility = Visibility.Collapsed;
+            SubscriptionPreviewPanel.Visibility = pendingSubscriptionPreview == null ? Visibility.Collapsed : Visibility.Visible;
+            var restore = subscriptions.FirstOrDefault(item => item.Group == selectedGroup) ?? subscriptions.FirstOrDefault();
+            SubscriptionGroupsList.SelectedItem = restore;
+            if (restore == null) { SubscriptionDetails.Visibility = Visibility.Collapsed; RefreshControls(); }
+        }
+        catch
+        {
+            if (version != subscriptionLoadVersion) return;
+            SubscriptionEmptyHint.Text = "Не удалось загрузить список подписок. Повтори попытку.";
+            SubscriptionEmptyHint.Visibility = Visibility.Visible;
+            SubscriptionDetails.Visibility = Visibility.Collapsed;
+            Feedback.Text = "Не удалось загрузить список подписок.";
+        }
+    }
+    private void ReloadSubscriptions_Click(object sender, RoutedEventArgs e) => _ = LoadSubscriptionsAsync();
+    private void SubscriptionGroups_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsInitialized || SubscriptionGroupTitle == null) return;
+        if (selectedSubscription is not { } item)
+        {
+            SubscriptionDetails.Visibility = Visibility.Collapsed; RefreshControls(); return;
+        }
+        SubscriptionDetails.Visibility = Visibility.Visible;
+        SubscriptionGroupTitle.Text = item.Group;
+        SubscriptionProfileCount.Text = $"{item.ProfileCount} проф.";
+        SubscriptionUsage.Text = string.IsNullOrWhiteSpace(item.Usage) ? "Не сообщается" : item.Usage;
+        SubscriptionExpiry.Text = string.IsNullOrWhiteSpace(item.Expiry) ? "Не сообщается" : item.Expiry;
+        SubscriptionUpdatedAt.Text = string.IsNullOrWhiteSpace(item.UpdatedAt) ? "Успешное обновление ещё не выполнялось." : $"Последнее успешное обновление: {item.UpdatedAt}";
+        RefreshControls();
+    }
+    private async void RefreshSubscription_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || subscriptionDownload != null || !connection.Actions.CanAdd || selectedSubscription is not { CanRefresh: true } item || pendingSubscriptionPreview != null) return;
+        using var cancellation = new CancellationTokenSource();
+        subscriptionDownload = cancellation;
+        try { await Execute(async () =>
+        {
+            try {
+                var previewResult = await ProfileBackend.PreviewSubscriptionAsync(item.Group, cancellation.Token);
+                pendingSubscriptionPreview = previewResult;
+                PresentSubscriptionPreview(previewResult);
+                Feedback.Text = previewResult.CanApply ? "Предпросмотр готов. Изменения не сохранены." : "Предпросмотр готов, но Go-ядро не разрешает его применить.";
+            }
+            catch (OperationCanceledException) { Feedback.Text = "Загрузка отменена. Изменения не применялись; для обновления получи новый предпросмотр."; }
+        }); }
+        finally { subscriptionDownload = null; RefreshControls(); }
+    }
+    private void CancelSubscriptionDownload_Click(object sender, RoutedEventArgs e) { subscriptionDownload?.Cancel(); RefreshControls(); }
+    private void PresentSubscriptionPreview(SubscriptionPreview result)
+    {
+        SubscriptionPreviewInfo.Text = $"{result.Group}: добавлено {result.Added}, обновлено {result.Updated}, удалено {result.Removed}, повторов {result.Duplicates}, неподдерживаемых {result.Skipped}.";
+        SubscriptionPreviewMetadata.Text = $"Использование по данным провайдера: {(string.IsNullOrWhiteSpace(result.Usage) ? "не сообщается" : result.Usage)} · срок: {(string.IsNullOrWhiteSpace(result.Expiry) ? "не сообщается" : result.Expiry)} · предпросмотр доступен до {result.ExpiresAt}.";
+        SubscriptionChangesList.ItemsSource = result.Changes;
+        SubscriptionPreviewPanel.Visibility = Visibility.Visible;
+        RefreshControls();
+    }
+    private async void ApplySubscription_Click(object sender, RoutedEventArgs e)
+    {
+        if (!connection.Actions.CanSave || pendingSubscriptionPreview is not { CanApply: true } pending) return;
+        await Execute(async () =>
+        {
+            try
+            {
+                var applied = await ProfileBackend.ApplySubscriptionAsync(pending.Token);
+                pendingSubscriptionPreview = null;
+                SubscriptionPreviewPanel.Visibility = Visibility.Collapsed;
+                PresentSubscriptionApplied(applied);
+            }
+            catch
+            {
+                pendingSubscriptionPreview = null;
+                SubscriptionPreviewPanel.Visibility = Visibility.Collapsed;
+                try { await ProfileBackend.CancelSubscriptionPreviewAsync(pending.Token); } catch { }
+                try {
+                    var document = await ProfileBackend.LoadDocumentAsync();
+                    PresentDocument(document, selected?.Id);
+                    Feedback.Text = "Ответ об обновлении не получен или предпросмотр устарел. Профили перечитаны: проверь результат перед повторной попыткой.";
+                }
+                catch { Feedback.Text = "Результат обновления не подтверждён. Не удалось перечитать профили; проверь хранилище перед повторной попыткой."; }
+            }
+        });
+        if (pendingSubscriptionPreview == null) await LoadSubscriptionsAsync();
+    }
+    private async void CancelSubscriptionPreview_Click(object sender, RoutedEventArgs e)
+    {
+        if (pendingSubscriptionPreview is not { } pending) return;
+        await Execute(async () =>
+        {
+            try {
+                await ProfileBackend.CancelSubscriptionPreviewAsync(pending.Token);
+                Feedback.Text = "Предпросмотр отменён. Изменения не применялись.";
+            }
+            catch { Feedback.Text = "Предпросмотр закрыт. Для обновления получи новый предпросмотр."; }
+            finally { pendingSubscriptionPreview = null; SubscriptionPreviewPanel.Visibility = Visibility.Collapsed; }
+        });
+    }
+    private void PresentSubscriptionApplied(AppliedProfiles result)
+    {
+        SearchBox.Clear();
+        PresentDocument(result.Document, result.Selected?.Id ?? selected?.Id);
+        ShowPanel("subscriptions");
+        Feedback.Text = $"Подписка обновлена. Обновлено: {result.Updated}. Добавлено: {result.Added}. Устаревших удалено: {result.Removed}.";
+        Log("Ручное обновление подписки применено Go-ядром.");
     }
     private bool HasEditorContent() => editing != null || NameBox.Text.Length > 0 || SourceBox.Text.Length > 0 || GroupBox.Text.Length > 0 || AutoReconnectCheck.IsChecked == true || FallbackCheck.IsChecked == true || FragmentCheck.IsChecked == true || NoiseCheck.IsChecked == true || MuxCheck.IsChecked == true;
     private void ClearEditorContent()
@@ -344,8 +483,8 @@ public partial class MainWindow : Window
     private void Cancel_Click(object sender, RoutedEventArgs e) { ShowPanel("connection"); }
     private void CancelEditor_Click(object sender, RoutedEventArgs e) { ClearEditorContent(); ShowPanel("connection"); }
     private void Engines_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("engines"); }
-    private void Home_Click(object sender, RoutedEventArgs e) { ShowPanel("connection"); }
-    private void Events_Click(object sender, RoutedEventArgs e) { ShowPanel("activity"); }
+    private void Home_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("connection"); }
+    private void Events_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("activity"); }
     private async void StartService_Click(object sender, RoutedEventArgs e) => await Execute(async () =>
     {
         await connection.StartServiceAsync(); Feedback.Text = "Служба запущена. Автоматическое подключение не выполняется.";

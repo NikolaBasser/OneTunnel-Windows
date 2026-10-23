@@ -42,6 +42,15 @@ powershell -NoProfile -Command "dotnet run --project tests/WorkspaceUi.Check/Wor
 The check creates a new temporary synthetic profile store and prints its capture directory.
 It does not connect a tunnel, probe servers, install a service or change the real profile store.
 
+SAVED SUBSCRIPTIONS
+The Subscriptions page lists saved groups without displaying their private source URLs.
+Check for updates downloads a preview; Apply commits that exact reviewed result.
+Cancel or a cancelled download does not apply changes. Previews expire after ten minutes;
+an intervening profile or group change requires a fresh preview.
+Provider-reported traffic and expiry may be unknown and do not establish live usage accuracy.
+Scheduled refresh is not included. Existing import and connect-time preparation still work.
+Manual subscription management runs in the user host and requires no service update.
+
 OUTPUT
 dist/OneTunnel-0.1.0-win-x64/
 dist/OneTunnel-0.1.0-win-x64.zip

@@ -13,6 +13,7 @@ HTTPS proxies, Trojan, TUIC, AnyTLS, and NaiveProxy.
 - Local proxy and whole-device connection modes.
 - Whole-device traffic protection with explicit disconnect and recovery controls.
 - Profile and subscription import, collapsible configuration groups, and country flags/emoji.
+- Saved subscription groups with provider-reported usage/expiry and a manual refresh preview that requires explicit approval before applying changes.
 - Optional automatic reconnection and compatible backup servers within a group.
 - Group availability checks with cancellation and per-server results.
 - Desktop workspace with profile search by name, group or protocol, and a separate event log.

@@ -1,6 +1,8 @@
 using System.IO;
 using System.Reflection;
 using System.Security.Cryptography;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -25,6 +27,13 @@ internal static class Program
             ("🇩🇪 Frankfurt", "hysteria2://synthetic@example.com:443/?sni=example.com", "Personal subscription"),
             ("🇫🇮 Helsinki — a long synthetic profile name for layout verification", "socks5://192.0.2.3:1080", "Work profiles") })
             ProfileBackend.SaveEditorAsync(name, source, group, null, transport, new(true, false)).GetAwaiter().GetResult();
+        // Only this synthetic test uses the raw store API to seed a saved source.
+        var host = typeof(ProfileBackend).Assembly.GetType("OneTunnel.Core.ProfileHost")!;
+        T Raw<T>(string command, object? args = null) => (T)host.GetMethod("Call", BindingFlags.Static | BindingFlags.Public)!.MakeGenericMethod(typeof(T)).Invoke(null, [command, args])!;
+        var rawDocument = JsonNode.Parse(Raw<JsonElement>("store.load").GetRawText())!.AsObject();
+        rawDocument["SubscriptionSources"] = new JsonObject { ["Personal subscription"] = "https://subscription.example/synthetic-test-only" };
+        rawDocument["SubscriptionMetadata"] = new JsonObject { ["Personal subscription"] = new JsonObject { ["Upload"] = 200, ["Download"] = 300, ["Total"] = 1000, ["Expire"] = 1900000000, ["UpdatedAt"] = "2026-10-23T00:00:00Z" } };
+        Raw<object?>("store.save", new { Document = rawDocument });
         using var resource = typeof(Program).Assembly.GetManifestResourceStream("TestApp.xaml")!;
         var xml = System.Xml.Linq.XDocument.Load(resource);
         System.Xml.Linq.XNamespace ns = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";
@@ -73,6 +82,49 @@ internal static class Program
         Assert(Storage.Load().Count == snapshot.Count, "Navigation preserves synthetic profiles");
         Assert(before.SequenceEqual(SHA256.HashData(File.ReadAllBytes(profileFile))), "Navigation does not write profile storage");
         Find<TextBox>("NameBox").Text = "Synthetic unfinished draft";
+        Panel("subscriptions"); Pump();
+        Assert(Find<StackPanel>("SubscriptionsPanel").IsVisible && Find<Button>("ImportSubscriptionButton").IsVisible && Find<ListBox>("SubscriptionGroupsList").IsVisible, "Subscription management page and import remain reachable");
+        Wait(() => Find<ListBox>("SubscriptionGroupsList").Items.Count == 1);
+        Assert(Find<TextBlock>("SubscriptionUsage").Text.Contains("500 B"), "Provider usage is rendered from the real Go summary");
+        var summaryJSON = JsonSerializer.Serialize(ProfileBackend.SubscriptionsAsync().GetAwaiter().GetResult());
+        Assert(!summaryJSON.Contains("subscription.example") && !summaryJSON.Contains("synthetic-test-only") && !summaryJSON.Contains("Source"), "Subscription summaries do not expose saved sources");
+        var busyField = typeof(MainWindow).GetField("busy", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var downloadField = typeof(MainWindow).GetField("subscriptionDownload", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var refreshHandler = typeof(MainWindow).GetMethod("RefreshSubscription_Click", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        busyField.SetValue(window, true);
+        refreshHandler.Invoke(window, [window, new RoutedEventArgs()]);
+        Assert(downloadField.GetValue(window) == null, "Busy refresh does not create an orphaned cancellation source");
+        busyField.SetValue(window, false);
+        using (var inFlight = new CancellationTokenSource()) {
+            downloadField.SetValue(window, inFlight);
+            refreshHandler.Invoke(window, [window, new RoutedEventArgs()]);
+            Assert(ReferenceEquals(downloadField.GetValue(window), inFlight), "Repeated refresh preserves cancellation for the original operation");
+            downloadField.SetValue(window, null);
+        }
+        var review = new SubscriptionPreview("synthetic-review-token", "Personal subscription", 1, 1, 1, 0, 0,
+            [new("🇳🇱 New synthetic node", "VLESS", "added"), new("Changed synthetic node", "Hysteria2", "updated"), new("Retired synthetic node", "SOCKS5", "removed")],
+            "500 B used · 500 B remaining of 1.0 KB · reported by provider", "18 Mar 2030 · reported by provider", "2026-10-23T12:10:00Z", true);
+        var pendingField = typeof(MainWindow).GetField("pendingSubscriptionPreview", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        pendingField.SetValue(window, review);
+        typeof(MainWindow).GetMethod("PresentSubscriptionPreview", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [review]);
+        Wait(() => Find<Button>("ApplySubscriptionButton").IsEnabled);
+        Assert(Find<ItemsControl>("SubscriptionChangesList").Items.Count == 3 && Find<TextBlock>("SubscriptionPreviewInfo").Text.Contains("1"), "Preview rows and Go-computed counts are rendered");
+        foreach (var scroll in Descendants(window).OfType<ScrollViewer>().Where(s => s.Content is Grid)) scroll.ScrollToEnd();
+        Pump(); Capture(window, "subscriptions-review.png");
+        window.Width = window.MinWidth; window.Height = window.MinHeight; Pump(); Capture(window, "subscriptions-review-minimum.png");
+        window.Width = 1240; window.Height = 850; Pump();
+        Click("CancelSubscriptionPreviewButton"); Wait(() => pendingField.GetValue(window) == null && Find<Button>("RefreshSubscriptionButton").IsEnabled);
+        Assert(before.SequenceEqual(SHA256.HashData(File.ReadAllBytes(profileFile))), "Preview rendering and Cancel do not change storage");
+        pendingField.SetValue(window, review);
+        typeof(MainWindow).GetMethod("PresentSubscriptionPreview", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [review]);
+        Wait(() => Find<Button>("ApplySubscriptionButton").IsEnabled);
+        Click("ApplySubscriptionButton"); Wait(() => pendingField.GetValue(window) == null && Find<Button>("RefreshSubscriptionButton").IsEnabled);
+        Assert(before.SequenceEqual(SHA256.HashData(File.ReadAllBytes(profileFile))), "Invalid-token Apply through IPC preserves storage and permits a fresh preview");
+        Assert(Find<TextBox>("NameBox").Text == "Synthetic unfinished draft", "Subscription review preserves the editor draft");
+        var projectedDocument = new ProfileDocument(1, Storage.Load(), Storage.CollapsedGroups.ToHashSet(), new());
+        typeof(MainWindow).GetMethod("PresentSubscriptionApplied", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window,
+            [new AppliedProfiles(projectedDocument, null, 1, 1, 1, 0, 0, true, false, false)]);
+        Assert(Find<TextBox>("NameBox").Text == "Synthetic unfinished draft", "Applied-subscription presentation preserves the editor draft");
         Panel("activity"); Panel("connection");
         Click("EditButton"); Pump();
         Assert(Find<TextBox>("NameBox").Text == "Synthetic unfinished draft", "Editing another profile preserves the draft");
@@ -108,9 +160,9 @@ internal static class Program
     private static void Capture(Window window, string name)
     {
         window.UpdateLayout(); var content = (FrameworkElement)window.Content;
-        var bitmap = new RenderTargetBitmap((int)content.ActualWidth, (int)content.ActualHeight, 96, 96, PixelFormats.Pbgra32);
-        var visual = new DrawingVisual(); using (var context = visual.RenderOpen()) context.DrawRectangle(new VisualBrush(content), null, new Rect(0, 0, content.ActualWidth, content.ActualHeight));
-        bitmap.Render(visual); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        var dpi = VisualTreeHelper.GetDpi(content);
+        var bitmap = new RenderTargetBitmap((int)Math.Ceiling(content.ActualWidth * dpi.DpiScaleX), (int)Math.Ceiling(content.ActualHeight * dpi.DpiScaleY), dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+        bitmap.Render(content); var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
         using var stream = File.Create(Path.Combine(Output, name)); encoder.Save(stream);
     }
 }

@@ -24,6 +24,9 @@ public sealed record TransportOptions
 }
 public sealed record ImportResult(List<Profile> Profiles,int Duplicates,int Skipped);
 public sealed record SubscriptionMergeResult(List<Profile> Profiles,int Added,int Updated,int Removed);
+public sealed record SubscriptionSummary(string Group,int ProfileCount,string UpdatedAt,string Usage,string Expiry,bool CanRefresh);
+public sealed record SubscriptionChange(string Name,string Protocol,string Kind);
+public sealed record SubscriptionPreview(string Token,string Group,int Added,int Updated,int Removed,int Duplicates,int Skipped,List<SubscriptionChange> Changes,string Usage,string Expiry,string ExpiresAt,bool CanApply);
 public sealed record ProfileDocument(int Version,List<Profile> Profiles,HashSet<string> CollapsedGroups,Dictionary<string,string> SubscriptionSources);
 public sealed record AppliedProfiles(ProfileDocument Document,Profile? Selected,int Added,int Updated,int Removed,int Duplicates,int Skipped,bool Batch,bool Offline,bool Retired);
 public sealed record DesktopState(string Root,bool Administrator,bool NeedsRecovery,bool Awg,bool Xray,bool SingBox,int MaxImportBytes=0);
