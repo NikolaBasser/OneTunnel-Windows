@@ -373,7 +373,7 @@ internal static class Program
         bool ResultsIdle() => !(bool)typeof(MainWindow).GetField("groupResultsPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)! && !(bool)typeof(MainWindow).GetField("fastestSelectionPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
         var targetResult = Storage.Load().First(p => p.Group == "Work profiles");
         var resultRows = new List<GroupResultDisplayRow> {
-            new(targetResult.Id.ToString(), "Synthetic network result", "Available", true, true, 12, "12 ms check duration"),
+            new(targetResult.Id.ToString(), "Synthetic network result", "Available", true, true, 12, "12 ms check duration · 7 ms HTTPS latency (not ICMP RTT)", 7),
             new(Guid.NewGuid().ToString(), "Synthetic configuration result", "Configuration valid", true, false, 0, "Configuration only · no network check")
         };
         var syntheticResults = new GroupResultsView("Synthetic results", "2026-10-23", resultRows, true, false, true, "synthetic-unretained-token", "");
