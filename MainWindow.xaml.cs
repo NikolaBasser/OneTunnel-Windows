@@ -152,6 +152,14 @@ public partial class MainWindow : Window
             ConnectionInfo.Text=display.ConnectionInfo;
             ConnectionHint.Text=display.ConnectionHint;
         }
+        StatisticsPanel.Visibility = display.ShowStatistics ? Visibility.Visible : Visibility.Collapsed;
+        StatisticsUploaded.Text = display.Uploaded;
+        StatisticsDownloaded.Text = display.Downloaded;
+        StatisticsUploadRate.Text = display.UploadRate;
+        StatisticsDownloadRate.Text = display.DownloadRate;
+        StatisticsElapsed.Text = display.Elapsed;
+        StatisticsScopeHint.Text = display.StatisticsScopeHint;
+        if(display.ErrorDiagnostic!="") Feedback.Text=display.ErrorDiagnostic;
         if(display.RecoveryHint!="") Feedback.Text=display.RecoveryHint;
         UpdateTray();
     }

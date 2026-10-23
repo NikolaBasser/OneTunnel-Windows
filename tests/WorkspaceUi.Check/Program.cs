@@ -47,7 +47,7 @@ internal static class Program
         window.Show();
         T Find<T>(string name) where T : FrameworkElement => (T)(window.FindName(name) ?? throw new Exception("Missing control: " + name));
         void Pump() { var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) }; timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame); }
-        void Wait(Func<bool> condition) { var until = DateTime.UtcNow.AddSeconds(25); while (!condition() && DateTime.UtcNow < until) Pump(); if (!condition()) throw new Exception("UI condition timed out"); }
+        void Wait(Func<bool> condition) { var until = DateTime.UtcNow.AddSeconds(25); while (!condition() && DateTime.UtcNow < until) Pump(); if (!condition()) throw new Exception("UI condition timed out; feedback=" + Find<TextBlock>("Feedback").Text + "; org=" + Find<TextBlock>("ProfileOrganizationStatus").Text); }
         void Click(string name) => Find<Button>(name).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
         void Panel(string value) => typeof(MainWindow).GetMethod("ShowPanel", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [value]);
         bool LibraryIdle() => !(bool)typeof(MainWindow).GetField("libraryPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)! && !(bool)typeof(MainWindow).GetField("favoritePending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
@@ -637,6 +637,19 @@ internal static class Program
         Wait(LibraryIdle);
         Assert(((Profile?)list.SelectedItem)?.Id != nativeAdded.Selected!.Id, "A revoked Go selection policy blocks the pending tray target before projection applies it");
         connectionSnapshot.SetValue(connectionObject, trayRetainedSnapshot); trayPendingField.SetValue(window, false);
+        var statsSnapshot = (DesktopReply)connectionSnapshot.GetValue(connectionObject)!;
+        var statsDisplay = statsSnapshot.Display! with { ShowStatistics = true, Uploaded = "Uploaded: 1.00 MiB", Downloaded = "Downloaded: 2.00 MiB", UploadRate = "Upload: —", DownloadRate = "Download: 2 KiB/s", Elapsed = "Elapsed: 00:01:02", StatisticsScopeHint = "Current attempt; payload and packet bytes" };
+        connectionSnapshot.SetValue(connectionObject, statsSnapshot with { Display = statsDisplay });
+        typeof(MainWindow).GetMethod("PresentConnectionState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
+        Assert(Find<StackPanel>("StatisticsPanel").Visibility == Visibility.Visible && Find<TextBlock>("StatisticsUploaded").Text == statsDisplay.Uploaded && Find<TextBlock>("StatisticsUploadRate").Text == statsDisplay.UploadRate && Find<TextBlock>("StatisticsElapsed").Text == statsDisplay.Elapsed, "Statistics render Go display strings unchanged, including unavailable rates");
+        connectionSnapshot.SetValue(connectionObject, statsSnapshot with { Display = statsDisplay with { ShowStatistics = false } });
+        typeof(MainWindow).GetMethod("PresentConnectionState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
+        Assert(Find<StackPanel>("StatisticsPanel").Visibility == Visibility.Collapsed, "Older service projections hide unavailable statistics");
+        var statsContract = new ConnectionStatistics(1, "synthetic-session", 62000, 1048576, 2097152, null, 2048, "proxy-payload");
+        var statsRoundTrip = JsonSerializer.Deserialize<CoreStatus>(JsonSerializer.Serialize(statsSnapshot.Response.State with { Statistics = statsContract }));
+        Assert(statsRoundTrip?.Statistics == statsContract, "Service statistics survive the retained C# observation contract without recomputation");
+        connectionSnapshot.SetValue(connectionObject, statsSnapshot);
+        typeof(MainWindow).GetMethod("PresentConnectionState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
         int traySelections = 0;
         using (var menuFixture = new TrayShell(() => { }, () => { }, () => { }, () => { }, () => { })) {
             menuFixture.PresentProfiles(trayView, (_, _) => traySelections++);
