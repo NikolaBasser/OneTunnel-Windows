@@ -46,6 +46,10 @@ public partial class MainWindow : Window
     private bool diagnosticsPending;
     private bool groupsPending, groupMutationPending, applyingGroupSelection, applyingBulkGroupExpansion, groupsLoaded;
     private int groupRequestVersion;
+    private GroupResultsView? groupResultsView;
+    private bool groupResultsPending, fastestSelectionPending;
+    private int groupResultsRequestVersion;
+    private string groupResultsSort = "stored", groupResultsFilter = "all";
     private TrayShell? tray;
     private WindowState previousWindowState = WindowState.Normal;
     private IntPtr windowHandle;
@@ -172,7 +176,7 @@ public partial class MainWindow : Window
         ApplySubscriptionButton.IsEnabled=actions.CanSave && pendingSubscriptionPreview?.CanApply == true && !busy;
         CancelSubscriptionPreviewButton.IsEnabled=pendingSubscriptionPreview != null && !busy;
         SubscriptionApplyUnavailable.Visibility=pendingSubscriptionPreview != null && (!pendingSubscriptionPreview.CanApply || !actions.CanSave) ? Visibility.Visible : Visibility.Collapsed;
-        ProfilesList.IsEnabled=actions.CanSelect;
+        ProfilesList.IsEnabled=actions.CanSelect && !fastestSelectionPending;
         ModeBox.IsEnabled=actions.CanChangeMode;
         RecoveryButton.IsEnabled=LegacyRecoveryButton.IsEnabled=actions.CanRecover;
         InstallServiceButton.IsEnabled=actions.CanInstallService;
@@ -183,6 +187,7 @@ public partial class MainWindow : Window
         UpdateDiagnosticsControls();
         UpdateLibraryControls();
         UpdateGroupControls();
+        UpdateGroupResultControls();
     }
     private void UpdateTray()
     {
@@ -537,12 +542,181 @@ public partial class MainWindow : Window
     }
     private async void CheckGroup_Click(object sender,RoutedEventArgs e)
     {
-        if(groupCheck!=null || !connection.Actions.CanCheckGroup || selected==null)return;
-        var group=selected.Group;
- using var cancellation=new CancellationTokenSource();groupCheck=cancellation;
-        try {await Execute(async()=>{try {var result=await ProfileBackend.CheckGroupAsync(group,cancellation.Token);GroupResults.ItemsSource=result.Rows;GroupResultsInfo.Text=$"{result.Group} · {result.CheckedAt}\nПроверка HTTPS не меняет маршруты и настройки DNS. Для WG/AWG проверяется конфигурация.";GroupResultsPanel.Visibility=Visibility.Visible;GroupResultsPanel.IsExpanded=true;Feedback.Text="Проверка группы завершена.";}catch(OperationCanceledException){Feedback.Text="Проверка группы отменена. Текущая проверка сервера завершается в службе.";}});}finally{groupCheck=null;RefreshControls();}
+        if (groupCheck != null || groupResultsPending || !connection.Actions.CanCheckGroup || selected is not { } profile) return;
+        using var cancellation = new CancellationTokenSource();
+        groupCheck = cancellation;
+        groupResultsRequestVersion++;
+        groupResultsView = null;
+        GroupResults.ItemsSource = null;
+        GroupResultsInfo.Text = "Проверка группы выполняется…";
+        GroupResultsPanel.Visibility = Visibility.Visible;
+        GroupResultsPanel.IsExpanded = true;
+        groupResultsPending = true;
+        busy = true;
+        RefreshControls();
+        try
+        {
+            await ProfileBackend.ClearGroupResultsAsync();
+            cancellation.Token.ThrowIfCancellationRequested();
+            await ProfileBackend.CheckGroupAsync(profile.Group, cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            Feedback.Text = "Проверка группы завершена.";
+            await RefreshGroupResultsAsync();
+        }
+        catch (OperationCanceledException)
+        {
+            await ClearGroupResultsQuietlyAsync();
+            ClearGroupResultsDisplay("Проверка группы отменена. Текущая проверка сервера завершается в службе.");
+            Feedback.Text = "Проверка группы отменена. Текущая проверка сервера завершается в службе.";
+        }
+        catch
+        {
+            await ClearGroupResultsQuietlyAsync();
+            ClearGroupResultsDisplay("Не удалось получить результаты проверки.");
+            Feedback.Text = "Не удалось подтвердить результаты проверки группы.";
+        }
+        finally
+        {
+            groupCheck = null;
+            groupResultsPending = false;
+            busy = false;
+            if (!lifetime.IsCancellationRequested) RefreshControls();
+        }
     }
     private void CancelGroup_Click(object sender,RoutedEventArgs e){if(connection.Actions.CanCancelGroup)groupCheck?.Cancel();}
+    private void GroupResultOptions_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsInitialized || groupResultsView == null || fastestSelectionPending || busy) return;
+        groupResultsSort = (GroupResultSortBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "stored";
+        groupResultsFilter = (GroupResultFilterBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "all";
+        _ = RefreshGroupResultsAsync();
+    }
+    private async Task RefreshGroupResultsAsync()
+    {
+        int request = ++groupResultsRequestVersion;
+        groupResultsPending = true;
+        UpdateGroupResultControls();
+        try
+        {
+            var view = await ProfileBackend.GroupResultsAsync(groupResultsSort, groupResultsFilter);
+            if (request != groupResultsRequestVersion || lifetime.IsCancellationRequested) return;
+            PresentGroupResults(view);
+        }
+        catch
+        {
+            if (request != groupResultsRequestVersion || lifetime.IsCancellationRequested) return;
+            ClearGroupResultsDisplay("Не удалось обновить результаты проверки.");
+            Feedback.Text = "Не удалось подтвердить результаты проверки группы.";
+        }
+        finally
+        {
+            if (request == groupResultsRequestVersion)
+            {
+                groupResultsPending = false;
+                if (!lifetime.IsCancellationRequested) UpdateGroupResultControls();
+            }
+        }
+    }
+    private void PresentGroupResults(GroupResultsView view)
+    {
+        groupResultsView = view;
+        GroupResults.ItemsSource = view.Rows;
+        GroupResultsInfo.Text = view.HasResults
+            ? $"{view.Group} · {view.CheckedAt}\n{view.Message}{(view.Stale ? "\nХранилище изменилось. Запусти новую проверку группы." : "")}" : view.Message;
+        GroupResultsPanel.Visibility = Visibility.Visible;
+        GroupResultsPanel.IsExpanded = true;
+        UpdateGroupResultControls();
+    }
+    private void ClearGroupResultsDisplay(string message)
+    {
+        groupResultsView = null;
+        GroupResults.ItemsSource = null;
+        GroupResultsInfo.Text = message;
+        GroupResultsPanel.Visibility = Visibility.Visible;
+        GroupResultsPanel.IsExpanded = true;
+        UpdateGroupResultControls();
+    }
+    private async Task ClearGroupResultsQuietlyAsync()
+    {
+        try { await ProfileBackend.ClearGroupResultsAsync(); } catch { }
+    }
+    private async void ClearGroupResults_Click(object sender, RoutedEventArgs e)
+    {
+        if (groupResultsPending || fastestSelectionPending || busy) return;
+        groupResultsRequestVersion++;
+        groupResultsPending = true;
+        UpdateGroupResultControls();
+        try
+        {
+            await ProfileBackend.ClearGroupResultsAsync();
+            if (lifetime.IsCancellationRequested) return;
+            ClearGroupResultsDisplay("Результаты очищены.");
+            Feedback.Text = "Результаты проверки очищены.";
+        }
+        catch
+        {
+            ClearGroupResultsDisplay("Не удалось подтвердить очистку результатов.");
+            Feedback.Text = "Не удалось подтвердить очистку результатов проверки.";
+        }
+        finally
+        {
+            groupResultsPending = false;
+            if (!lifetime.IsCancellationRequested) UpdateGroupResultControls();
+        }
+    }
+    private async void SelectFastestResult_Click(object sender, RoutedEventArgs e)
+    {
+        if (groupResultsPending || fastestSelectionPending || busy || groupResultsView is not { HasResults: true, CanSelectFastest: true } view || !connection.Actions.CanSelect) return;
+        fastestSelectionPending = true;
+        UpdateGroupResultControls();
+        UpdateLibraryControls();
+        RefreshControls();
+        try
+        {
+            Guid? previousSelection = selected?.Id;
+            Guid id = await ProfileBackend.FastestGroupResultAsync(view.Token);
+            if (selected?.Id != previousSelection || !connection.Actions.CanSelect) return;
+            if (lifetime.IsCancellationRequested) return;
+            await PresentFastestSelectionAsync(id);
+        }
+        catch
+        {
+            groupResultsRequestVersion++;
+            await ClearGroupResultsQuietlyAsync();
+            ClearGroupResultsDisplay("Результаты устарели или больше недоступны. Запусти новую проверку группы.");
+            Feedback.Text = "Не удалось выбрать результат. Запусти новую проверку группы.";
+        }
+        finally
+        {
+            fastestSelectionPending = false;
+            if (!lifetime.IsCancellationRequested) { RefreshControls(); UpdateLibraryControls(); UpdateGroupResultControls(); }
+        }
+    }
+    private async Task PresentFastestSelectionAsync(Guid id)
+    {
+        if (!connection.Actions.CanSelect) return;
+        var profile = profiles.FirstOrDefault(item => item.Id == id) ?? throw new InvalidOperationException("Selected profile is no longer available.");
+        bool refreshLibrary = favoritesOnly || FavoritesOnlyBox.IsChecked == true;
+        pendingLibrarySelection = id;
+        if (!string.IsNullOrWhiteSpace(SearchBox.Text)) SearchBox.Clear();
+        if (refreshLibrary)
+        {
+            updatingLibraryControls = true;
+            try { favoritesOnly = false; FavoritesOnlyBox.IsChecked = false; }
+            finally { updatingLibraryControls = false; }
+            await RefreshLibraryProjectionAsync();
+            if (lifetime.IsCancellationRequested) return;
+            if (appliedFavoritesOnly || !libraryProjectionLoaded || !libraryIDs.Contains(id))
+                throw new InvalidOperationException("The selected profile is not visible in the current library.");
+            if (selected?.Id != id || !connection.Actions.CanSelect) return;
+        }
+        RefreshProfileFilter(true);
+        if (!MatchesProfile(profile)) throw new InvalidOperationException("The selected profile is not visible in the current library.");
+        applyingLibrarySelection = true;
+        try { ProfilesList.SelectedItem = profile; }
+        finally { applyingLibrarySelection = false; pendingLibrarySelection = null; }
+        Feedback.Text = "Лучший результат выбран. Подключение не запускалось.";
+    }
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
         if (!connection.Actions.CanSave) return;
@@ -567,6 +741,7 @@ public partial class MainWindow : Window
             _ = RefreshLibraryProjectionAsync();
             if (GroupsPanel.Visibility == Visibility.Visible) _ = RefreshGroupSummariesAsync();
         }
+        if (groupResultsView?.HasResults == true) _ = RefreshGroupResultsAsync();
     }
     private void PresentApplied(AppliedProfiles result)
     {
@@ -684,9 +859,18 @@ public partial class MainWindow : Window
     private void UpdateLibraryControls()
     {
         if (!IsInitialized || LibrarySortBox == null) return;
-        FavoritesOnlyBox.IsEnabled = LibrarySortBox.IsEnabled = !libraryPending && !favoritePending;
+        FavoritesOnlyBox.IsEnabled = LibrarySortBox.IsEnabled = SearchBox.IsEnabled = !libraryPending && !favoritePending && !fastestSelectionPending;
         FavoriteButton.Content = selected != null && Storage.FavoriteIDs.Contains(selected.Id) ? "Убрать из избранного" : "Добавить в избранное";
         FavoriteButton.IsEnabled = selected != null && connection.Actions.CanEdit && !busy && !libraryPending && !favoritePending;
+    }
+    private void UpdateGroupResultControls()
+    {
+        if (!IsInitialized || GroupResultSortBox == null) return;
+        bool locked = fastestSelectionPending || busy;
+        bool pending = groupResultsPending || locked;
+        GroupResultSortBox.IsEnabled = GroupResultFilterBox.IsEnabled = !locked;
+        SelectFastestResultButton.IsEnabled = !pending && groupResultsView is { HasResults: true, CanSelectFastest: true } && connection.Actions.CanSelect;
+        ClearGroupResultsButton.IsEnabled = !pending && groupResultsView != null;
     }
     private sealed class ProfileRankComparer(Dictionary<Guid, int> ranks) : IComparer
     {

@@ -39,3 +39,5 @@ public sealed record DesktopState(string Root,bool Administrator,bool NeedsRecov
 public sealed record ReliabilityOptions(bool AutoReconnect=false,bool UseFallbacks=false);
 public sealed record GroupCheckRow(string ID,string Name,string Message,bool Success,bool NetworkTest,long Milliseconds);
 public sealed record GroupCheckResult(string Group,string CheckedAt,List<GroupCheckRow> Rows);
+public sealed record GroupResultsView(string Group,string CheckedAt,List<GroupResultDisplayRow> Rows,bool HasResults,bool Stale,bool CanSelectFastest,string Token,string Message);
+public sealed record GroupResultDisplayRow(string ID,string Name,string Message,bool Success,bool NetworkTest,long Milliseconds,string TimingLabel);
