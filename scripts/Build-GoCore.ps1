@@ -18,7 +18,7 @@ try {
         if ($LASTEXITCODE -ne 0 -or !$directory -or !(Test-Path -LiteralPath $directory)) { throw "Dependency directory unavailable: $Name" }
         return $directory
     }
-    $tags = @(); if ($EmbeddedXray) { $tags += 'embeddedxray' }; if ($EmbeddedSingBox) { $tags += 'embeddedsingbox'; $tags += 'with_quic' }
+    $tags = @(); if ($EmbeddedXray) { $tags += 'embeddedxray' }; if ($EmbeddedSingBox) { $tags += 'embeddedsingbox'; $tags += 'with_quic'; $tags += 'with_naive_outbound'; $tags += 'with_purego' }
     if ($EmbeddedTun) { $tags += 'embeddedtun'; $tags += 'with_gvisor' }
     if ($EmbeddedAWG) { $tags += 'embeddedawg' }
     $buildTags = if ($tags.Count) { @('-tags',($tags -join ',')) } else { @() }
@@ -30,11 +30,16 @@ try {
     if ($EmbeddedTun) { $scope = 'full-device-experimental-unverified' }
     if ($EmbeddedAWG) { $scope = 'native-and-proxy-partial' }
     if ($EmbeddedAWG -and $EmbeddedXray -and $EmbeddedSingBox -and $EmbeddedTun) { $scope = 'embedded-native-and-proxy' }
-    @{Runtime='go';Version='0.3.1';ApiVersion=1;AdapterRequired=$false;EmbeddedXray=[bool]$EmbeddedXray;EmbeddedSingBox=[bool]$EmbeddedSingBox;EmbeddedTun=[bool]$EmbeddedTun;EmbeddedAWG=[bool]$EmbeddedAWG;EmbeddedScope=$scope;EmbeddedInternalNtp=[bool]$EmbeddedSingBox} | ConvertTo-Json | Set-Content (Join-Path $target 'go-runtime.json') -Encoding UTF8
+    @{Runtime='go';Version='0.4.0';ApiVersion=1;AdapterRequired=$false;EmbeddedXray=[bool]$EmbeddedXray;EmbeddedSingBox=[bool]$EmbeddedSingBox;EmbeddedTun=[bool]$EmbeddedTun;EmbeddedAWG=[bool]$EmbeddedAWG;EmbeddedScope=$scope;EmbeddedInternalNtp=[bool]$EmbeddedSingBox;EmbeddedNaive=[bool]$EmbeddedSingBox} | ConvertTo-Json | Set-Content (Join-Path $target 'go-runtime.json') -Encoding UTF8
     if ($EmbeddedXray) {
         Copy-Item (Join-Path (Module-Directory 'github.com/xtls/xray-core') 'LICENSE') (Join-Path $target 'LICENSE.embedded-xray.txt') -Force
     }
     if ($EmbeddedSingBox) {
+        $cronet = Module-Directory 'github.com/sagernet/cronet-go/lib/windows_amd64'
+        $cronetDll = Join-Path $cronet 'libcronet.dll'
+        if ((Get-FileHash -LiteralPath $cronetDll -Algorithm SHA256).Hash -ne '3217C6260FBCA5F16072E0B79735742F40109A63BB0FF88FD6B96DD6B54A2928') { throw 'Cronet checksum mismatch.' }
+        Copy-Item -LiteralPath $cronetDll -Destination (Join-Path $target 'libcronet.dll') -Force
+        Copy-Item (Join-Path $cronet 'LICENSE') (Join-Path $target 'LICENSE.cronet.txt') -Force
         Copy-Item (Join-Path (Module-Directory 'github.com/sagernet/sing-box') 'LICENSE') (Join-Path $target 'LICENSE.embedded-sing-box.txt') -Force
     }
     if ($EmbeddedTun -or $EmbeddedAWG) {

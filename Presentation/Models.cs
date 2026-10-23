@@ -1,7 +1,7 @@
 namespace OneTunnel.Core;
 
 // Presentation DTOs. Validation, import and persistence live exclusively in Go.
-public enum Protocol { AmneziaWG, WireGuard, VLESS, SOCKS5, Hysteria2, Shadowsocks }
+public enum Protocol { AmneziaWG, WireGuard, VLESS, SOCKS5, Hysteria2, Shadowsocks, HTTP, Trojan, TUIC, AnyTLS, NaiveProxy }
 public sealed record Profile(Guid Id,string Name,Protocol Protocol,string Source)
 {
     public string Group {get;init;}="Без группы";

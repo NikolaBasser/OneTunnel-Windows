@@ -40,3 +40,9 @@ golang.org/x/text — 0.43.0
 
 
 Exact downloaded package URLs, package SHA256 and verification method are recorded in third-party/provenance.json. The corresponding-source repositories, build instructions and original releases are available at the links above. Preserve upstream notices. Before external distribution, provide the exact corresponding source and required license/notice files for all shipped components and review their terms. This working folder is a local development deliverable.
+
+NaiveProxy Chromium networking component — Cronet 150.0.7871.63
+  github.com/sagernet/cronet-go v0.0.0-20260912104727-0d28acc44093; Windows amd64 library module v0.0.0-20260912104006-c10c03c318db.
+  https://github.com/SagerNet/cronet-go and https://github.com/klzgrad/naiveproxy ; preserve service/LICENSE.cronet.txt, third-party/notices/LICENSE.naiveproxy.txt and generated module notices.
+  libcronet.dll is loaded in-process from the service directory; no separate proxy executable is used.
+  NaiveProxy source revision: https://github.com/SagerNet/naiveproxy/tree/72a06c9fca0e2d228588c7f3074bf7efff3ff686 (BSD-style Chromium notice included).
