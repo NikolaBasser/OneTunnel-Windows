@@ -36,6 +36,13 @@ public static class ProfileBackend
     public static Task CancelBackupRestoreAsync(string token)=>ProfileHost.CallAsync<object?>("backup.restore.cancel",new{Token=token});
     public static Task<TrayProfilesView> TrayProfilesAsync()=>ProfileHost.CallAsync<TrayProfilesView>("tray.profiles.view");
     public static Task<string> SelectTrayProfileAsync(string id,string token)=>ProfileHost.CallAsync<string>("tray.profiles.select",new{ID=id,Token=token});
+    public static Task<UserSettingsView> UserSettingsAsync(CancellationToken cancellation=default)=>ProfileHost.CallAsync<UserSettingsView>("user.settings.view",cancellation:cancellation);
+    public static Task<ProfileDocument> SaveUserSettingsAsync(string token,UserPreferences preferences)=>ProfileHost.CallAsync<ProfileDocument>("ui.user.settings.save",new{Token=token,UserSettings=preferences});
+    public static Task<UserSettingsTickResult> TickUserSettingsAsync(CancellationToken cancellation=default)=>ProfileHost.CallAsync<UserSettingsTickResult>("user.settings.tick",cancellation:cancellation);
+    public static Task<UserSettingsView> EnableUserProxyAsync(string token)=>ProfileHost.CallAsync<UserSettingsView>("user.proxy.enable",new{Token=token});
+    public static Task<UserSettingsView> DisableUserProxyAsync(string token)=>ProfileHost.CallAsync<UserSettingsView>("user.proxy.disable",new{Token=token});
+    public static Task<UserSettingsView> EnableUserStartupAsync(string token,string executable)=>ProfileHost.CallAsync<UserSettingsView>("user.startup.enable",new{Token=token,Executable=executable});
+    public static Task<UserSettingsView> DisableUserStartupAsync(string token)=>ProfileHost.CallAsync<UserSettingsView>("user.startup.disable",new{Token=token});
     public static TransportOptions DefaultTransport()=>ProfileHost.Call<TransportOptions>("transport.defaults");
     public static Task<ProfileView> ViewAsync(Protocol protocol)=>ProfileHost.CallAsync<ProfileView>("profile.view",new{Requested=(int)protocol});
     public static ProfileDocument Delete(Guid id)=>ProfileHost.Call<ProfileDocument>("ui.delete",new{ID=id.ToString()});

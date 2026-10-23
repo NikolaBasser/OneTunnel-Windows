@@ -30,6 +30,7 @@ public sealed class ServiceConnection : IConnectionController
         snapshot=reply;
         Changed?.Invoke();
     }
+    public void ReceiveAutomationReply(DesktopReply reply) => Apply(reply);
     public async Task SetContextAsync(DesktopContext value)
     {
         if(context==value) return; // Deduplicate identical UI inputs on the transport.

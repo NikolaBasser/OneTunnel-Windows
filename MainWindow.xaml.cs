@@ -72,6 +72,11 @@ public partial class MainWindow : Window
     private int networkPreferencesRequestVersion;
     private Guid? networkPreferencesRequestedId, networkPreferencesFieldsId;
     private string? networkPreferencesFieldsToken;
+    private UserSettingsView? userSettingsView;
+    private bool userSettingsPending, userSettingsTickPending, userSettingsSavePending, userSettingsActionPending, updatingUserSettingsControls, userSettingsDraftDirty;
+    private string? userSettingsDraftToken;
+    private int userSettingsRequestVersion;
+    private System.Windows.Threading.DispatcherTimer? userSettingsTimer;
     private TrayShell? tray;
     private WindowState previousWindowState = WindowState.Normal;
     private IntPtr windowHandle;
@@ -118,6 +123,11 @@ public partial class MainWindow : Window
             subscriptionScheduleTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
             subscriptionScheduleTimer.Tick += SubscriptionScheduleTimer_Tick;
             subscriptionScheduleTimer.Start();
+            UserAutoConnectProfileBox.ItemsSource = profiles;
+            userSettingsTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            userSettingsTimer.Tick += UserSettingsTimer_Tick;
+            userSettingsTimer.Start();
+            _ = LoadUserSettingsAsync();
             await RefreshService();
             _ = connection.ObserveAsync(lifetime.Token);
             var args = Environment.GetCommandLineArgs();
@@ -132,7 +142,7 @@ public partial class MainWindow : Window
             }
         };
         StateChanged += (_, _) => { if (WindowState != WindowState.Minimized) previousWindowState = WindowState; };
-        Closed += (_, _) => { subscriptionScheduleTimer?.Stop(); lifetime.Cancel(); preview?.Cancel(); groupCheck?.Cancel(); subscriptionDownload?.Cancel(); ReleaseRestoreHotkey(); try { windowSource?.RemoveHook(WindowNativeHook); } catch { } windowSource = null; tray?.Dispose(); tray = null; };
+        Closed += (_, _) => { subscriptionScheduleTimer?.Stop(); userSettingsTimer?.Stop(); lifetime.Cancel(); preview?.Cancel(); groupCheck?.Cancel(); subscriptionDownload?.Cancel(); ReleaseRestoreHotkey(); try { windowSource?.RemoveHook(WindowNativeHook); } catch { } windowSource = null; tray?.Dispose(); tray = null; };
     }
     private async Task RefreshService()
     {
@@ -177,10 +187,12 @@ public partial class MainWindow : Window
         ActivityPanel.Visibility = panel == "activity" ? Visibility.Visible : Visibility.Collapsed;
         GroupsPanel.Visibility = panel == "groups" ? Visibility.Visible : Visibility.Collapsed;
         SubscriptionsPanel.Visibility = panel == "subscriptions" ? Visibility.Visible : Visibility.Collapsed;
+        UserSettingsPanel.Visibility = panel == "settings" ? Visibility.Visible : Visibility.Collapsed;
         ImportConnectionButton.Visibility = panel == "connection" ? Visibility.Visible : Visibility.Collapsed;
-        PageTitle.Text = panel switch { "editor" => "Импорт / подписка", "subscriptions" => "Подписки", "groups" => "Группы", "engines" => "Движки и восстановление", "activity" => "События", _ => "Подключения" };
-        PageDescription.Text = panel switch { "editor" => "Импортируй профиль или обнови его из источника", "subscriptions" => "Сохранённые группы и ручное обновление профилей", "groups" => "Управление группами профилей и подписок", "engines" => "Состояние компонентов и восстановление соединения", "activity" => "Журнал событий приложения", _ => "Профили, сохранённые на этом компьютере" };
+        PageTitle.Text = panel switch { "editor" => "Импорт / подписка", "subscriptions" => "Подписки", "groups" => "Группы", "engines" => "Движки и восстановление", "activity" => "События", "settings" => "User settings", _ => "Подключения" };
+        PageDescription.Text = panel switch { "editor" => "Импортируй профиль или обнови его из источника", "subscriptions" => "Сохранённые группы и ручное обновление профилей", "groups" => "Управление группами профилей и подписок", "engines" => "Состояние компонентов и восстановление соединения", "activity" => "Журнал событий приложения", "settings" => "Current-user automation, proxy, and startup controls", _ => "Профили, сохранённые на этом компьютере" };
         if (panel == "subscriptions") _ = LoadSubscriptionsAsync();
+        if (panel == "settings") _ = LoadUserSettingsAsync();
         if (panel == "engines")
         {
             var state=DesktopEnvironment.State;
@@ -201,6 +213,7 @@ public partial class MainWindow : Window
         AddProfileButton.IsEnabled=actions.CanAdd;
         ImportConnectionButton.IsEnabled=ImportSubscriptionButton.IsEnabled=actions.CanAdd;
         SubscriptionButton.IsEnabled=ReloadSubscriptionsButton.IsEnabled=!busy;
+        UserSettingsNavigationButton.IsEnabled=!busy;
         HomeNavigationButton.IsEnabled=GroupsNavigationButton.IsEnabled=EventsNavigationButton.IsEnabled=!busy;
         CancelSubscriptionDownloadButton.Visibility=subscriptionDownload != null ? Visibility.Visible : Visibility.Collapsed;
         CancelSubscriptionDownloadButton.IsEnabled=subscriptionDownload != null && !subscriptionDownload.IsCancellationRequested;
@@ -224,6 +237,7 @@ public partial class MainWindow : Window
         UpdateGroupResultControls();
         UpdateProfileOrganizationControls();
         UpdateNetworkPreferencesControls();
+        UpdateUserSettingsControls();
         UpdateSubscriptionScheduleControls();
         UpdateBackupControls();
     }
@@ -1696,6 +1710,206 @@ public partial class MainWindow : Window
     private void Engines_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("engines"); }
     private void Home_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("connection"); }
     private void Events_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("activity"); }
+    private void UserSettings_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("settings"); }
+
+    private async Task LoadUserSettingsAsync(bool resetDraft = false)
+    {
+        if (userSettingsPending || userSettingsTickPending || userSettingsActionPending || userSettingsSavePending || lifetime.IsCancellationRequested) return;
+        if (resetDraft) { userSettingsDraftDirty = false; userSettingsDraftToken = null; }
+        int request = ++userSettingsRequestVersion;
+        userSettingsPending = true; UpdateUserSettingsControls();
+        try
+        {
+            var view = await ProfileBackend.UserSettingsAsync(lifetime.Token);
+            if (request != userSettingsRequestVersion || lifetime.IsCancellationRequested) return;
+            PresentUserSettings(view, resetDraft);
+        }
+        catch
+        {
+            if (request == userSettingsRequestVersion && !lifetime.IsCancellationRequested)
+                UserSettingsStatus.Text = "Settings are unavailable. Refresh and try again.";
+        }
+        finally
+        {
+            userSettingsPending = false; UpdateUserSettingsControls();
+        }
+    }
+
+    private async void UserSettingsTimer_Tick(object? sender, EventArgs e)
+    {
+        if (busy || userSettingsTickPending || userSettingsPending || userSettingsActionPending || userSettingsSavePending || lifetime.IsCancellationRequested) return;
+        int request = ++userSettingsRequestVersion;
+        userSettingsTickPending = true;
+        UpdateUserSettingsControls();
+        try
+        {
+            var result = await ProfileBackend.TickUserSettingsAsync(lifetime.Token);
+            if (request != userSettingsRequestVersion || lifetime.IsCancellationRequested) return;
+            if (result.Connection is { } connectionReply)
+            {
+                connection.ReceiveAutomationReply(connectionReply);
+                PresentConnectionState();
+                RefreshControls();
+            }
+            PresentUserSettings(result.View);
+        }
+        catch
+        {
+            if (request == userSettingsRequestVersion && !lifetime.IsCancellationRequested && UserSettingsPanel.Visibility == Visibility.Visible)
+                UserSettingsStatus.Text = "Automation status is unavailable. It will be checked again shortly.";
+        }
+        finally
+        {
+            userSettingsTickPending = false;
+            UpdateUserSettingsControls();
+        }
+    }
+
+    private void PresentUserSettings(UserSettingsView view, bool resetDraft = false)
+    {
+        userSettingsView = view;
+        if (resetDraft || !userSettingsDraftDirty)
+        {
+            userSettingsDraftDirty = false;
+            userSettingsDraftToken = view.Token;
+            updatingUserSettingsControls = true;
+            try
+            {
+                UserSystemProxyBox.IsChecked = view.Preferences.UseSystemProxy;
+                UserAutoConnectBox.IsChecked = view.Preferences.AutoConnect;
+                UserAutoConnectProfileBox.SelectedItem = profiles.FirstOrDefault(p => string.Equals(p.Id.ToString(), view.Preferences.ProfileID, StringComparison.OrdinalIgnoreCase));
+                UserFullDeviceBox.IsChecked = view.Preferences.FullDevice;
+                UserAllowTrustedBox.IsChecked = view.Preferences.AllowTrusted;
+                UserAllowPublicBox.IsChecked = view.Preferences.AllowPublic;
+            }
+            finally { updatingUserSettingsControls = false; }
+        }
+        UserSettingsStatus.Text = view.Message;
+        UpdateUserSettingsControls();
+    }
+
+    private void UserSettingsDraft_Changed(object sender, RoutedEventArgs e)
+    {
+        if (updatingUserSettingsControls) return;
+        if (!userSettingsDraftDirty) userSettingsDraftToken = userSettingsView?.Token;
+        userSettingsDraftDirty = true;
+        UpdateUserSettingsControls();
+    }
+
+    private void UserAutoConnectProfile_Changed(object sender, SelectionChangedEventArgs e) => UserSettingsDraft_Changed(sender, e);
+
+    private void UpdateUserSettingsControls()
+    {
+        if (!IsInitialized || UserSettingsStatus == null) return;
+        var view = userSettingsView;
+        bool pending = userSettingsPending || userSettingsTickPending || userSettingsSavePending || userSettingsActionPending;
+        bool draftEnabled = view != null && !userSettingsPending && !userSettingsSavePending && !userSettingsActionPending;
+        UserSystemProxyBox.IsEnabled = draftEnabled;
+        UserAutoConnectBox.IsEnabled = draftEnabled;
+        UserAutoConnectProfileBox.IsEnabled = draftEnabled && UserAutoConnectBox.IsChecked == true;
+        UserFullDeviceBox.IsEnabled = draftEnabled;
+        UserAllowTrustedBox.IsEnabled = draftEnabled;
+        UserAllowPublicBox.IsEnabled = draftEnabled;
+        bool staleDraft = userSettingsDraftDirty && view != null && !string.Equals(userSettingsDraftToken, view.Token, StringComparison.Ordinal);
+        SaveUserSettingsButton.IsEnabled = !busy && !pending && view?.CanSave == true && userSettingsDraftDirty && !staleDraft;
+        ReloadUserSettingsButton.IsEnabled = !pending;
+        EnableUserProxyButton.IsEnabled = !busy && !pending && !userSettingsDraftDirty && view?.CanEnableProxy == true;
+        DisableUserProxyButton.IsEnabled = !busy && !pending && !userSettingsDraftDirty && view?.CanDisableProxy == true;
+        EnableUserStartupButton.IsEnabled = !busy && !pending && !userSettingsDraftDirty && view?.CanEnableStartup == true;
+        DisableUserStartupButton.IsEnabled = !busy && !pending && !userSettingsDraftDirty && view?.CanDisableStartup == true;
+        UserNetworkCategory.Text = "Network category: " + (view?.NetworkCategory is { Length: > 0 } category ? category : "unavailable");
+        UserAutoConnectInhibited.Visibility = view?.AutoConnectInhibited == true ? Visibility.Visible : Visibility.Collapsed;
+        UserProxyStatus.Text = view == null ? "System proxy: status unavailable" : view.ProxyEnabled ? "System proxy: enabled for this user's current session" : "System proxy: off";
+        UserStartupStatus.Text = view == null ? "Startup: status unavailable" : !view.StartupRecorded ? "Startup: not registered" : view.StartupEnabled ? "Startup: registered for this user" : "Startup: ownership recorded, but registration is missing or changed";
+        UserStartupPath.Text = Environment.ProcessPath ?? "Unavailable";
+        if (staleDraft) UserSettingsStatus.Text = "Settings changed since this draft was loaded. Reload settings before saving; the draft has been preserved.";
+    }
+
+    private async void SaveUserSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (userSettingsView is not { CanSave: true } view || !userSettingsDraftDirty || userSettingsPending || userSettingsTickPending || userSettingsSavePending || userSettingsActionPending) return;
+        string token = userSettingsDraftToken ?? view.Token;
+        var preferences = new UserPreferences(
+            UserSystemProxyBox.IsChecked == true,
+            UserAutoConnectBox.IsChecked == true,
+            UserAutoConnectProfileBox.SelectedItem is Profile selectedProfile ? selectedProfile.Id.ToString() : "",
+            UserFullDeviceBox.IsChecked == true,
+            UserAllowTrustedBox.IsChecked == true,
+            UserAllowPublicBox.IsChecked == true);
+        int request = ++userSettingsRequestVersion;
+        userSettingsSavePending = true; UpdateUserSettingsControls();
+        bool persisted = false;
+        try
+        {
+            var document = await ProfileBackend.SaveUserSettingsAsync(token, preferences);
+            persisted = true;
+            if (request != userSettingsRequestVersion || lifetime.IsCancellationRequested) return;
+            Storage.Accept(document);
+            var saved = await ProfileBackend.UserSettingsAsync(lifetime.Token);
+            if (request != userSettingsRequestVersion || lifetime.IsCancellationRequested) return;
+            PresentUserSettings(saved, resetDraft: true);
+            UserSettingsStatus.Text = saved.Message;
+        }
+        catch
+        {
+            if (request == userSettingsRequestVersion && !lifetime.IsCancellationRequested)
+                UserSettingsStatus.Text = persisted ? "Preferences were saved, but current settings could not be reloaded. Refresh settings before making another change." : "Preferences were not confirmed. Refresh settings before trying again.";
+        }
+        finally { userSettingsSavePending = false; UpdateUserSettingsControls(); }
+    }
+
+    private async void ReloadUserSettings_Click(object sender, RoutedEventArgs e) => await LoadUserSettingsAsync(resetDraft: true);
+
+    private async Task RunUserSettingsActionAsync(Func<string, Task<UserSettingsView>> action, string confirmation, string completed)
+    {
+        if (userSettingsView is not { } view || userSettingsActionPending || userSettingsPending || userSettingsTickPending || userSettingsSavePending || userSettingsDraftDirty || lifetime.IsCancellationRequested) return;
+        if (MessageBox.Show(this, confirmation, "OneTunnel user settings", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (userSettingsView is not { } current || !string.Equals(current.Token, view.Token, StringComparison.Ordinal))
+        {
+            UserSettingsStatus.Text = "Settings changed while the confirmation was open. Review the current status and try again.";
+            return;
+        }
+        int request = ++userSettingsRequestVersion;
+        userSettingsActionPending = true; UserSettingsStatus.Text = "Applying the confirmed change…"; UpdateUserSettingsControls();
+        try
+        {
+            var updated = await action(current.Token);
+            if (request != userSettingsRequestVersion || lifetime.IsCancellationRequested) return;
+            PresentUserSettings(updated, resetDraft: true);
+            UserSettingsStatus.Text = string.IsNullOrWhiteSpace(updated.Message) ? completed : updated.Message;
+        }
+        catch
+        {
+            if (request == userSettingsRequestVersion && !lifetime.IsCancellationRequested)
+                UserSettingsStatus.Text = "The action could not be confirmed or completed. Refresh settings before retrying.";
+        }
+        finally { userSettingsActionPending = false; UpdateUserSettingsControls(); }
+    }
+
+    private async void EnableUserProxy_Click(object sender, RoutedEventArgs e) => await RunUserSettingsActionAsync(
+        ProfileBackend.EnableUserProxyAsync,
+        "Enable the current-user Windows proxy using OneTunnel's confirmed local listener? OneTunnel will preserve the previous user proxy values and restore only values it still owns. Machine-wide WinHTTP settings are not changed.",
+        "Proxy status updated.");
+
+    private async void DisableUserProxy_Click(object sender, RoutedEventArgs e) => await RunUserSettingsActionAsync(
+        ProfileBackend.DisableUserProxyAsync,
+        "Disable OneTunnel's current-user proxy lease and restore unchanged values that OneTunnel owns? External changes will be preserved.",
+        "Proxy status updated.");
+
+    private async void EnableUserStartup_Click(object sender, RoutedEventArgs e)
+    {
+        string executable = Environment.ProcessPath ?? "";
+        await RunUserSettingsActionAsync(
+            token => ProfileBackend.EnableUserStartupAsync(token, executable),
+            $"Register this application to start for the current Windows user?\n\nPath: {executable}\n\nThis does not connect automatically. Go will validate the path.",
+            "Startup status updated.");
+    }
+
+    private async void DisableUserStartup_Click(object sender, RoutedEventArgs e) => await RunUserSettingsActionAsync(
+        ProfileBackend.DisableUserStartupAsync,
+        "Remove OneTunnel's unchanged current-user startup entry? Other applications' entries will be preserved.",
+        "Startup status updated.");
+
     private async void StartService_Click(object sender, RoutedEventArgs e) => await Execute(async () =>
     {
         await connection.StartServiceAsync(); Feedback.Text = "Служба запущена. Автоматическое подключение не выполняется.";

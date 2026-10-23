@@ -19,6 +19,7 @@ internal static class Program
     [STAThread]
     private static int Main()
     {
+        var registryBefore = UserRegistryFingerprint();
         Directory.CreateDirectory(Output);
         var data = Path.Combine(Output, "synthetic-data-" + Guid.NewGuid().ToString("N"));
         Environment.SetEnvironmentVariable("ONETUNNEL_DATA_DIR", data);
@@ -637,6 +638,36 @@ internal static class Program
         Wait(LibraryIdle);
         Assert(((Profile?)list.SelectedItem)?.Id != nativeAdded.Selected!.Id, "A revoked Go selection policy blocks the pending tray target before projection applies it");
         connectionSnapshot.SetValue(connectionObject, trayRetainedSnapshot); trayPendingField.SetValue(window, false);
+        bool UserSettingsIdle() => new[] { "userSettingsPending", "userSettingsTickPending", "userSettingsSavePending", "userSettingsActionPending" }.All(name => !(bool)typeof(MainWindow).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!);
+        Panel("settings"); Wait(() => UserSettingsIdle() && typeof(MainWindow).GetField("userSettingsView", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window) != null);
+        ((DispatcherTimer?)typeof(MainWindow).GetField("userSettingsTimer", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window))?.Stop();
+        Assert(Find<CheckBox>("UserAutoConnectBox").IsChecked == false && Find<CheckBox>("UserSystemProxyBox").IsChecked == false && Find<CheckBox>("UserAllowTrustedBox").IsChecked == false && Find<CheckBox>("UserAllowPublicBox").IsChecked == false, "All user automation and network permissions start disabled");
+        Assert(!Find<Button>("EnableUserProxyButton").IsEnabled && Find<TextBox>("UserStartupPath").Text.Length > 0, "Inactive service cannot enable a proxy; startup path is visible without registry activation");
+        var automationDraft = Find<TextBox>("NameBox").Text;
+        Find<CheckBox>("UserSystemProxyBox").IsChecked = true; Find<CheckBox>("UserAllowTrustedBox").IsChecked = true;
+        Wait(() => Find<Button>("SaveUserSettingsButton").IsEnabled); Click("SaveUserSettingsButton"); Wait(UserSettingsIdle);
+        var userPreferences = Raw<JsonElement>("store.load").GetProperty("UserSettings");
+        Assert(userPreferences.GetProperty("UseSystemProxy").GetBoolean() && !userPreferences.GetProperty("AutoConnect").GetBoolean() && userPreferences.GetProperty("AllowTrusted").GetBoolean(), "Go saves proxy permission separately from activation and auto-connect");
+        Assert(!Find<Button>("EnableUserProxyButton").IsEnabled && Find<TextBlock>("UserProxyStatus").Text == "System proxy: off" && Find<TextBox>("NameBox").Text == automationDraft, "Saving permissions never activates a proxy or changes the editor draft");
+        Find<CheckBox>("UserFullDeviceBox").IsChecked = true;
+        typeof(MainWindow).GetMethod("UserSettingsTimer_Tick", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [null, EventArgs.Empty]); Wait(UserSettingsIdle);
+        Assert(Find<CheckBox>("UserFullDeviceBox").IsChecked == true, "Go status ticks preserve unsaved automation drafts");
+        Raw<object?>("favorite.set", new { ID = targetResult.Id.ToString(), Favorite = true });
+        var refreshUserSettings = PrivateTask("LoadUserSettingsAsync", false); Wait(() => refreshUserSettings.IsCompleted && UserSettingsIdle()); refreshUserSettings.GetAwaiter().GetResult();
+        Assert(Find<CheckBox>("UserFullDeviceBox").IsChecked == true && !Find<Button>("SaveUserSettingsButton").IsEnabled && Find<TextBlock>("UserSettingsStatus").Text.Contains("draft"), "Changed Go revision keeps the draft but blocks a stale preference save");
+        Raw<object?>("favorite.set", new { ID = targetResult.Id.ToString(), Favorite = false });
+        Click("ReloadUserSettingsButton"); Wait(UserSettingsIdle);
+        var userView = (UserSettingsView)typeof(MainWindow).GetField("userSettingsView", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+        typeof(MainWindow).GetMethod("PresentUserSettings", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [userView with { StartupRecorded = true, StartupEnabled = false }, false]);
+        Assert(Find<TextBlock>("UserStartupStatus").Text.Contains("missing or changed"), "Recorded startup ownership is not presented as a confirmed active registration");
+        typeof(MainWindow).GetMethod("PresentUserSettings", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [userView, true]);
+        Find<CheckBox>("UserSystemProxyBox").IsChecked = false; Find<CheckBox>("UserAllowTrustedBox").IsChecked = false;
+        Find<CheckBox>("UserAllowPublicBox").IsChecked = false; Find<CheckBox>("UserFullDeviceBox").IsChecked = false; Find<ComboBox>("UserAutoConnectProfileBox").SelectedItem = null;
+        Wait(() => Find<Button>("SaveUserSettingsButton").IsEnabled); Click("SaveUserSettingsButton"); Wait(UserSettingsIdle);
+        var resetUserDocument = Raw<JsonElement>("store.load");
+        Assert(!resetUserDocument.TryGetProperty("UserSettings", out var resetUserPreferences) || resetUserPreferences.ValueKind == JsonValueKind.Null, "Explicitly clearing preferences restores disabled defaults without registry effects");
+        Assert(Find<TextBox>("NameBox").Text == automationDraft && Raw<JsonElement>("store.load").GetProperty("FavoriteIDs").GetArrayLength() == 1, "Automation tools preserve editor drafts and unrelated favorites");
+        Panel("connection");
         var statsSnapshot = (DesktopReply)connectionSnapshot.GetValue(connectionObject)!;
         var statsDisplay = statsSnapshot.Display! with { ShowStatistics = true, Uploaded = "Uploaded: 1.00 MiB", Downloaded = "Downloaded: 2.00 MiB", UploadRate = "Upload: —", DownloadRate = "Download: 2 KiB/s", Elapsed = "Elapsed: 00:01:02", StatisticsScopeHint = "Current attempt; payload and packet bytes" };
         connectionSnapshot.SetValue(connectionObject, statsSnapshot with { Display = statsDisplay });
@@ -665,10 +696,31 @@ internal static class Program
         window.Close();
         Assert(tray!.StatusItem.IsDisposed && tray.ExitItem.IsDisposed, "Window Close disposes the tray even on the capture/test close path");
         CheckHiddenWindowClose();
+        Assert(registryBefore.SequenceEqual(UserRegistryFingerprint()), "Isolated UI checks leave current-user proxy and startup registry settings unchanged");
         app.Shutdown();
         Console.WriteLine("PASS: isolated WPF profile search, empty results, navigation, existing settings, default/minimum layout and storage-preservation checks. No connect/probe/service mutation commands sent.");
         Console.WriteLine(Output);
         return 0;
+    }
+    private static byte[] UserRegistryFingerprint()
+    {
+        var values = new List<object>();
+        foreach (var item in new[] {
+            (Key: @"Software\Microsoft\Windows\CurrentVersion\Internet Settings", Names: new[] { "ProxyEnable", "ProxyServer", "ProxyOverride", "AutoConfigURL", "AutoDetect" }),
+            (Key: @"Software\Microsoft\Windows\CurrentVersion\Run", Names: new[] { "OneTunnel" }) })
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(item.Key, writable: false);
+            var existing = key?.GetValueNames() ?? [];
+            foreach (string name in item.Names)
+            {
+                bool exists = existing.Contains(name, StringComparer.OrdinalIgnoreCase);
+                values.Add(new { item.Key, Name = name, Exists = exists, Kind = exists ? (int)key!.GetValueKind(name) : -1,
+                    Value = exists ? key!.GetValue(name, null, Microsoft.Win32.RegistryValueOptions.DoNotExpandEnvironmentNames) : null });
+            }
+        }
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(values);
+        try { return SHA256.HashData(bytes); }
+        finally { CryptographicOperations.ZeroMemory(bytes); }
     }
     private static void Assert(bool value, string message) { if (!value) throw new Exception(message); Console.WriteLine("PASS: " + message); }
     [DllImport("user32.dll")]

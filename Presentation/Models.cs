@@ -62,4 +62,7 @@ public sealed record NetworkInput(string Mode,string ServerIP,string ServerName,
 public sealed record BackupExportResult(int ProfileCount);
 public sealed record BackupRestorePreview(string Token,int CurrentProfiles,int ReplacementProfiles,int EnabledSchedules,bool CanApply,string ExpiresAt);
 public sealed record TrayProfileItem(string ID,string Name,string Group);
+public sealed record UserPreferences(bool UseSystemProxy=false,bool AutoConnect=false,string ProfileID="",bool FullDevice=false,bool AllowTrusted=false,bool AllowPublic=false);
+public sealed record UserSettingsView(UserPreferences Preferences,string Token,string NetworkCategory,string Message,bool CanSave,bool ProxyEnabled,bool AutoConnectInhibited,bool StartupRecorded,bool CanEnableProxy,bool CanDisableProxy,bool CanEnableStartup,bool CanDisableStartup,bool StartupEnabled=false);
+public sealed record UserSettingsTickResult(UserSettingsView View,DesktopReply? Connection);
 public sealed record TrayProfilesView(string Token,string SelectedID,string Message,List<TrayProfileItem> Profiles,bool CanSelect,bool Truncated);
