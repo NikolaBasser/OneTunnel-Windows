@@ -51,6 +51,15 @@ Provider-reported traffic and expiry may be unknown and do not establish live us
 Scheduled refresh is not included. Existing import and connect-time preparation still work.
 Manual subscription management runs in the user host and requires no service update.
 
+SYSTEM TRAY
+Right-click the OneTunnel notification-area icon for the Go-projected status and actions.
+Open or double-click restores the existing window. Minimize retains its taskbar entry.
+The recovery menu opens the existing view; it does not change networking automatically.
+Status notifications are off by default. The tray menu can enable them for this session;
+Windows notification preferences may suppress delivery. This choice is not persisted.
+Close/Exit retains the normal UI-exit behavior and does not disconnect the service.
+This UI-only feature requires no installed-service update.
+
 OUTPUT
 dist/OneTunnel-0.1.0-win-x64/
 dist/OneTunnel-0.1.0-win-x64.zip

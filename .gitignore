@@ -12,6 +12,7 @@
 /tests/WorkspaceUi.Check/*
 !/tests/WorkspaceUi.Check/WorkspaceUiCheck.csproj
 !/tests/WorkspaceUi.Check/Program.cs
+!/tests/WorkspaceUi.Check/TrayChecks.cs
 /scripts/Analyze-*
 /scripts/Test-*
 /scripts/Setup-Engines.ps1

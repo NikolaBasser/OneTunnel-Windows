@@ -26,6 +26,8 @@ public partial class MainWindow : Window
     private int subscriptionLoadVersion;
     private Guid? editing;
     private bool busy, allowClose, storageReady;
+    private TrayShell? tray;
+    private WindowState previousWindowState = WindowState.Normal;
     public MainWindow()
     {
         InitializeComponent();
@@ -46,6 +48,11 @@ public partial class MainWindow : Window
         Log("Приложение готово. Подключения не запускаются автоматически."); RefreshControls();
         Loaded += async (_, _) =>
         {
+            try {
+                tray = new TrayShell(RestoreWindow, MinimizeWindow, () => Connect_Click(this, new RoutedEventArgs()), () => { RestoreWindow(); Engines_Click(this, new RoutedEventArgs()); }, Close);
+                UpdateTray(); tray.Show();
+            }
+            catch { tray?.Dispose(); tray = null; Feedback.Text = "Значок трея недоступен. Окно остаётся в панели задач."; }
             await RefreshService();
             _ = connection.ObserveAsync(lifetime.Token);
             var args = Environment.GetCommandLineArgs();
@@ -59,6 +66,8 @@ public partial class MainWindow : Window
                 allowClose = true; Close();
             }
         };
+        StateChanged += (_, _) => { if (WindowState != WindowState.Minimized) previousWindowState = WindowState; };
+        Closed += (_, _) => { lifetime.Cancel(); preview?.Cancel(); groupCheck?.Cancel(); subscriptionDownload?.Cancel(); tray?.Dispose(); tray = null; };
     }
     private async Task RefreshService()
     {
@@ -79,6 +88,7 @@ public partial class MainWindow : Window
             ConnectionHint.Text=display.ConnectionHint;
         }
         if(display.RecoveryHint!="") Feedback.Text=display.RecoveryHint;
+        UpdateTray();
     }
     private void Log(string message)
     {
@@ -133,6 +143,21 @@ public partial class MainWindow : Window
         StartServiceButton.IsEnabled=actions.CanStartService;
         EditorPanel.IsEnabled=EditorActions.IsEnabled=actions.CanSave;
         SaveProfileButton.IsEnabled=actions.CanSave;
+        UpdateTray();
+    }
+    private void UpdateTray()
+    {
+        if (tray?.Present(connection.Display, connection.Actions) is { } notification) tray.Notify(notification);
+    }
+    private void MinimizeWindow()
+    {
+        if (WindowState != WindowState.Minimized) previousWindowState = WindowState;
+        WindowState = WindowState.Minimized;
+    }
+    private void RestoreWindow()
+    {
+        WindowState = previousWindowState == WindowState.Minimized ? WindowState.Normal : previousWindowState;
+        ShowInTaskbar = true; Show(); Activate();
     }
     private async void Profiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
