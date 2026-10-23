@@ -2,28 +2,36 @@ OneTunnel — Windows x64
 
 BUILD REQUIREMENTS
 Windows 10/11 x64, .NET 10 SDK and PowerShell.
-The pinned Go toolchain is prepared by scripts/Setup-Go.ps1.
+An explicitly selected clean core bundle matching core-reference.json is required.
 Assets and dependency license notices are included in the source tree.
 
-BUILD THE CORE EXPLICITLY
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build-Core.ps1
-The core builder requires Go and does not use .NET or Windows UI sources.
-Use a new or empty output directory for each bundle.
+PREPARE THE CORE INPUT
+Read core-reference.json and check out that exact commit in the separate OneTunnel-Core repository.
+Follow its BUILD.txt to produce a clean Windows amd64 core bundle.
+This repository contains no Go sources, Go setup script or implicit core build command.
 
 BUILD THE WINDOWS APPLICATION
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build.ps1 -Name OneTunnel-win-x64 -CoreBundlePath artifacts/core-bundle
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build.ps1 -Name OneTunnel-win-x64 -CoreBundlePath C:\path\to\trusted-core-bundle
 For a development build:
 dotnet build OneTunnel.csproj -p:CoreBundlePath=C:\path\to\trusted-core-bundle
 Application builds never compile or download Go binaries implicitly.
 Bundle validation checks API, platform, native architecture and file integrity before packaging.
 Use bundles produced from reviewed source; self-reported hashes do not authenticate a publisher.
-The selected core version and source revision are recorded in core-bundle.json.
+The selected core must match the pinned version, source revision, API and target and be clean.
+Updating core-reference.json is a reviewed dependency update, not an automatic latest-version selection.
+The selected manifest is included in the application output as core-bundle.json.
 
 SUPPORTED TARGETS
 The complete application and embedded native dependencies currently support Windows x64.
-CI also checks portable control/protocol packages on Linux amd64 and arm64; these checks
-do not constitute Linux VPN application support. Windows ARM64 requires matching native
-dependencies and runtime validation before it can be packaged. No release is produced by CI.
+Portable core tests belong to the separate core repository. Windows ARM64 requires matching
+native dependencies and runtime validation before it can be packaged. No release is produced by CI.
+
+CI
+Push and pull-request checks run synthetic source/bundle-validator checks only; they are not application builds.
+The manual Windows package workflow explicitly checks out and builds the pinned core source.
+Before running it, configure ONETUNNEL_CORE_REPOSITORY as the trusted owner/repository and
+CORE_READ_TOKEN as a read-only token for that private repository. Missing configuration fails
+the build job. No remote repository is assumed or created by this local split.
 
 OUTPUT
 dist/OneTunnel-win-x64/

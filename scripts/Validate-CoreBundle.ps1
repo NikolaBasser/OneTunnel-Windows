@@ -4,6 +4,7 @@ param(
     [string]$ExpectedOS = 'windows',
     [string]$ExpectedArchitecture = 'amd64',
     [string]$ExpectedRevision = '',
+    [string]$Reference = '',
     [switch]$Quiet
 )
 $ErrorActionPreference = 'Stop'
@@ -31,6 +32,18 @@ if (($manifest.SchemaVersion -isnot [int] -and $manifest.SchemaVersion -isnot [l
 }
 if ($ExpectedOS -cne 'windows' -or $ExpectedArchitecture -cne 'amd64') { throw 'Only Windows amd64 core bundles are currently supported.' }
 if ($ExpectedRevision -and $manifest.SourceRevision -cne $ExpectedRevision) { throw 'Core source revision does not match the selected revision.' }
+if ($Reference) {
+    $pin = Get-Content -LiteralPath $Reference -Raw | ConvertFrom-Json
+    if (($pin.SchemaVersion -isnot [int] -and $pin.SchemaVersion -isnot [long]) -or $pin.SchemaVersion -ne 1 -or
+        $pin.Repository -cne 'OneTunnel-Core' -or $pin.SourceRevision -isnot [string] -or
+        $pin.SourceRevision -cnotmatch '^[0-9a-f]{40}$' -or $pin.Version -isnot [string] -or
+        $pin.Version -notmatch '^\d+\.\d+\.\d+$' -or
+        ($pin.ApiVersion -isnot [int] -and $pin.ApiVersion -isnot [long]) -or
+        $pin.ApiVersion -ne $ExpectedApiVersion -or $pin.OS -cne $ExpectedOS -or
+        $pin.Architecture -cne $ExpectedArchitecture) { throw 'Invalid pinned core reference.' }
+    if ($manifest.SourceRevision -cne $pin.SourceRevision -or $manifest.Version -cne $pin.Version -or
+        $manifest.Dirty) { throw 'Core bundle must match the pinned clean source revision and version.' }
+}
 $declared = @{}
 foreach ($entry in @($manifest.Files)) {
     $relative = [string]$entry.Path

@@ -1,4 +1,4 @@
-name: Validate core and Windows boundary
+name: Validate Windows sources and pinned core integration
 
 on:
   push:
@@ -9,34 +9,33 @@ permissions:
   contents: read
 
 concurrency:
-  group: validate-${{ github.ref }}
+  group: windows-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  portable:
-    name: Portable packages (${{ matrix.runner }})
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [ubuntu-24.04, ubuntu-24.04-arm]
-    runs-on: ${{ matrix.runner }}
+  source-validation:
+    name: Synthetic source checks (no application build)
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.27.3'
-          cache-dependency-path: GoCore/go.sum
-      - name: Test portable contracts and configuration compilers
-        working-directory: GoCore
-        run: go test -mod=readonly -count=1 ./internal/control ./internal/protocol ./internal/profiles
-      - name: Check portable packages
-        working-directory: GoCore
-        run: go vet -mod=readonly ./internal/control ./internal/protocol ./internal/profiles
+      - name: Validate synthetic bundles and pinned references
+        shell: pwsh
+        run: ./tests/CoreBundle.Tests.ps1
+      - name: Check declared core reference
+        shell: pwsh
+        run: |
+          $pin = Get-Content core-reference.json -Raw | ConvertFrom-Json
+          if ($pin.SourceRevision -cnotmatch '^[0-9a-f]{40}$' -or $pin.Repository -cne 'OneTunnel-Core' -or
+              $pin.SchemaVersion -ne 1 -or $pin.ApiVersion -ne 1 -or $pin.Version -notmatch '^\d+\.\d+\.\d+$' -or
+              $pin.OS -cne 'windows' -or $pin.Architecture -cne 'amd64') { throw 'Invalid core source pin.' }
+          'Synthetic source checks passed. The application build requires the explicit manual pinned-core integration job.' | Add-Content $env:GITHUB_STEP_SUMMARY
 
-  windows:
-    name: Windows x64 core and WPF package
+  windows-build:
+    name: Explicit Windows x64 build with pinned core
+    if: github.event_name == 'workflow_dispatch'
+    needs: source-validation
     runs-on: windows-2025
     defaults:
       run:
@@ -45,37 +44,35 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Require configured trusted core source
+        id: core
+        env:
+          CORE_REPOSITORY: ${{ vars.ONETUNNEL_CORE_REPOSITORY }}
+          CORE_READ_TOKEN: ${{ secrets.CORE_READ_TOKEN }}
+        run: |
+          if ($env:CORE_REPOSITORY -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' -or !$env:CORE_READ_TOKEN) {
+            throw 'Configure ONETUNNEL_CORE_REPOSITORY and read-only CORE_READ_TOKEN before running the application build. No split core remote is assumed.'
+          }
+          $pin = Get-Content core-reference.json -Raw | ConvertFrom-Json
+          if ($pin.SourceRevision -cnotmatch '^[0-9a-f]{40}$') { throw 'Invalid pinned core commit.' }
+          "revision=$($pin.SourceRevision)" | Add-Content $env:GITHUB_OUTPUT
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ vars.ONETUNNEL_CORE_REPOSITORY }}
+          ref: ${{ steps.core.outputs.revision }}
+          token: ${{ secrets.CORE_READ_TOKEN }}
+          path: artifacts/core-source
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: '1.27.3'
-          cache-dependency-path: GoCore/go.sum
+          cache-dependency-path: artifacts/core-source/go.sum
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           dotnet-version: '10.0.x'
-      - name: Test contracts with production engine build tags
-        working-directory: GoCore
-        run: >-
-          go test -mod=readonly -p 1 -count=1
-          -tags embeddedxray,embeddedsingbox,embeddedtun,embeddedawg,with_quic,with_gvisor,with_naive_outbound,with_purego
-          ./...
-      - name: Check Windows contracts and profile storage
-        working-directory: GoCore
-        run: >-
-          go vet -mod=readonly
-          -tags embeddedxray,embeddedsingbox,embeddedtun,embeddedawg,with_quic,with_gvisor,with_naive_outbound,with_purego
-          ./...
-      - name: Build standalone core without the UI toolchain
-        run: ./GoCore/build.ps1 -GoExecutable (Get-Command go).Source -Output "$PWD/artifacts/core-bundle"
-      - name: Test bundle validation with synthetic data
-        run: ./tests/CoreBundle.Tests.ps1
-      - name: Package Windows against the selected core bundle
+      - name: Build the explicitly selected core source
+        run: ./artifacts/core-source/build.ps1 -GoExecutable (Get-Command go).Source -Output "$PWD/artifacts/core-bundle"
+      - name: Build and package the Windows application
         run: ./scripts/Build.ps1 -Name OneTunnel-ci-win-x64 -CoreBundlePath "$PWD/artifacts/core-bundle"
-      - name: Verify selected core replaces stale development binaries
+      - name: Verify actual core output selection
         run: ./tests/CoreBoundary.Integration.ps1 -CoreBundlePath "$PWD/artifacts/core-bundle"
-      - name: Record unsupported application targets
-        run: |
-          @'
-          Windows ARM64 application packaging is unsupported: the pinned Cronet native dependency is Windows amd64.
-          Linux checks cover portable packages only; no Linux service or application package exists at this stage.
-          This workflow does not install a service, connect a VPN, or modify routes, DNS, or firewall rules.
-          '@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY

@@ -6,18 +6,19 @@
 	<Version>0.5.0</Version>
     <DefaultItemExcludes>$(DefaultItemExcludes);tests\**;dist\**;artifacts\**;assets\downloads\**</DefaultItemExcludes>
   </PropertyGroup>
-  <ItemGroup><Compile Remove="Core\**;Service\**;GoCore\**;Presentation\**;Client\obj\**;Client\bin\**"/><ProjectReference Include="Presentation\OneTunnel.Presentation.csproj"/></ItemGroup>
+  <ItemGroup><Compile Remove="Presentation\**;Client\obj\**;Client\bin\**"/><ProjectReference Include="Presentation\OneTunnel.Presentation.csproj"/></ItemGroup>
   <PropertyGroup Condition="'$(CoreBundlePath)' != ''">
     <CoreBundlePath>$([System.IO.Path]::GetFullPath('$(CoreBundlePath)', '$(MSBuildProjectDirectory)'))</CoreBundlePath>
   </PropertyGroup>
   <Target Name="ValidateCoreBundle" BeforeTargets="PrepareForBuild">
-    <Error Condition="'$(CoreBundlePath)' == ''" Text="Set CoreBundlePath to a trusted core bundle. Build it explicitly with scripts/Build-Core.ps1 first." />
+    <Error Condition="'$(CoreBundlePath)' == ''" Text="Set CoreBundlePath to a trusted clean bundle matching core-reference.json. Build that pinned revision in the separate OneTunnel-Core repository." />
     <Error Condition="'$(RuntimeIdentifier)' != '' and '$(RuntimeIdentifier)' != 'win-x64'" Text="Only Windows x64 core bundles are supported. Native ARM64 dependencies have not been validated." />
-    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\Validate-CoreBundle.ps1&quot; -Bundle &quot;$(CoreBundlePath)&quot; -Quiet" />
+    <Exec Command="powershell.exe -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\scripts\Validate-CoreBundle.ps1&quot; -Bundle &quot;$(CoreBundlePath)&quot; -Reference &quot;$(MSBuildProjectDirectory)\core-reference.json&quot; -Quiet" />
   </Target>
   <ItemGroup Condition="'$(CoreBundlePath)' != ''">
     <Content Include="$(CoreBundlePath)\**\*" Link="%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" />
   </ItemGroup>
+  <ItemGroup><Content Include="core-reference.json" CopyToOutputDirectory="Always" CopyToPublishDirectory="Always" /></ItemGroup>
   <ItemGroup><Content Include="third-party\notices\*.txt;third-party\provenance.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
   <ItemGroup><Content Include="assets\emoji\*.png;assets\LICENSE.twemoji.txt;assets\LICENSE.uniseg.txt;assets\emoji-provenance.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" /></ItemGroup>
 </Project>

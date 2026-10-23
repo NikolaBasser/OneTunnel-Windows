@@ -52,12 +52,44 @@ function Must-Reject([string]$name, [scriptblock]$operation, [string]$expectedMe
     }
     if (!$rejected) { throw "Validator accepted invalid bundle: $name" }
     $script:passed++
+
 }
 try {
     $valid = New-Fixture 'valid'
     $identity = & $Validator -Bundle $valid -ExpectedRevision $revision
     if ($identity.SourceRevision -cne $revision) { throw 'Valid bundle identity was lost.' }
     $script:passed++
+    $reference = Join-Path $testRoot 'core-reference.json'
+    $pin = @{SchemaVersion=1;Repository='OneTunnel-Core';SourceRevision=$revision;Version='0.5.0';ApiVersion=1;OS='windows';Architecture='amd64'}
+    $pin | ConvertTo-Json | Set-Content -LiteralPath $reference -Encoding UTF8
+    & $Validator -Bundle $valid -Reference $reference -Quiet
+    $script:passed++
+    foreach ($property in @('SourceRevision','Version','ApiVersion','OS','Architecture','Repository','SchemaVersion')) {
+        $changed = $pin.Clone()
+        switch ($property) {
+            'SourceRevision' { $changed[$property] = '2' * 40 }
+            'Version' { $changed[$property] = '0.5.1' }
+            'ApiVersion' { $changed[$property] = 2 }
+            'OS' { $changed[$property] = 'linux' }
+            'Architecture' { $changed[$property] = 'arm64' }
+            'Repository' { $changed[$property] = 'Unexpected-Core' }
+            'SchemaVersion' { $changed[$property] = '1' }
+        }
+        $changed | ConvertTo-Json | Set-Content -LiteralPath $reference -Encoding UTF8
+        Must-Reject "mismatched pinned $property" { & $Validator -Bundle $valid -Reference $reference }
+    }
+    $pin | ConvertTo-Json | Set-Content -LiteralPath $reference -Encoding UTF8
+    $dirty = New-Fixture 'dirty-pinned'
+    $manifest = Get-Content -LiteralPath (Join-Path $dirty 'core-bundle.json') -Raw | ConvertFrom-Json
+    $manifest.Dirty = $true
+    Save-Manifest $dirty $manifest
+    $runtime = Get-Content -LiteralPath (Join-Path $dirty 'service/go-runtime.json') -Raw | ConvertFrom-Json
+    $runtime.Dirty = $true
+    $runtime | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $dirty 'service/go-runtime.json') -Encoding UTF8
+    Update-Manifest $dirty
+    & $Validator -Bundle $dirty -Quiet
+    Must-Reject 'dirty pinned bundle' { & $Validator -Bundle $dirty -Reference $reference } 'pinned clean source revision'
+    Must-Reject 'missing pinned reference' { & $Validator -Bundle $valid -Reference (Join-Path $testRoot 'missing-reference.json') }
     Must-Reject 'missing bundle' { & $Validator -Bundle (Join-Path $testRoot 'missing') }
     Must-Reject 'wrong selected revision' { & $Validator -Bundle $valid -ExpectedRevision ('2' * 40) }
     Must-Reject 'wrong API' { & $Validator -Bundle $valid -ExpectedApiVersion 2 }
