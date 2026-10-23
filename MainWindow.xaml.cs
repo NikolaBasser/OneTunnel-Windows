@@ -81,7 +81,7 @@ public partial class MainWindow : Window
         if (panel == "engines")
         {
             var state=DesktopEnvironment.State;
-            EngineDetails.Text = $"AmneziaWG / WireGuard — {(state.Awg ? "компонент найден" : "не установлен")}\nSOCKS5 / Shadowsocks / TUN (sing-box) — {(state.SingBox ? "компонент найден" : "не установлен")}\nVLESS / Hysteria2 (Xray) — {(state.Xray ? "компонент найден" : "не установлен")}\nПрофили, импорт и подписки: Go-ядро\nУправляющая служба: {(connection.Available ? "доступна" : "нет связи — установи или запусти службу")}\nДля обычной работы права администратора интерфейсу не требуются.";
+            EngineDetails.Text = $"AmneziaWG / WireGuard — {(state.Awg ? "компонент найден" : "не установлен")}\nSOCKS5 / Shadowsocks / HTTP(S) / Trojan / TUIC / AnyTLS / NaiveProxy / TUN (sing-box) — {(state.SingBox ? "компонент найден" : "не установлен")}\nVLESS / Hysteria2 (Xray) — {(state.Xray ? "компонент найден" : "не установлен")}\nПрофили, импорт и подписки: Go-ядро\nУправляющая служба: {(connection.Available ? "доступна" : "нет связи — установи или запусти службу")}\nДля обычной работы права администратора интерфейсу не требуются.";
         }
     }
     private async void RefreshControls()
@@ -110,7 +110,7 @@ public partial class MainWindow : Window
         ProfileDescription.Text = p == null ? "Импорт конфигурации или подписки" : $"{p.Protocol} · профиль сохранён локально";
         ModePanel.Visibility = p != null ? Visibility.Visible : Visibility.Collapsed;
         profileView = null;
-        if (p == null) { ConnectionInfo.Text = "AmneziaWG · WireGuard · VLESS · SOCKS5 · Hysteria2 · Shadowsocks"; ConnectionHint.Text = "Серверы не входят в приложение."; }
+        if (p == null) { ConnectionInfo.Text = "AmneziaWG · WireGuard · VLESS · SOCKS5 · Hysteria2 · Shadowsocks · HTTP(S) · Trojan · TUIC · AnyTLS · NaiveProxy"; ConnectionHint.Text = "Серверы не входят в приложение."; }
         else
         {
             try
