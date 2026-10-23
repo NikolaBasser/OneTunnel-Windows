@@ -819,7 +819,7 @@ public partial class MainWindow : Window
             libraryProjectionLoaded = true;
             appliedLibrarySort = librarySort;
             appliedFavoritesOnly = favoritesOnly;
-            var selectionToRestore = pendingLibrarySelection ?? selected?.Id;
+            var selectionToRestore = fastestSelectionPending && !connection.Actions.CanSelect ? selected?.Id : pendingLibrarySelection ?? selected?.Id;
             if (profileCollectionView != null) profileCollectionView.CustomSort = new ProfileRankComparer(libraryRanks);
             LibraryStatus.Text = "";
             RefreshProfileFilter(true);

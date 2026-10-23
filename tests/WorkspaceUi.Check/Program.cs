@@ -401,6 +401,23 @@ internal static class Program
         var targetSelection = (Task)typeof(MainWindow).GetMethod("PresentFastestSelectionAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [targetResult.Id])!;
         Wait(() => targetSelection.IsCompleted && LibraryIdle()); targetSelection.GetAwaiter().GetResult();
         Assert(list.SelectedItem is Profile resultSelected && resultSelected.Id == targetResult.Id && search.Text == "" && Find<CheckBox>("FavoritesOnlyBox").IsChecked == false, "Explicit result selection reveals and selects the exact hidden profile");
+        Find<CheckBox>("FavoritesOnlyBox").IsChecked = true; Wait(LibraryIdle);
+        var connectionObject = typeof(MainWindow).GetField("connection", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+        var connectionSnapshot = connectionObject.GetType().GetField("snapshot", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var retainedSnapshot = (DesktopReply)connectionSnapshot.GetValue(connectionObject)!;
+        var fastestFlag = typeof(MainWindow).GetField("fastestSelectionPending", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert(hostGate.Wait(2000), "Test can delay best-result visibility projection without networking");
+        Task policySelection;
+        try {
+            fastestFlag.SetValue(window, true);
+            policySelection = (Task)typeof(MainWindow).GetMethod("PresentFastestSelectionAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [targetResult.Id])!;
+            connectionSnapshot.SetValue(connectionObject, retainedSnapshot with { Actions = retainedSnapshot.Actions! with { CanSelect = false } });
+        }
+        finally { hostGate.Release(); }
+        Wait(() => policySelection.IsCompleted && LibraryIdle()); policySelection.GetAwaiter().GetResult();
+        Assert(((Profile?)list.SelectedItem)?.Id != targetResult.Id, "A newly unavailable Go selection policy blocks pending best-result selection");
+        connectionSnapshot.SetValue(connectionObject, retainedSnapshot);
+        fastestFlag.SetValue(window, false);
         var selectedBeforeMissing = list.SelectedItem;
         var missingSelection = (Task)typeof(MainWindow).GetMethod("PresentFastestSelectionAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [Guid.NewGuid()])!;
         Wait(() => missingSelection.IsCompleted);
