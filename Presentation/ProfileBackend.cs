@@ -24,9 +24,18 @@ public static class ProfileBackend
     public static Task<ImportPreview> ImportFileAsync(string path)=>ProfileHost.CallAsync<ImportPreview>("editor.import",new{Path=path});
     public static Task<List<SubscriptionSummary>> SubscriptionsAsync()=>ProfileHost.CallAsync<List<SubscriptionSummary>>("ui.subscription.list");
     public static Task<SubscriptionPreview> PreviewSubscriptionAsync(string group,CancellationToken cancellation=default)=>ProfileHost.CallAsync<SubscriptionPreview>("ui.subscription.refresh.preview",new{Group=group},cancellation:cancellation);
+    public static Task<SubscriptionScheduleView> SubscriptionScheduleAsync(string group)=>ProfileHost.CallAsync<SubscriptionScheduleView>("subscription.schedule.view",new{Group=group});
+    public static Task<ProfileDocument> SaveSubscriptionScheduleAsync(string group,string token,SubscriptionSchedule schedule)=>ProfileHost.CallAsync<ProfileDocument>("ui.subscription.schedule.save",new{Group=group,Token=token,Schedule=schedule});
+    public static Task<ScheduledSubscriptionResult> TickSubscriptionScheduleAsync(CancellationToken cancellation=default)=>ProfileHost.CallAsync<ScheduledSubscriptionResult>("subscription.schedule.tick",cancellation:cancellation);
     public static Task<ProfileDocument> LoadDocumentAsync()=>ProfileHost.CallAsync<ProfileDocument>("ui.store.load");
     public static Task<AppliedProfiles> ApplySubscriptionAsync(string token)=>ProfileHost.CallAsync<AppliedProfiles>("ui.subscription.refresh.apply",new{Token=token});
     public static Task CancelSubscriptionPreviewAsync(string token)=>ProfileHost.CallAsync<object?>("ui.subscription.refresh.cancel",new{Token=token});
+    public static Task<BackupExportResult> ExportBackupAsync(string path,string password)=>ProfileHost.CallAsync<BackupExportResult>("backup.export",new{Path=path,Password=password});
+    public static Task<BackupRestorePreview> PreviewBackupAsync(string path,string password)=>ProfileHost.CallAsync<BackupRestorePreview>("backup.restore.preview",new{Path=path,Password=password});
+    public static Task<ProfileDocument> ApplyBackupRestoreAsync(string token,bool restoreSchedules)=>ProfileHost.CallAsync<ProfileDocument>("ui.backup.restore.apply",new{Token=token,RestoreSchedules=restoreSchedules});
+    public static Task CancelBackupRestoreAsync(string token)=>ProfileHost.CallAsync<object?>("backup.restore.cancel",new{Token=token});
+    public static Task<TrayProfilesView> TrayProfilesAsync()=>ProfileHost.CallAsync<TrayProfilesView>("tray.profiles.view");
+    public static Task<string> SelectTrayProfileAsync(string id,string token)=>ProfileHost.CallAsync<string>("tray.profiles.select",new{ID=id,Token=token});
     public static TransportOptions DefaultTransport()=>ProfileHost.Call<TransportOptions>("transport.defaults");
     public static Task<ProfileView> ViewAsync(Protocol protocol)=>ProfileHost.CallAsync<ProfileView>("profile.view",new{Requested=(int)protocol});
     public static ProfileDocument Delete(Guid id)=>ProfileHost.Call<ProfileDocument>("ui.delete",new{ID=id.ToString()});

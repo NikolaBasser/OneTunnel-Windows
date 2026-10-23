@@ -9,6 +9,8 @@ public sealed class TrayShell : IDisposable
     private readonly System.Windows.Forms.ContextMenuStrip menu;
     private string? lastStatus;
     private bool disposed;
+    private int profileGeneration;
+    private readonly List<System.Windows.Forms.ToolStripItem> profileItems = [];
 
     public System.Windows.Forms.ToolStripMenuItem StatusItem { get; }
     public System.Windows.Forms.ToolStripMenuItem ToggleItem { get; }
@@ -17,6 +19,7 @@ public sealed class TrayShell : IDisposable
     public System.Windows.Forms.ToolStripMenuItem ExitItem { get; }
     public System.Windows.Forms.ToolStripMenuItem OpenItem { get; }
     public System.Windows.Forms.ToolStripMenuItem MinimizeItem { get; }
+    public System.Windows.Forms.ToolStripMenuItem TrayProfilesMenuItem { get; }
 
     public TrayShell(Action open, Action minimize, Action toggle, Action recover, Action exit)
     {
@@ -28,6 +31,9 @@ public sealed class TrayShell : IDisposable
         menu.Items.Add(StatusItem);
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         menu.Items.Add(ToggleItem); menu.Items.Add(RecoverItem);
+        TrayProfilesMenuItem = new System.Windows.Forms.ToolStripMenuItem("Выбрать профиль");
+        menu.Items.Add(TrayProfilesMenuItem);
+        ClearProfiles();
         menu.Items.Add(NotificationsItem);
         menu.Items.Add(new System.Windows.Forms.ToolStripSeparator());
         OpenItem = new System.Windows.Forms.ToolStripMenuItem("Открыть OneTunnel"); OpenItem.Click += (_, _) => { if (!disposed) open(); };
@@ -41,6 +47,41 @@ public sealed class TrayShell : IDisposable
         icon.BalloonTipClicked += (_, _) => { if (!disposed) open(); };
     }
 
+    public void ClearProfiles()
+    {
+        if (disposed) return;
+        profileGeneration++;
+        foreach (var item in profileItems) item.Dispose();
+        profileItems.Clear();
+        var placeholder = new System.Windows.Forms.ToolStripMenuItem("Обновление списка профилей…") { Enabled = false };
+        profileItems.Add(placeholder); TrayProfilesMenuItem.DropDownItems.Add(placeholder);
+        TrayProfilesMenuItem.Enabled = false;
+    }
+    public void PresentProfiles(TrayProfilesView view, Action<string,string> selectProfile)
+    {
+        if (disposed) return;
+        int generation = ++profileGeneration;
+        foreach (var item in profileItems) item.Dispose();
+        profileItems.Clear();
+        foreach (var profile in view.Profiles)
+        {
+            string id = profile.ID;
+            var item = new System.Windows.Forms.ToolStripMenuItem($"{profile.Name} · {profile.Group}") { Checked = id == view.SelectedID, CheckOnClick = false, Enabled = view.CanSelect };
+            item.Click += (_, _) => { if (!disposed && !item.IsDisposed && item.Enabled && generation == profileGeneration && view.CanSelect) selectProfile(id, view.Token); };
+            profileItems.Add(item); TrayProfilesMenuItem.DropDownItems.Add(item);
+        }
+        if (view.Truncated)
+        {
+            var more = new System.Windows.Forms.ToolStripMenuItem("Открой окно для остальных профилей") { Enabled = false };
+            profileItems.Add(more); TrayProfilesMenuItem.DropDownItems.Add(more);
+        }
+        if (profileItems.Count == 0)
+        {
+            var empty = new System.Windows.Forms.ToolStripMenuItem(string.IsNullOrWhiteSpace(view.Message) ? "Нет доступных профилей" : view.Message) { Enabled = false };
+            profileItems.Add(empty); TrayProfilesMenuItem.DropDownItems.Add(empty);
+        }
+        TrayProfilesMenuItem.Enabled = view.CanSelect && view.Profiles.Count > 0;
+    }
     public void Show() { if (!disposed) icon.Visible = true; }
 
     public string? Present(DesktopDisplay display, DesktopActions actions)

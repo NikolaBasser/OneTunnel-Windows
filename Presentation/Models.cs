@@ -26,11 +26,15 @@ public sealed record TransportOptions
 public sealed record ImportResult(List<Profile> Profiles,int Duplicates,int Skipped);
 public sealed record SubscriptionMergeResult(List<Profile> Profiles,int Added,int Updated,int Removed);
 public sealed record SubscriptionSummary(string Group,int ProfileCount,string UpdatedAt,string Usage,string Expiry,bool CanRefresh);
+public sealed record SubscriptionSchedule(bool Enabled,int IntervalMinutes);
+public sealed record SubscriptionScheduleView(string Group,string Token,string NextCheckAt,string Message,bool Enabled,bool CanEdit,int IntervalMinutes);
+public sealed record ScheduledSubscriptionResult(SubscriptionPreview? Preview,string Message);
 public sealed record SubscriptionChange(string Name,string Protocol,string Kind);
 public sealed record SubscriptionPreview(string Token,string Group,int Added,int Updated,int Removed,int Duplicates,int Skipped,List<SubscriptionChange> Changes,string Usage,string Expiry,string ExpiresAt,bool CanApply);
 public sealed record ProfileDocument(int Version,List<Profile> Profiles,HashSet<string> CollapsedGroups,Dictionary<string,string> SubscriptionSources)
 {
     public HashSet<Guid> FavoriteIDs {get;init;}=[];
+    public Dictionary<string,SubscriptionSchedule> SubscriptionSchedules {get;init;}=[];
 }
 public sealed record ProfileLibraryView([property: System.Text.Json.Serialization.JsonPropertyName("ids")] List<Guid> IDs);
 public sealed record GroupSummary(string Name,int ProfileCount,bool IsSubscription,string Token);
@@ -49,3 +53,7 @@ public sealed record NetworkRule(string Kind,string Value,string Action);
 public sealed record NetworkOptions(DNSOptions? DNS,List<NetworkRule> Rules);
 public sealed record NetworkPreferencesView(string ID,string Token,string Message,string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,bool Supported,bool CanSave);
 public sealed record NetworkInput(string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText);
+public sealed record BackupExportResult(int ProfileCount);
+public sealed record BackupRestorePreview(string Token,int CurrentProfiles,int ReplacementProfiles,int EnabledSchedules,bool CanApply,string ExpiresAt);
+public sealed record TrayProfileItem(string ID,string Name,string Group);
+public sealed record TrayProfilesView(string Token,string SelectedID,string Message,List<TrayProfileItem> Profiles,bool CanSelect,bool Truncated);

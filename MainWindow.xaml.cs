@@ -33,6 +33,16 @@ public partial class MainWindow : Window
     private SubscriptionPreview? pendingSubscriptionPreview;
     private CancellationTokenSource? subscriptionDownload;
     private int subscriptionLoadVersion;
+    private SubscriptionScheduleView? subscriptionScheduleView;
+    private bool subscriptionSchedulePending, subscriptionScheduleSavePending, scheduleTickPending;
+    private int subscriptionScheduleVersion;
+    private string? subscriptionScheduleDraftGroup;
+    private System.Windows.Threading.DispatcherTimer? subscriptionScheduleTimer;
+    private TrayProfilesView? trayProfilesView;
+    private bool trayProfilesPending, traySelectionPending, applyingTrayProfileSelection;
+    private int trayProfilesVersion, traySelectionVersion;
+    private BackupRestorePreview? backupRestorePreview;
+    private bool backupPending, backupApplyPending;
     private Guid? editing;
     private bool busy, allowClose, storageReady;
     private bool libraryPending, favoritePending, libraryProjectionLoaded, updatingLibraryControls, applyingLibrarySelection;
@@ -101,9 +111,13 @@ public partial class MainWindow : Window
                 tray.NotificationsItem.CheckedChanged += TrayNotificationsItem_Changed;
                 TrayNotificationsBox.IsEnabled = true;
                 UpdateTray(); tray.Show();
+                _ = RefreshTrayProfilesAsync();
                 HideToTrayButton.IsEnabled = windowSource != null && windowHandle != IntPtr.Zero && taskbarCreatedMessage != 0;
             }
             catch { tray?.Dispose(); tray = null; TrayNotificationsBox.IsEnabled = HideToTrayButton.IsEnabled = false; Feedback.Text = "Значок трея недоступен. Окно остаётся в панели задач; уведомления недоступны."; }
+            subscriptionScheduleTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(60) };
+            subscriptionScheduleTimer.Tick += SubscriptionScheduleTimer_Tick;
+            subscriptionScheduleTimer.Start();
             await RefreshService();
             _ = connection.ObserveAsync(lifetime.Token);
             var args = Environment.GetCommandLineArgs();
@@ -118,7 +132,7 @@ public partial class MainWindow : Window
             }
         };
         StateChanged += (_, _) => { if (WindowState != WindowState.Minimized) previousWindowState = WindowState; };
-        Closed += (_, _) => { lifetime.Cancel(); preview?.Cancel(); groupCheck?.Cancel(); subscriptionDownload?.Cancel(); ReleaseRestoreHotkey(); try { windowSource?.RemoveHook(WindowNativeHook); } catch { } windowSource = null; tray?.Dispose(); tray = null; };
+        Closed += (_, _) => { subscriptionScheduleTimer?.Stop(); lifetime.Cancel(); preview?.Cancel(); groupCheck?.Cancel(); subscriptionDownload?.Cancel(); ReleaseRestoreHotkey(); try { windowSource?.RemoveHook(WindowNativeHook); } catch { } windowSource = null; tray?.Dispose(); tray = null; };
     }
     private async Task RefreshService()
     {
@@ -202,6 +216,64 @@ public partial class MainWindow : Window
         UpdateGroupResultControls();
         UpdateProfileOrganizationControls();
         UpdateNetworkPreferencesControls();
+        UpdateSubscriptionScheduleControls();
+        UpdateBackupControls();
+    }
+    private async Task RefreshTrayProfilesAsync()
+    {
+        if (tray == null || trayProfilesPending || lifetime.IsCancellationRequested) return;
+        int request = ++trayProfilesVersion;
+        trayProfilesPending = true;
+        trayProfilesView = null;
+        tray.ClearProfiles();
+        try
+        {
+            var view = await ProfileBackend.TrayProfilesAsync();
+            if (request != trayProfilesVersion || lifetime.IsCancellationRequested || tray == null) return;
+            trayProfilesView = view;
+            tray.PresentProfiles(view, (id, token) => _ = SelectTrayProfileAsync(id, token));
+        }
+        catch
+        {
+            if (request != trayProfilesVersion || tray == null) return;
+            trayProfilesView = null;
+            tray.ClearProfiles();
+        }
+        finally { if (request == trayProfilesVersion) trayProfilesPending = false; }
+    }
+    private async Task SelectTrayProfileAsync(string id, string token)
+    {
+        if (traySelectionPending || !connection.Actions.CanSelect || trayProfilesView is not { CanSelect: true } currentTrayView || currentTrayView.Token != token || !Guid.TryParse(id, out var requestedId)) return;
+        int selectionRequest = traySelectionVersion;
+        traySelectionPending = true;
+        tray?.ClearProfiles();
+        RestoreWindow();
+        try
+        {
+            string selectedId = await ProfileBackend.SelectTrayProfileAsync(id, token);
+            if (lifetime.IsCancellationRequested || selectionRequest != traySelectionVersion || !connection.Actions.CanSelect) return;
+            if (!Guid.TryParse(selectedId, out var actualId) || actualId != requestedId || profiles.FirstOrDefault(profile => profile.Id == actualId) is not { } profile) throw new InvalidDataException();
+            SearchBox.Clear();
+            updatingLibraryControls = true;
+            try { favoritesOnly = false; FavoritesOnlyBox.IsChecked = false; }
+            finally { updatingLibraryControls = false; }
+            pendingLibrarySelection = actualId;
+            RefreshProfileFilter(true);
+            await RefreshLibraryProjectionAsync();
+            if (lifetime.IsCancellationRequested || selectionRequest != traySelectionVersion || !connection.Actions.CanSelect) return;
+            if (profiles.FirstOrDefault(candidate => candidate.Id == actualId) is not { } exactProfile) throw new InvalidDataException();
+            applyingTrayProfileSelection = true;
+            try { ProfilesList.SelectedItem = exactProfile; ProfilesList.ScrollIntoView(exactProfile); }
+            finally { applyingTrayProfileSelection = false; }
+            if (!HasEditorContent()) ShowPanel("connection");
+            Feedback.Text = "Профиль выбран из трея. Подключение не запускалось.";
+        }
+        catch { Feedback.Text = "Не удалось выбрать профиль из трея. Открой окно и обнови список профилей."; }
+        finally
+        {
+            traySelectionPending = false;
+            if (!lifetime.IsCancellationRequested) _ = RefreshTrayProfilesAsync();
+        }
     }
     private void UpdateTray()
     {
@@ -341,6 +413,7 @@ public partial class MainWindow : Window
     private async void Profiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (!applyingLibrarySelection && e.AddedItems.Count > 0) pendingLibrarySelection = null;
+        if (!applyingLibrarySelection && !applyingTrayProfileSelection && !applyingProfileDocument && e.AddedItems.Count > 0) traySelectionVersion++;
         if (!IsInitialized || ProfileTitle == null) return;
         var p = selected;
         if (!applyingProfileDocument && p == null)
@@ -380,6 +453,7 @@ public partial class MainWindow : Window
         }
         UpdateModeHelp(); RefreshControls();
         PresentConnectionState();
+        if (tray != null) _ = RefreshTrayProfilesAsync();
     }
     private void Mode_Changed(object sender, SelectionChangedEventArgs e) => UpdateModeHelp();
     private void UpdateModeHelp()
@@ -436,9 +510,12 @@ public partial class MainWindow : Window
         if (!IsInitialized || SubscriptionGroupTitle == null) return;
         if (selectedSubscription is not { } item)
         {
-            SubscriptionDetails.Visibility = Visibility.Collapsed; RefreshControls(); return;
+            subscriptionScheduleVersion++; subscriptionScheduleView = null;
+            ScheduleEnabledBox.IsChecked = false; ScheduleIntervalBox.Clear(); ScheduleStatus.Text = "Выбери группу подписки, чтобы настроить расписание.";
+            SubscriptionDetails.Visibility = Visibility.Collapsed; UpdateSubscriptionScheduleControls(); RefreshControls(); return;
         }
         SubscriptionDetails.Visibility = Visibility.Visible;
+        if (subscriptionScheduleView?.Group != item.Group) _ = LoadSubscriptionScheduleAsync(item.Group, resetDraft: subscriptionScheduleDraftGroup != item.Group);
         SubscriptionGroupTitle.Text = item.Group;
         SubscriptionProfileCount.Text = $"{item.ProfileCount} проф.";
         SubscriptionUsage.Text = string.IsNullOrWhiteSpace(item.Usage) ? "Не сообщается" : item.Usage;
@@ -519,6 +596,79 @@ public partial class MainWindow : Window
         ShowPanel("subscriptions");
         Feedback.Text = $"Подписка обновлена. Обновлено: {result.Updated}. Добавлено: {result.Added}. Устаревших удалено: {result.Removed}.";
         Log("Ручное обновление подписки применено Go-ядром.");
+    }
+    private void UpdateSubscriptionScheduleControls()
+    {
+        if (!IsInitialized || ScheduleEnabledBox == null) return;
+        var view = subscriptionScheduleView;
+        bool selectedMatches = view != null && selectedSubscription?.Group == view.Group;
+        bool pending = subscriptionSchedulePending || subscriptionScheduleSavePending || scheduleTickPending || busy;
+        ScheduleEnabledBox.IsEnabled = ScheduleIntervalBox.IsEnabled = selectedMatches && view!.CanEdit && !pending;
+        SaveSubscriptionScheduleButton.IsEnabled = selectedMatches && view!.CanEdit && connection.Actions.CanSave && !pending && pendingSubscriptionPreview == null;
+    }
+    private void PresentSubscriptionSchedule(SubscriptionScheduleView view, bool resetDraft = false)
+    {
+        subscriptionScheduleView = view;
+        if (resetDraft || subscriptionScheduleDraftGroup != view.Group)
+        {
+            ScheduleEnabledBox.IsChecked = view.Enabled;
+            ScheduleIntervalBox.Text = view.IntervalMinutes.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            subscriptionScheduleDraftGroup = view.Group;
+        }
+        ScheduleStatus.Text = string.Join(" ", new[] { view.Message, string.IsNullOrWhiteSpace(view.NextCheckAt) ? "" : $"Следующая проверка: {view.NextCheckAt}." }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        UpdateSubscriptionScheduleControls();
+    }
+    private async Task LoadSubscriptionScheduleAsync(string group, bool resetDraft = false)
+    {
+        if (busy || !subscriptions.Any(item => item.Group == group)) return;
+        int request = ++subscriptionScheduleVersion;
+        subscriptionSchedulePending = true;
+        subscriptionScheduleView = null;
+        ScheduleStatus.Text = "Загрузка расписания…";
+        UpdateSubscriptionScheduleControls();
+        try
+        {
+            var view = await ProfileBackend.SubscriptionScheduleAsync(group);
+            if (request != subscriptionScheduleVersion || lifetime.IsCancellationRequested || selectedSubscription?.Group != group) return;
+            if (view.Group != group) throw new InvalidDataException();
+            PresentSubscriptionSchedule(view, resetDraft);
+        }
+        catch { if (request == subscriptionScheduleVersion) ScheduleStatus.Text = "Не удалось загрузить расписание. Повтори попытку."; }
+        finally
+        {
+            if (request == subscriptionScheduleVersion) { subscriptionSchedulePending = false; if (!lifetime.IsCancellationRequested) RefreshControls(); }
+        }
+    }
+    private async void SaveSubscriptionSchedule_Click(object sender, RoutedEventArgs e)
+    {
+        if (selectedSubscription is not { } item || subscriptionScheduleView is not { } view || view.Group != item.Group || !connection.Actions.CanSave || subscriptionScheduleSavePending || !int.TryParse(ScheduleIntervalBox.Text, out int minutes)) return;
+        subscriptionScheduleSavePending = true; UpdateSubscriptionScheduleControls();
+        try
+        {
+            var document = await ProfileBackend.SaveSubscriptionScheduleAsync(item.Group, view.Token, new(ScheduleEnabledBox.IsChecked == true, minutes));
+            if (lifetime.IsCancellationRequested || selectedSubscription?.Group != item.Group) return;
+            PresentDocument(document, selected?.Id);
+            await LoadSubscriptionScheduleAsync(item.Group, resetDraft: true);
+            Feedback.Text = "Расписание сохранено. Оно создаёт только предпросмотр обновления.";
+        }
+        catch { ScheduleStatus.Text = "Не удалось сохранить расписание. Проверь настройки и повтори попытку."; }
+        finally { subscriptionScheduleSavePending = false; if (!lifetime.IsCancellationRequested) RefreshControls(); }
+    }
+    private async void SubscriptionScheduleTimer_Tick(object? sender, EventArgs e)
+    {
+        if (scheduleTickPending || busy || pendingSubscriptionPreview != null || lifetime.IsCancellationRequested) return;
+        scheduleTickPending = true; UpdateSubscriptionScheduleControls();
+        try
+        {
+            var result = await ProfileBackend.TickSubscriptionScheduleAsync(lifetime.Token);
+            if (lifetime.IsCancellationRequested || result.Preview == null) return;
+            pendingSubscriptionPreview = result.Preview; PresentSubscriptionPreview(result.Preview);
+            if (!HasEditorContent()) ShowPanel("subscriptions");
+            Feedback.Text = "Готов предпросмотр планового обновления. Профили не применены.";
+        }
+        catch (OperationCanceledException) { }
+        catch { if (!lifetime.IsCancellationRequested) Feedback.Text = "Не удалось проверить расписание обновления."; }
+        finally { scheduleTickPending = false; if (!lifetime.IsCancellationRequested) RefreshControls(); }
     }
     private bool HasEditorContent() => editing != null || NameBox.Text.Length > 0 || SourceBox.Text.Length > 0 || GroupBox.Text.Length > 0 || AutoReconnectCheck.IsChecked == true || FallbackCheck.IsChecked == true || FragmentCheck.IsChecked == true || NoiseCheck.IsChecked == true || MuxCheck.IsChecked == true;
     private void ClearEditorContent()
@@ -757,11 +907,106 @@ public partial class MainWindow : Window
             PresentApplied(result);
         });
     }
+    private void UpdateBackupControls()
+    {
+        if (!IsInitialized || ExportBackupButton == null) return;
+        bool pending = backupPending || backupApplyPending || busy;
+        ExportBackupButton.IsEnabled = storageReady && !pending;
+        PreviewBackupButton.IsEnabled = !pending && backupRestorePreview == null;
+        CancelBackupPreviewButton.IsEnabled = !pending && backupRestorePreview != null;
+        AddRestoreSchedulesBox.IsEnabled = !pending && backupRestorePreview?.EnabledSchedules > 0;
+        ApplyBackupRestoreButton.IsEnabled = !pending && backupRestorePreview?.CanApply == true && connection.Actions.CanSave;
+    }
+
+    private async void ExportBackup_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new SaveFileDialog { Filter = "Зашифрованная копия OneTunnel (*.otbackup)|*.otbackup", DefaultExt = ".otbackup", AddExtension = true, OverwritePrompt = false, FileName = "OneTunnel.otbackup" };
+        if (dialog.ShowDialog(this) != true) return;
+        await ExportBackupToPathAsync(dialog.FileName, BackupPasswordBox.Password);
+    }
+
+    private async Task ExportBackupToPathAsync(string path, string password)
+    {
+        if (backupPending || busy || !storageReady) return;
+        backupPending = true; BackupStatus.Text = "Создание зашифрованной копии…"; UpdateBackupControls();
+        try
+        {
+            var result = await ProfileBackend.ExportBackupAsync(path, password);
+            BackupStatus.Text = $"Копия создана. Профилей: {result.ProfileCount}.";
+        }
+        catch { BackupStatus.Text = "Не удалось создать копию. Проверь пароль и выбери новый путь для файла."; }
+        finally { BackupPasswordBox.Clear(); backupPending = false; UpdateBackupControls(); }
+    }
+
+    private async void PreviewBackup_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog { Filter = "Зашифрованная копия OneTunnel (*.otbackup)|*.otbackup|Все файлы (*.*)|*.*", CheckFileExists = true };
+        if (dialog.ShowDialog(this) != true) return;
+        await PreviewBackupFromPathAsync(dialog.FileName, RestorePasswordBox.Password);
+    }
+
+    private async Task PreviewBackupFromPathAsync(string path, string password)
+    {
+        if (backupPending || backupApplyPending || busy) return;
+        backupPending = true; backupRestorePreview = null; AddRestoreSchedulesBox.IsChecked = false;
+        BackupStatus.Text = "Проверка копии…"; UpdateBackupControls();
+        try
+        {
+            var view = await ProfileBackend.PreviewBackupAsync(path, password);
+            if (lifetime.IsCancellationRequested) { await ProfileBackend.CancelBackupRestoreAsync(view.Token); return; }
+            PresentBackupRestorePreview(view);
+        }
+        catch { backupRestorePreview = null; BackupStatus.Text = "Не удалось проверить копию. Проверь пароль и целостность файла."; }
+        finally { RestorePasswordBox.Clear(); backupPending = false; UpdateBackupControls(); }
+    }
+
+    private void PresentBackupRestorePreview(BackupRestorePreview view)
+    {
+        backupRestorePreview = view; AddRestoreSchedulesBox.IsChecked = false;
+        BackupStatus.Text = $"Будет заменено профилей: {view.CurrentProfiles} → {view.ReplacementProfiles}. В копии расписаний: {view.EnabledSchedules}. Предпросмотр действует до {view.ExpiresAt}.";
+        UpdateBackupControls();
+    }
+
+    private async void CancelBackupPreview_Click(object sender, RoutedEventArgs e) => await CancelBackupRestoreAsync();
+    private async Task CancelBackupRestoreAsync()
+    {
+        if (backupRestorePreview is not { } view || backupPending || backupApplyPending) return;
+        backupPending = true; UpdateBackupControls();
+        try { await ProfileBackend.CancelBackupRestoreAsync(view.Token); BackupStatus.Text = "Предпросмотр отменён."; }
+        catch { BackupStatus.Text = "Не удалось отменить предпросмотр. Он завершится автоматически."; }
+        finally { backupRestorePreview = null; AddRestoreSchedulesBox.IsChecked = false; RestorePasswordBox.Clear(); backupPending = false; UpdateBackupControls(); }
+    }
+
+    private async void ApplyBackupRestore_Click(object sender, RoutedEventArgs e)
+    {
+        if (backupRestorePreview is not { CanApply: true } view || !connection.Actions.CanSave) return;
+        bool restoreSchedules = AddRestoreSchedulesBox.IsChecked == true;
+        string schedules = restoreSchedules ? " Расписания останутся включёнными и будут запрашивать источники, пока окно OneTunnel открыто." : " Расписания из копии будут отключены.";
+        if (MessageBox.Show(this, $"Заменить локальную библиотеку? Сейчас профилей: {view.CurrentProfiles}; в копии: {view.ReplacementProfiles}. Включённых расписаний: {view.EnabledSchedules}.{schedules}", "Восстановление резервной копии", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        await ApplyBackupRestoreAsync(restoreSchedules);
+    }
+
+    private async Task ApplyBackupRestoreAsync(bool restoreSchedules)
+    {
+        if (backupRestorePreview is not { CanApply: true } view || backupApplyPending || !connection.Actions.CanSave) return;
+        backupApplyPending = true; busy = true; UpdateBackupControls();
+        try
+        {
+            var document = await ProfileBackend.ApplyBackupRestoreAsync(view.Token, restoreSchedules);
+            PresentDocument(document, document.Profiles.FirstOrDefault()?.Id);
+            BackupStatus.Text = "Библиотека восстановлена из копии."; Feedback.Text = "Локальная библиотека заменена после подтверждения.";
+            _ = LoadSubscriptionsAsync();
+        }
+        catch { BackupStatus.Text = "Не удалось применить копию. Библиотека могла измениться; обнови её и проверь состояние."; }
+        finally { backupRestorePreview = null; AddRestoreSchedulesBox.IsChecked = false; RestorePasswordBox.Clear(); backupApplyPending = false; busy = false; if (!lifetime.IsCancellationRequested) RefreshControls(); }
+    }
+
     private void PresentDocument(ProfileDocument document,Guid? selectedId=null,bool refreshLibrary=true)
     {
         InvalidateGroupSummaries();
         InvalidateProfileOrganization("Сведения профиля обновляются…", clearFields: false);
         InvalidateNetworkPreferences("Настройки сети обновляются…", clearFields: false);
+        subscriptionScheduleVersion++; subscriptionScheduleView = null;
         Storage.Accept(document);RefreshGroups(document.Profiles);
         applyingProfileDocument = true;
         try
@@ -780,6 +1025,7 @@ public partial class MainWindow : Window
             if (GroupsPanel.Visibility == Visibility.Visible) _ = RefreshGroupSummariesAsync();
         }
         if (groupResultsView?.HasResults == true) _ = RefreshGroupResultsAsync();
+        if (tray != null) _ = RefreshTrayProfilesAsync();
         if (selected is { } currentProfile) { _ = LoadProfileOrganizationAsync(currentProfile.Id); _ = LoadNetworkPreferencesAsync(currentProfile.Id); }
     }
     private void PresentApplied(AppliedProfiles result)
@@ -858,7 +1104,7 @@ public partial class MainWindow : Window
             libraryProjectionLoaded = true;
             appliedLibrarySort = librarySort;
             appliedFavoritesOnly = favoritesOnly;
-            var selectionToRestore = fastestSelectionPending && !connection.Actions.CanSelect ? selected?.Id : pendingLibrarySelection ?? selected?.Id;
+            var selectionToRestore = (fastestSelectionPending || traySelectionPending) && !connection.Actions.CanSelect ? selected?.Id : pendingLibrarySelection ?? selected?.Id;
             if (profileCollectionView != null) profileCollectionView.CustomSort = new ProfileRankComparer(libraryRanks);
             LibraryStatus.Text = "";
             RefreshProfileFilter(true);
@@ -1450,9 +1696,10 @@ public partial class MainWindow : Window
     });
     private void Window_Closing(object? sender, CancelEventArgs e)
     {
-        if (allowClose) return;
-        if (!connection.Actions.CanClose) { e.Cancel = true; Feedback.Text = "Дождись завершения текущей операции."; return; }
+        if (!allowClose && (!connection.Actions.CanClose || backupPending || backupApplyPending)) { e.Cancel = true; Feedback.Text = "Дождись завершения текущей операции."; return; }
         hiddenToTray = false; ReleaseRestoreHotkey();
+        BackupPasswordBox.Clear(); RestorePasswordBox.Clear();
+        if (backupRestorePreview is { } restorePreview) _ = ProfileBackend.CancelBackupRestoreAsync(restorePreview.Token);
         lifetime.Cancel(); preview?.Cancel();
         // The service owns the connection. Closing the UI never tears it down.
     }
