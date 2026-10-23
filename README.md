@@ -21,6 +21,8 @@ HTTPS proxies, Trojan, TUIC, AnyTLS, and NaiveProxy.
 - An explicit minimize-to-tray button with a temporary Ctrl+Shift+O restore shortcut and window recovery after an Explorer restart.
 - Import/update subscriptions through the existing import editor; navigation preserves unfinished edits.
 - User profiles encrypted with Windows DPAPI.
+- Go-generated diagnostics preview with explicit copy or JSON save, excluding
+  profile credentials, names, server addresses and subscription URLs.
 
 The interface runs in the user session. A separate authenticated Go service manages
 engines and system networking. Closing the window leaves the service connection active.
@@ -30,6 +32,10 @@ reserved only while hidden. If Windows cannot register it, the window stays visi
 and reports the conflict. An Explorer restart restores an explicitly hidden window.
 Status notifications are off by default and can be enabled in the window or tray;
 the choice resets when the application exits.
+The Events page can generate a local diagnostics report. Review it before copying
+or saving. Its identity describes the bundled profile host; engine availability
+is a package hint. It does not inspect the installed service or test connectivity,
+the kill switch or DNS/IPv6 leaks. Reports are not generated or uploaded automatically.
 Its recovery entry opens the recovery view without executing recovery automatically.
 Persistent traffic protection remains active after a connection failure and during
 reconnection. Explicit disconnect/recovery controls release owned protection.

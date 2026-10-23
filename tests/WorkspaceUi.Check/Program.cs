@@ -84,6 +84,44 @@ internal static class Program
         Panel("connection"); Pump();
         Assert(Storage.Load().Count == snapshot.Count, "Navigation preserves synthetic profiles");
         Assert(before.SequenceEqual(SHA256.HashData(File.ReadAllBytes(profileFile))), "Navigation does not write profile storage");
+        Panel("activity");
+        var report = Find<TextBox>("DiagnosticsReport");
+        Assert(report.IsReadOnly && report.Text.Length == 0 && !Find<Button>("CopyDiagnosticsButton").IsEnabled && !Find<Button>("SaveDiagnosticsButton").IsEnabled, "Diagnostics requires explicit generation before exporting");
+        Click("GenerateDiagnosticsButton");
+        Assert(!Find<Button>("GenerateDiagnosticsButton").IsEnabled && !Find<Button>("CopyDiagnosticsButton").IsEnabled && !Find<Button>("SaveDiagnosticsButton").IsEnabled, "Pending diagnostics disables repeated generation and export");
+        Wait(() => Find<Button>("GenerateDiagnosticsButton").IsEnabled);
+        Assert(report.Text.Length > 0 && Find<Button>("CopyDiagnosticsButton").IsEnabled && Find<Button>("SaveDiagnosticsButton").IsEnabled, "Go report enables reviewed export");
+        string reviewedReport = report.Text;
+        using (var diagnostics = JsonDocument.Parse(reviewedReport)) {
+            Assert(diagnostics.RootElement.GetProperty("schemaVersion").GetInt32() == 1 && diagnostics.RootElement.GetProperty("profiles").GetProperty("total").GetInt32() == 3, "Actual Go IPC returns the expected report schema and counts");
+            using var pin = JsonDocument.Parse(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "core-reference.json")));
+            Assert(diagnostics.RootElement.GetProperty("profileHost").GetProperty("revision").GetString() == pin.RootElement.GetProperty("SourceRevision").GetString() && !diagnostics.RootElement.GetProperty("profileHost").GetProperty("dirty").GetBoolean(), "Report identifies the exact clean bundled host revision");
+        }
+        Assert(!reviewedReport.Contains("subscription.example") && !reviewedReport.Contains("synthetic-test-only") && !reviewedReport.Contains("Amsterdam") && !reviewedReport.Contains(data), "Go diagnostics excludes synthetic names, sources and local paths");
+        var exportPath = Path.Combine(Output, "synthetic-diagnostics.json");
+        var export = (Task)typeof(MainWindow).GetMethod("SaveDiagnosticsReportAsync", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [exportPath])!;
+        Wait(() => export.IsCompleted); export.GetAwaiter().GetResult();
+        Assert(File.ReadAllBytes(exportPath).SequenceEqual(new System.Text.UTF8Encoding(false).GetBytes(reviewedReport)), "File export preserves the exact reviewed report without a BOM");
+        Capture(window, "diagnostics-default.png");
+        window.Width = window.MinWidth; window.Height = window.MinHeight;
+        foreach (var scroll in Descendants(window).OfType<ScrollViewer>().Where(s => s.Content is Grid)) scroll.ScrollToEnd();
+        Pump(); Capture(window, "diagnostics-minimum.png");
+        window.Width = 1240; window.Height = 850;
+        var encryptedProfiles = File.ReadAllBytes(profileFile);
+        try {
+            File.WriteAllText(profileFile, "SYNTHETIC-CORRUPT-STORE-SECRET");
+            Click("GenerateDiagnosticsButton");
+            Assert(report.Text.Length == 0 && !Find<Button>("CopyDiagnosticsButton").IsEnabled && !Find<Button>("SaveDiagnosticsButton").IsEnabled, "Regeneration clears stale preview and export before reading Go");
+            Wait(() => Find<Button>("GenerateDiagnosticsButton").IsEnabled);
+            Assert(report.Text.Length == 0 && !Find<Button>("CopyDiagnosticsButton").IsEnabled && !Find<Button>("SaveDiagnosticsButton").IsEnabled, "Failed generation leaves no stale export");
+            Assert(!Find<TextBlock>("Feedback").Text.Contains("SECRET") && !Find<TextBlock>("Feedback").Text.Contains(data), "Diagnostics failure feedback excludes underlying store data");
+            Assert(File.ReadAllText(profileFile) == "SYNTHETIC-CORRUPT-STORE-SECRET", "Failed report does not modify even a corrupt synthetic store");
+        }
+        finally { File.WriteAllBytes(profileFile, encryptedProfiles); }
+        Click("GenerateDiagnosticsButton"); Wait(() => Find<Button>("GenerateDiagnosticsButton").IsEnabled);
+        Assert(report.Text == reviewedReport, "Regeneration recovers after restoring the synthetic store");
+        Assert(before.SequenceEqual(SHA256.HashData(File.ReadAllBytes(profileFile))), "Report generation and export preserve encrypted profiles and settings");
+        // Do not replace the user's clipboard or open native Save dialogs during tests.
         Find<TextBox>("NameBox").Text = "Synthetic unfinished draft";
         Panel("subscriptions"); Pump();
         Assert(Find<StackPanel>("SubscriptionsPanel").IsVisible && Find<Button>("ImportSubscriptionButton").IsVisible && Find<ListBox>("SubscriptionGroupsList").IsVisible, "Subscription management page and import remain reachable");

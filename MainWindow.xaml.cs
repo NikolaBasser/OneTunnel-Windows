@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     private int subscriptionLoadVersion;
     private Guid? editing;
     private bool busy, allowClose, storageReady;
+    private bool diagnosticsPending;
     private TrayShell? tray;
     private WindowState previousWindowState = WindowState.Normal;
     private IntPtr windowHandle;
@@ -162,11 +163,62 @@ public partial class MainWindow : Window
         EditorPanel.IsEnabled=EditorActions.IsEnabled=actions.CanSave;
         SaveProfileButton.IsEnabled=actions.CanSave;
         UpdateTray();
+        UpdateDiagnosticsControls();
     }
     private void UpdateTray()
     {
         if (tray?.Present(connection.Display, connection.Actions) is { } notification) tray.Notify(notification);
     }
+    private void UpdateDiagnosticsControls()
+    {
+        if (GenerateDiagnosticsButton == null) return;
+        GenerateDiagnosticsButton.IsEnabled = !diagnosticsPending;
+        bool available = !diagnosticsPending && DiagnosticsReport.Text.Length > 0;
+        CopyDiagnosticsButton.IsEnabled = SaveDiagnosticsButton.IsEnabled = available;
+    }
+    private async void GenerateDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        if (diagnosticsPending) return;
+        diagnosticsPending = true;
+        DiagnosticsReport.Clear();
+        UpdateDiagnosticsControls();
+        try
+        {
+            var report = await ProfileBackend.DiagnosticsAsync();
+            if (report.Length == 0) throw new InvalidDataException();
+            DiagnosticsReport.Text = report;
+            Feedback.Text = "Диагностический отчёт сформирован. Проверь его перед копированием или сохранением.";
+        }
+        catch
+        {
+            DiagnosticsReport.Clear();
+            Feedback.Text = "Не удалось сформировать диагностический отчёт.";
+        }
+        finally
+        {
+            diagnosticsPending = false;
+            UpdateDiagnosticsControls();
+        }
+    }
+    private void CopyDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        if (diagnosticsPending || DiagnosticsReport.Text.Length == 0) return;
+        try { Clipboard.SetText(DiagnosticsReport.Text); Feedback.Text = "Диагностический отчёт скопирован."; }
+        catch { Feedback.Text = "Не удалось скопировать диагностический отчёт."; }
+    }
+    private async void SaveDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        if (diagnosticsPending || DiagnosticsReport.Text.Length == 0) return;
+        try
+        {
+            var dialog = new SaveFileDialog { Filter = "Файл JSON (*.json)|*.json", DefaultExt = ".json", AddExtension = true, FileName = "onetunnel-diagnostics.json", OverwritePrompt = true };
+            if (dialog.ShowDialog(this) != true) return;
+            await SaveDiagnosticsReportAsync(dialog.FileName);
+            Feedback.Text = "Диагностический отчёт сохранён.";
+        }
+        catch { Feedback.Text = "Не удалось сохранить диагностический отчёт."; }
+    }
+    private Task SaveDiagnosticsReportAsync(string path) => File.WriteAllTextAsync(path, DiagnosticsReport.Text, new System.Text.UTF8Encoding(false));
     private void MinimizeWindow()
     {
         if (WindowState != WindowState.Minimized) previousWindowState = WindowState;

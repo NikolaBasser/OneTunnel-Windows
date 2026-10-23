@@ -82,6 +82,11 @@ if registration fails, the window stays visible. Ordinary minimize keeps its
 taskbar entry. Explorer restart restores an explicitly hidden window.
 Status notifications can be enabled in the window or tray for the current session.
 They are off by default and are not saved between application launches.
+The Events page offers explicit diagnostics generation, preview, copy and JSON save.
+The report identifies the bundled profile host, not the installed service; engine
+availability hints do not test runtime health. Generation makes no network requests.
+No report is created, copied, saved or uploaded automatically. A service update is
+not required for this user-host feature.
 
 LICENSES
 THIRD-PARTY-NOTICES.txt, assets/LICENSE*.txt, third-party/notices/,
