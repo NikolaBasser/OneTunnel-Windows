@@ -1,5 +1,8 @@
 OneTunnel — Windows x64
 
+APPLICATION VERSION
+0.1.0. The Go core is versioned separately and pinned by core-reference.json.
+
 BUILD REQUIREMENTS
 Windows 10/11 x64, .NET 10 SDK and PowerShell.
 An explicitly selected clean core bundle matching core-reference.json is required.
@@ -11,7 +14,7 @@ Follow its BUILD.txt to produce a clean Windows amd64 core bundle.
 This repository contains no Go sources, Go setup script or implicit core build command.
 
 BUILD THE WINDOWS APPLICATION
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build.ps1 -Name OneTunnel-win-x64 -CoreBundlePath C:\path\to\trusted-core-bundle
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build.ps1 -Name OneTunnel-0.1.0-win-x64 -CoreBundlePath C:\path\to\trusted-core-bundle
 For a development build:
 dotnet build OneTunnel.csproj -p:CoreBundlePath=C:\path\to\trusted-core-bundle
 Application builds never compile or download Go binaries implicitly.
@@ -34,8 +37,8 @@ CORE_READ_TOKEN as a read-only token for that private repository. Missing config
 the build job. No remote repository is assumed or created by this local split.
 
 OUTPUT
-dist/OneTunnel-win-x64/
-dist/OneTunnel-win-x64.zip
+dist/OneTunnel-0.1.0-win-x64/
+dist/OneTunnel-0.1.0-win-x64.zip
 
 SERVICE INSTALLATION
 The package contains a native Go installer; scripts/Install-Service.ps1 is a compatibility launcher.

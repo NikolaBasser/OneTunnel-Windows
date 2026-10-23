@@ -1,6 +1,7 @@
 # Build output, installed engines and private diagnostics
 *.md
 *.MD
+!/README.md
 /docs/
 /tests/
 !/tests/
