@@ -17,13 +17,19 @@ HTTPS proxies, Trojan, TUIC, AnyTLS, and NaiveProxy.
 - Optional automatic reconnection and compatible backup servers within a group.
 - Group availability checks with cancellation and per-server results.
 - Desktop workspace with profile search by name, group or protocol, and a separate event log.
-- Notification-area status and quick connection actions, with opt-in status notifications for the current session.
+- Notification-area status and quick connection actions, with opt-in status notifications available in the window and tray for the current session.
+- An explicit minimize-to-tray button with a temporary Ctrl+Shift+O restore shortcut and window recovery after an Explorer restart.
 - Import/update subscriptions through the existing import editor; navigation preserves unfinished edits.
 - User profiles encrypted with Windows DPAPI.
 
 The interface runs in the user session. A separate authenticated Go service manages
 engines and system networking. Closing the window leaves the service connection active.
-The tray can restore or ordinarily minimize the window; minimization retains the taskbar.
+Ordinary minimization retains the taskbar. The separate minimize-to-tray button
+hides the window; restore it from the tray or press Ctrl+Shift+O. The shortcut is
+reserved only while hidden. If Windows cannot register it, the window stays visible
+and reports the conflict. An Explorer restart restores an explicitly hidden window.
+Status notifications are off by default and can be enabled in the window or tray;
+the choice resets when the application exits.
 Its recovery entry opens the recovery view without executing recovery automatically.
 Persistent traffic protection remains active after a connection failure and during
 reconnection. Explicit disconnect/recovery controls release owned protection.

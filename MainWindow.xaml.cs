@@ -4,10 +4,16 @@ using System.Windows;
 using System.Windows.Controls;
 using Microsoft.Win32;
 using OneTunnel.Core;
+using System.Runtime.InteropServices;
+using System.Windows.Interop;
+using System.Windows.Input;
 
 namespace OneTunnel;
 public partial class MainWindow : Window
 {
+    private const int RestoreHotkeyId = 0x4F31;
+    private const uint ModControl = 0x0002, ModShift = 0x0004, ModNoRepeat = 0x4000;
+    private const uint WmHotkey = 0x0312;
     private readonly ObservableCollection<Profile> profiles = [];
     private readonly ObservableCollection<SubscriptionSummary> subscriptions = [];
     private readonly OneTunnel.Client.ServiceConnection connection = new();
@@ -28,9 +34,18 @@ public partial class MainWindow : Window
     private bool busy, allowClose, storageReady;
     private TrayShell? tray;
     private WindowState previousWindowState = WindowState.Normal;
+    private IntPtr windowHandle;
+    private HwndSource? windowSource;
+    private uint taskbarCreatedMessage;
+    private bool hotkeyRegistered, hiddenToTray, syncingTrayNotifications;
+
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint virtualKey);
+    [DllImport("user32.dll", SetLastError = true)] private static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern uint RegisterWindowMessage(string message);
     public MainWindow()
     {
         InitializeComponent();
+        SourceInitialized += (_, _) => InitializeNativeWindow();
         ModeHelp.Text = "После подключения укажи локальный адрес прокси в браузере или другом приложении.";
         ProtocolBox.ItemsSource = Enum.GetValues<Protocol>(); ProtocolBox.SelectedIndex = 0;
         ProfilesList.ItemsSource = profiles;
@@ -50,9 +65,12 @@ public partial class MainWindow : Window
         {
             try {
                 tray = new TrayShell(RestoreWindow, MinimizeWindow, () => Connect_Click(this, new RoutedEventArgs()), () => { RestoreWindow(); Engines_Click(this, new RoutedEventArgs()); }, Close);
+                tray.NotificationsItem.CheckedChanged += TrayNotificationsItem_Changed;
+                TrayNotificationsBox.IsEnabled = true;
                 UpdateTray(); tray.Show();
+                HideToTrayButton.IsEnabled = windowSource != null && windowHandle != IntPtr.Zero && taskbarCreatedMessage != 0;
             }
-            catch { tray?.Dispose(); tray = null; Feedback.Text = "Значок трея недоступен. Окно остаётся в панели задач."; }
+            catch { tray?.Dispose(); tray = null; TrayNotificationsBox.IsEnabled = HideToTrayButton.IsEnabled = false; Feedback.Text = "Значок трея недоступен. Окно остаётся в панели задач; уведомления недоступны."; }
             await RefreshService();
             _ = connection.ObserveAsync(lifetime.Token);
             var args = Environment.GetCommandLineArgs();
@@ -67,7 +85,7 @@ public partial class MainWindow : Window
             }
         };
         StateChanged += (_, _) => { if (WindowState != WindowState.Minimized) previousWindowState = WindowState; };
-        Closed += (_, _) => { lifetime.Cancel(); preview?.Cancel(); groupCheck?.Cancel(); subscriptionDownload?.Cancel(); tray?.Dispose(); tray = null; };
+        Closed += (_, _) => { lifetime.Cancel(); preview?.Cancel(); groupCheck?.Cancel(); subscriptionDownload?.Cancel(); ReleaseRestoreHotkey(); try { windowSource?.RemoveHook(WindowNativeHook); } catch { } windowSource = null; tray?.Dispose(); tray = null; };
     }
     private async Task RefreshService()
     {
@@ -156,8 +174,79 @@ public partial class MainWindow : Window
     }
     private void RestoreWindow()
     {
+        hiddenToTray = false;
+        ReleaseRestoreHotkey();
         WindowState = previousWindowState == WindowState.Minimized ? WindowState.Normal : previousWindowState;
         ShowInTaskbar = true; Show(); Activate();
+    }
+    private void InitializeNativeWindow()
+    {
+        try
+        {
+            windowHandle = new WindowInteropHelper(this).Handle;
+            windowSource = HwndSource.FromHwnd(windowHandle);
+            if (windowSource == null || windowHandle == IntPtr.Zero) return;
+            windowSource.AddHook(WindowNativeHook);
+            taskbarCreatedMessage = RegisterWindowMessage("TaskbarCreated");
+        }
+        catch { try { windowSource?.RemoveHook(WindowNativeHook); } catch { } windowSource = null; windowHandle = IntPtr.Zero; }
+    }
+    private bool TryHideToTray()
+    {
+        if (hiddenToTray) return true;
+        if (tray == null || windowHandle == IntPtr.Zero || windowSource == null || taskbarCreatedMessage == 0)
+        {
+            Feedback.Text = "Не удалось подготовить восстановление окна. Оно остаётся доступным в панели задач.";
+            return false;
+        }
+        if (!RegisterHotKey(windowHandle, RestoreHotkeyId, ModControl | ModShift | ModNoRepeat, (uint)KeyInterop.VirtualKeyFromKey(Key.O)))
+        {
+            Feedback.Text = "Не удалось скрыть окно: сочетание Ctrl+Shift+O уже занято или недоступно. Окно остаётся в панели задач.";
+            return false;
+        }
+        hotkeyRegistered = true;
+        if (WindowState != WindowState.Minimized) previousWindowState = WindowState;
+        hiddenToTray = true;
+        try { ShowInTaskbar = false; Hide(); return true; }
+        catch
+        {
+            RestoreWindow();
+            Feedback.Text = "Не удалось скрыть окно. Оно восстановлено и остаётся в панели задач.";
+            return false;
+        }
+    }
+    private void HideToTray_Click(object sender, RoutedEventArgs e) => TryHideToTray();
+    private void TrayNotifications_Changed(object sender, RoutedEventArgs e)
+    {
+        if (syncingTrayNotifications || tray == null) return;
+        syncingTrayNotifications = true;
+        try { tray.NotificationsItem.Checked = TrayNotificationsBox.IsChecked == true; }
+        finally { syncingTrayNotifications = false; }
+    }
+    private void TrayNotificationsItem_Changed(object? sender, EventArgs e)
+    {
+        if (syncingTrayNotifications) return;
+        syncingTrayNotifications = true;
+        try { TrayNotificationsBox.IsChecked = tray?.NotificationsItem.Checked == true; }
+        finally { syncingTrayNotifications = false; }
+    }
+    private IntPtr WindowNativeHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WmHotkey && wParam == (IntPtr)RestoreHotkeyId && hiddenToTray)
+        {
+            RestoreWindow(); handled = true;
+        }
+        else if (taskbarCreatedMessage != 0 && (uint)msg == taskbarCreatedMessage && hiddenToTray)
+        {
+            RestoreWindow(); handled = true;
+        }
+        return IntPtr.Zero;
+    }
+    private void ReleaseRestoreHotkey()
+    {
+        if (!hotkeyRegistered) return;
+        hotkeyRegistered = false;
+        try { if (windowHandle != IntPtr.Zero) UnregisterHotKey(windowHandle, RestoreHotkeyId); } catch { }
     }
     private async void Profiles_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
@@ -526,6 +615,7 @@ public partial class MainWindow : Window
     {
         if (allowClose) return;
         if (!connection.Actions.CanClose) { e.Cancel = true; Feedback.Text = "Дождись завершения текущей операции."; return; }
+        hiddenToTray = false; ReleaseRestoreHotkey();
         lifetime.Cancel(); preview?.Cancel();
         // The service owns the connection. Closing the UI never tears it down.
     }

@@ -1,10 +1,12 @@
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -66,7 +68,7 @@ internal static class Program
         Capture(window, "workspace-default.png");
         window.Width = window.MinWidth; window.Height = window.MinHeight; Pump();
         Capture(window, "workspace-minimum.png");
-        foreach (var name in new[] { "AddProfileButton", "ConnectButton", "SearchBox", "ProfilesList" }) {
+        foreach (var name in new[] { "AddProfileButton", "ConnectButton", "SearchBox", "ProfilesList", "HideToTrayButton", "TrayNotificationsBox" }) {
             var element = Find<FrameworkElement>(name); Assert(element.IsVisible && element.ActualWidth > 20 && element.ActualHeight > 10, name + " remains visible at minimum size");
         }
         window.Width = 1240; window.Height = 850; Pump();
@@ -147,6 +149,20 @@ internal static class Program
         var tray = (TrayShell?)typeof(MainWindow).GetField("tray", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window);
         Assert(tray != null, "Tray initialization coexists with WPF on the STA dispatcher");
         window.ShowInTaskbar = true;
+        var notifications = Find<CheckBox>("TrayNotificationsBox");
+        Assert(notifications.IsEnabled && notifications.IsChecked == false && !tray!.NotificationsItem.Checked, "Visible notification setting starts off for this session");
+        var trayStorageBefore = SHA256.HashData(File.ReadAllBytes(profileFile));
+        notifications.IsChecked = true;
+        Assert(tray!.NotificationsItem.Checked, "Window notification setting updates the tray without replaying status");
+        tray.NotificationsItem.PerformClick();
+        Assert(notifications.IsChecked == false, "Tray notification setting updates the window");
+        tray.NotificationsItem.PerformClick();
+        Assert(notifications.IsChecked == true, "Tray notification opt-in remains synchronized");
+        notifications.IsChecked = false;
+        Assert(!tray.NotificationsItem.Checked, "Window notification opt-out updates the tray");
+        CheckTrayWindowControls(window, Pump, () => Click("HideToTrayButton"));
+        Assert(trayStorageBefore.SequenceEqual(SHA256.HashData(File.ReadAllBytes(profileFile))), "Tray visibility and notification controls do not write profiles or settings");
+        window.ShowInTaskbar = true;
         typeof(MainWindow).GetMethod("MinimizeWindow", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
         Assert(window.WindowState == WindowState.Minimized && window.ShowInTaskbar && window.IsVisible, "Tray minimization retains the taskbar recovery path");
         typeof(MainWindow).GetMethod("RestoreWindow", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
@@ -161,12 +177,101 @@ internal static class Program
         typeof(MainWindow).GetField("allowClose", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(window, true);
         window.Close();
         Assert(tray!.StatusItem.IsDisposed && tray.ExitItem.IsDisposed, "Window Close disposes the tray even on the capture/test close path");
+        CheckHiddenWindowClose();
         app.Shutdown();
         Console.WriteLine("PASS: isolated WPF profile search, empty results, navigation, existing settings, default/minimum layout and storage-preservation checks. No connect/probe/service mutation commands sent.");
         Console.WriteLine(Output);
         return 0;
     }
     private static void Assert(bool value, string message) { if (!value) throw new Exception(message); Console.WriteLine("PASS: " + message); }
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool RegisterHotKey(nint window, int id, uint modifiers, uint key);
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool UnregisterHotKey(nint window, int id);
+    [DllImport("user32.dll", EntryPoint = "SendMessageW")]
+    private static extern nint SendMessage(nint window, uint message, nint wParam, nint lParam);
+
+    private static void CheckTrayWindowControls(MainWindow window, Action pump, Action hide)
+    {
+        const int probeId = 0x534F;
+        const uint modifiers = 0x4006, key = 0x4F;
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        int hotkeyId = (int)typeof(MainWindow).GetField("RestoreHotkeyId", BindingFlags.Static | BindingFlags.NonPublic)!.GetRawConstantValue()!;
+        uint shellMessage = (uint)typeof(MainWindow).GetField("taskbarCreatedMessage", flags)!.GetValue(window)!;
+        var hwnd = new WindowInteropHelper(window).Handle;
+        var carrier = new Window { Width = 1, Height = 1, Left = -6000, Top = -6000, ShowInTaskbar = false, WindowStyle = WindowStyle.None };
+        carrier.Show();
+        var probe = new WindowInteropHelper(carrier).Handle;
+        bool probeRegistered = false;
+        var selected = ((ListBox)window.FindName("ProfilesList")).SelectedItem;
+        ((TextBox)window.FindName("NameBox")).Text = "Synthetic unsaved tray draft";
+        var draft = ((TextBox)window.FindName("NameBox")).Text;
+        void Restore() => typeof(MainWindow).GetMethod("RestoreWindow", flags)!.Invoke(window, null);
+        try {
+            Assert(shellMessage != 0 && ((Button)window.FindName("HideToTrayButton")).IsEnabled, "Native restore hook enables the explicit tray button");
+            probeRegistered = RegisterHotKey(probe, probeId, modifiers, key);
+            Assert(probeRegistered, "Restore shortcut remains free while the window is visible");
+            hide();
+            Assert(window.IsVisible && window.ShowInTaskbar, "Shortcut conflict refuses hiding and retains taskbar access");
+            Assert(((TextBlock)window.FindName("Feedback")).Text.Contains("Ctrl+Shift+O"), "Shortcut conflict explains how to recover");
+            UnregisterHotKey(probe, probeId); probeRegistered = false;
+            hide();
+            Assert(!window.IsVisible && !window.ShowInTaskbar, "Explicit tray button hides the window and taskbar entry");
+            SendMessage(hwnd, 0x0312, hotkeyId + 1, 0);
+            Assert(!window.IsVisible, "Unowned hotkey message does not restore the hidden window");
+            SendMessage(hwnd, 0x0312, hotkeyId, 0); pump();
+            Assert(window.IsVisible && window.ShowInTaskbar && window.WindowState == WindowState.Normal, "Owned hotkey restores the same window");
+            Assert(ReferenceEquals(((ListBox)window.FindName("ProfilesList")).SelectedItem, selected) && ((TextBox)window.FindName("NameBox")).Text == draft, "Tray round trip preserves selection and draft");
+            probeRegistered = RegisterHotKey(probe, probeId, modifiers, key);
+            Assert(probeRegistered, "Restoring releases the global shortcut");
+            UnregisterHotKey(probe, probeId); probeRegistered = false;
+            hide();
+            SendMessage(hwnd, shellMessage, 0, 0); pump();
+            Assert(window.IsVisible && window.ShowInTaskbar, "Shell restart message restores an explicitly hidden window");
+            typeof(MainWindow).GetMethod("MinimizeWindow", flags)!.Invoke(window, null);
+            SendMessage(hwnd, shellMessage, 0, 0);
+            Assert(window.IsVisible && window.ShowInTaskbar && window.WindowState == WindowState.Minimized, "Shell restart does not restore ordinary taskbar minimization");
+            Restore();
+            window.WindowState = WindowState.Maximized;
+            hide();
+            SendMessage(hwnd, 0x0312, hotkeyId, 0);
+            Assert(window.WindowState == WindowState.Maximized && window.IsVisible, "Tray round trip preserves maximized state");
+            window.WindowState = WindowState.Normal;
+        }
+        finally {
+            if (probeRegistered) UnregisterHotKey(probe, probeId);
+            Restore(); carrier.Close();
+        }
+    }
+
+    private static void CheckHiddenWindowClose()
+    {
+        var window = new MainWindow { Left = -5000, Top = -5000 };
+        var flags = BindingFlags.Instance | BindingFlags.NonPublic;
+        window.Show();
+        try {
+            Assert(((CheckBox)window.FindName("TrayNotificationsBox")).IsChecked == false, "A new window starts with notifications disabled");
+            ((Button)window.FindName("HideToTrayButton")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+            Assert(!window.IsVisible, "A new session can hide using the released restore shortcut");
+            typeof(MainWindow).GetField("allowClose", flags)!.SetValue(window, true);
+            window.Close();
+            var probe = new Window { Width = 1, Height = 1, Left = -6000, Top = -6000, ShowInTaskbar = false };
+            probe.Show();
+            var hwnd = new WindowInteropHelper(probe).Handle;
+            bool registered = false;
+            try {
+                registered = RegisterHotKey(hwnd, 0x534F, 0x4006, 0x4F);
+                Assert(registered, "Closing a hidden window releases the native shortcut");
+            }
+            finally { if (registered) UnregisterHotKey(hwnd, 0x534F); probe.Close(); }
+        }
+        finally {
+            typeof(MainWindow).GetField("allowClose", flags)!.SetValue(window, true);
+            window.Close();
+        }
+    }
     private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
     {
         for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++) {

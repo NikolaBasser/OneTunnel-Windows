@@ -10,7 +10,7 @@
      <Button x:Name="SubscriptionButton" Content="Подписки" HorizontalContentAlignment="Left" Click="Subscriptions_Click"/>
      <Button x:Name="EventsNavigationButton" Content="События" HorizontalContentAlignment="Left" Click="Events_Click"/>
     </StackPanel>
-    <StackPanel Grid.Row="2"><TextBlock Text="Windows x64" Foreground="{StaticResource Muted}" FontSize="12" Margin="4,0,0,8"/><Button Content="Движки и восстановление" HorizontalContentAlignment="Left" Click="Engines_Click"/></StackPanel>
+    <StackPanel Grid.Row="2"><TextBlock Text="Windows x64" Foreground="{StaticResource Muted}" FontSize="12" Margin="4,0,0,8"/><Button Content="Движки и восстановление" HorizontalContentAlignment="Left" Click="Engines_Click"/><CheckBox x:Name="TrayNotificationsBox" IsEnabled="False" Margin="4,8,4,12" Checked="TrayNotifications_Changed" Unchecked="TrayNotifications_Changed" ToolTip="Уведомления включаются только на время работы приложения."><TextBlock Text="Уведомлять об изменении статуса" TextWrapping="Wrap" MaxWidth="130" FontSize="12"/></CheckBox><Button x:Name="HideToTrayButton" Content="Свернуть в трей" IsEnabled="False" HorizontalContentAlignment="Left" ToolTip="Скрывает окно. Нажми Ctrl+Shift+O, чтобы вернуть его." Click="HideToTray_Click"/><TextBlock Text="Вернуть: Ctrl+Shift+O" Foreground="{StaticResource Muted}" FontSize="12" Margin="4,0,0,0"/></StackPanel>
    </Grid>
   </Border>
   <Grid Grid.Column="1" Margin="28,22,28,18"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>

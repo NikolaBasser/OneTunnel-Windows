@@ -76,6 +76,12 @@ RUN
 OneTunnel.exe in the package directory.
 The package includes the .NET runtime, user profile host and Go service.
 Servers and access credentials are configured separately in the application.
+The separate minimize-to-tray button hides the window. Restore it from the tray
+or with Ctrl+Shift+O. This shortcut is registered only while the window is hidden;
+if registration fails, the window stays visible. Ordinary minimize keeps its
+taskbar entry. Explorer restart restores an explicitly hidden window.
+Status notifications can be enabled in the window or tray for the current session.
+They are off by default and are not saved between application launches.
 
 LICENSES
 THIRD-PARTY-NOTICES.txt, assets/LICENSE*.txt, third-party/notices/,
