@@ -1,15 +1,27 @@
 # Security Policy
 
-## Поддерживаемые версии
+## Supported versions
 
-Исправления безопасности выпускаются для актуальной версии OneTunnel. При проверке указывайте точную версию и SHA коммита. Старые версии могут потребовать обновления; отдельные ветки долгосрочной поддержки пока не объявлены.
+Security fixes target the current OneTunnel release. Include the exact application version,
+core revision, and commit SHA. Older versions may require an update; no separate long-term
+support branches have been announced.
 
-## Сообщение об уязвимости
+## Reporting a vulnerability
 
-Этот репозиторий приватный. Участники с доступом могут создать Issue в этом репозитории и адресовать его владельцу @NikolaBasser. Перед публикацией проверьте, что репозиторий остаётся приватным. Если доступа нет, используйте уже согласованный личный канал связи с владельцем; отдельный публичный адрес для security-отчётов пока не объявлен. Не публикуйте сведения об эксплуатации в публичных Issues, комментариях или сторонних репозиториях.
+This repository is private. Authorized collaborators may report a vulnerability through a
+private issue addressed to the owner, @NikolaBasser. Confirm repository visibility before
+submitting sensitive details. Without repository access, use the owner's previously agreed
+private contact channel; no separate public security reporting address has been announced.
+Do not publish exploit details in public issues, comments, or unrelated repositories.
 
-Укажите версию OneTunnel, версию Windows, затронутый компонент, ожидаемое и фактическое поведение, минимальные шаги воспроизведения и возможные последствия. Особенно важны обход kill switch, утечки DNS/трафика, повышение привилегий, ошибки проверки доступа к Windows-службе и раскрытие учётных данных.
+Include the OneTunnel version, Windows version, affected component, expected and observed
+behavior, minimal reproduction, and potential impact. Relevant issues include protection
+bypass, DNS or traffic leaks, privilege escalation, service authentication errors, and
+credential disclosure.
 
-Используйте искусственные конфигурации. Не прикладывайте токены, приватные ключи, URL подписок, реальные профили, персональные адреса, дампы памяти или необработанные сетевые журналы. Воспроизводите проблему только на собственном изолированном стенде.
+Use synthetic configurations and an isolated test environment under your control. Do not
+attach tokens, private keys, subscription URLs, real profiles, personal addresses, memory
+dumps, or unreviewed network captures.
 
-Владелец рассматривает отчёт, уточняет воспроизведение и согласует исправление и раскрытие. Фиксированный срок ответа и программа вознаграждений не объявлены.
+The owner reviews reports, confirms reproduction, and coordinates fixes and disclosure.
+No fixed response time or bug bounty program has been announced.
