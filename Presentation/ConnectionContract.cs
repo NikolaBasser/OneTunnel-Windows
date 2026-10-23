@@ -19,7 +19,7 @@ public interface IConnectionController
     Task<string> ProbeAsync();
 }
 
-public sealed record CoreStatus(bool Active, bool NeedsRecovery, bool TrafficLocked, bool WholeDevice, bool FullDeviceMode, bool ClockSynchronized, int LocalPort, string Status, Guid? ProfileId);
+public sealed record CoreStatus(bool Active, bool NeedsRecovery, bool TrafficLocked, bool WholeDevice, bool FullDeviceMode, bool ClockSynchronized, int LocalPort, string Status, Guid? ProfileId, bool Reconnecting=false,int ReconnectAttempt=0);
 public sealed record CoreRequest(int Version, string Command, Profile? Profile = null, bool FullDevice = false);
 public sealed record CoreResponse(int Version, string Instance, CoreStatus State, string? Result = null, string? Error = null, ulong Revision = 0);
 

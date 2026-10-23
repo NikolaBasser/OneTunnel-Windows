@@ -13,6 +13,7 @@ public partial class MainWindow : Window
     private bool refreshing;
     private readonly CancellationTokenSource lifetime = new();
     private CancellationTokenSource? preview;
+    private CancellationTokenSource? groupCheck;
     private ProfileView? profileView;
     private Profile? selected => ProfilesList.SelectedItem as Profile;
     private Guid? editing;
@@ -86,12 +87,14 @@ public partial class MainWindow : Window
     }
     private async void RefreshControls()
     {
-        try { await connection.SetContextAsync(new(busy,storageReady,selected?.Id.ToString()??"")); }
+        try { await connection.SetContextAsync(new(busy,storageReady,selected?.Id.ToString()??"",groupCheck!=null)); }
         catch { Feedback.Text="Нет ответа от пользовательского Go-ядра."; }
         var actions=connection.Actions;
         ConnectButton.Content=actions.ConnectCaption;
         ConnectButton.IsEnabled=actions.CanToggle;
         ProbeButton.IsEnabled=actions.CanProbe;
+ CheckGroupButton.IsEnabled=actions.CanCheckGroup;
+ CancelGroupButton.IsEnabled=actions.CanCancelGroup;CancelGroupButton.Visibility=actions.CanCancelGroup?Visibility.Visible:Visibility.Collapsed;
         EditButton.IsEnabled=actions.CanEdit; DeleteButton.IsEnabled=actions.CanDelete;
         AddProfileButton.IsEnabled=actions.CanAdd;
         ProfilesList.IsEnabled=actions.CanSelect;
@@ -135,7 +138,8 @@ public partial class MainWindow : Window
     private void Add_Click(object sender, RoutedEventArgs e)
     {
         if (!connection.Actions.CanAdd) return;
-        editing = null; LoadTransport(null); NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; ProtocolBox.SelectedIndex = 0; EditorTitle.Text = "Новое подключение"; ShowPanel("editor"); NameBox.Focus();
+        AutoReconnectCheck.IsChecked=false;FallbackCheck.IsChecked=false;
+ editing = null; LoadTransport(null); NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; ProtocolBox.SelectedIndex = 0; EditorTitle.Text = "Новое подключение"; ShowPanel("editor"); NameBox.Focus();
     }
     private void EmojiPicker_Click(object sender, RoutedEventArgs e)
     {
@@ -169,15 +173,24 @@ public partial class MainWindow : Window
         await Execute(async () => {
             var edit = await ProfileBackend.LoadEditorAsync(p.Id);
             LoadTransport(edit.Transport);
+ AutoReconnectCheck.IsChecked=edit.Reliability?.AutoReconnect??false;FallbackCheck.IsChecked=edit.Reliability?.UseFallbacks??false;
             GroupBox.Text = edit.Group; editing = edit.Id; NameBox.Text = edit.Name; SourceBox.Text = edit.Source; ProtocolBox.SelectedItem = edit.Protocol; EditorTitle.Text = "Изменить подключение"; ShowPanel("editor");
         });
     }
+    private async void CheckGroup_Click(object sender,RoutedEventArgs e)
+    {
+        if(groupCheck!=null || !connection.Actions.CanCheckGroup || selected==null)return;
+        var group=selected.Group;
+ using var cancellation=new CancellationTokenSource();groupCheck=cancellation;
+        try {await Execute(async()=>{try {var result=await ProfileBackend.CheckGroupAsync(group,cancellation.Token);GroupResults.ItemsSource=result.Rows;GroupResultsInfo.Text=$"{result.Group} · {result.CheckedAt}\nПроверка HTTPS не меняет маршруты и настройки DNS. Для WG/AWG проверяется конфигурация.";GroupResultsPanel.Visibility=Visibility.Visible;GroupResultsPanel.IsExpanded=true;Feedback.Text="Проверка группы завершена.";}catch(OperationCanceledException){Feedback.Text="Проверка группы отменена. Текущая проверка сервера завершается в службе.";}});}finally{groupCheck=null;RefreshControls();}
+    }
+    private void CancelGroup_Click(object sender,RoutedEventArgs e){if(connection.Actions.CanCancelGroup)groupCheck?.Cancel();}
     private async void Save_Click(object sender, RoutedEventArgs e)
     {
         if (!connection.Actions.CanSave) return;
         await Execute(async () =>
         {
-            var result=await ProfileBackend.SaveEditorAsync(NameBox.Text,SourceBox.Text,GroupBox.Text,editing,ReadTransport());
+            var result=await ProfileBackend.SaveEditorAsync(NameBox.Text,SourceBox.Text,GroupBox.Text,editing,ReadTransport(),new(AutoReconnectCheck.IsChecked==true,FallbackCheck.IsChecked==true));
             PresentApplied(result);
         });
     }

@@ -9,7 +9,7 @@
      <ListBox.GroupStyle><GroupStyle><GroupStyle.ContainerStyle><Style TargetType="GroupItem"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupItem"><Expander IsExpanded="True" Loaded="Group_Loaded" Expanded="Group_Changed" Collapsed="Group_Changed" Margin="0,6,0,6"><Expander.Header><StackPanel Orientation="Horizontal"><ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" MaxWidth="170" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding ItemCount, StringFormat=({0})}" Margin="6,0,0,0" Foreground="{StaticResource Muted}"/></StackPanel></Expander.Header><ItemsPresenter/></Expander></ControlTemplate></Setter.Value></Setter></Style></GroupStyle.ContainerStyle></GroupStyle></ListBox.GroupStyle>
      <ListBox.ItemTemplate><DataTemplate><StackPanel Margin="5,10"><ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Name}"/><TextBlock Text="{Binding Protocol}" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,5,0,0"/></StackPanel></DataTemplate></ListBox.ItemTemplate>
     </ListBox>
-    <StackPanel Grid.Row="3"><TextBlock Text="Windows · 0.3.1" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,20,0,12"/><Button Content="Движки и восстановление" Margin="0" Click="Engines_Click"/></StackPanel>
+    <StackPanel Grid.Row="3"><TextBlock Text="Windows x64" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,20,0,12"/><Button Content="Движки и восстановление" Margin="0" Click="Engines_Click"/></StackPanel>
    </Grid>
   </Border>
   <Grid Grid.Column="1" Margin="34,30,34,22"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
@@ -20,7 +20,11 @@
       <ui:EmojiText x:Name="ProfileTitle" Value="Добавь первое подключение" FontSize="30" FontWeight="SemiBold" Margin="0,6,0,12"/>
       <TextBlock x:Name="ProfileDescription" Text="Импортируй WG/AWG-конфигурацию, ссылку подключения или HTTPS-подписку. Профили хранятся на этом компьютере в зашифрованном виде." Foreground="{StaticResource Muted}" LineHeight="23" Margin="0,0,0,26"/>
       <StackPanel x:Name="ModePanel" Visibility="Collapsed"><TextBlock Text="Куда направлять трафик" FontWeight="SemiBold" Margin="0,0,0,8"/><ComboBox x:Name="ModeBox" SelectedIndex="0" MaxWidth="450" HorizontalAlignment="Left" MinWidth="380" SelectionChanged="Mode_Changed"><ComboBoxItem Content="Локальный прокси · только выбранные приложения"/><ComboBoxItem Content="Всё устройство · системный туннель"/></ComboBox><TextBlock x:Name="ModeHelp" Foreground="{StaticResource Muted}" Margin="0,10,0,22"/></StackPanel>
-      <WrapPanel Margin="0,0,0,20"><Button x:Name="ConnectButton" Content="Подключить" Background="{StaticResource Accent}" Foreground="White" IsEnabled="False" Click="Connect_Click"/><Button x:Name="ProbeButton" Content="Проверить доступ" IsEnabled="False" Click="Probe_Click"/><Button x:Name="EditButton" Content="Изменить" IsEnabled="False" Click="Edit_Click"/><Button x:Name="DeleteButton" Content="Удалить" IsEnabled="False" Click="Delete_Click"/></WrapPanel>
+      <WrapPanel Margin="0,0,0,20"><Button x:Name="ConnectButton" Content="Подключить" Background="{StaticResource Accent}" Foreground="White" IsEnabled="False" Click="Connect_Click"/><Button x:Name="CancelGroupButton" Visibility="Collapsed" Content="Отменить проверку" IsEnabled="False" Click="CancelGroup_Click"/><Button x:Name="CheckGroupButton" Content="Проверить группу" IsEnabled="False" Click="CheckGroup_Click"/><Button x:Name="ProbeButton" Content="Проверить доступ" IsEnabled="False" Click="Probe_Click"/><Button x:Name="EditButton" Content="Изменить" IsEnabled="False" Click="Edit_Click"/><Button x:Name="DeleteButton" Content="Удалить" IsEnabled="False" Click="Delete_Click"/></WrapPanel>
+      <Expander x:Name="GroupResultsPanel" Header="Результаты проверки группы" Visibility="Collapsed" Margin="0,0,0,20">
+       <StackPanel Margin="0,12,0,0"><TextBlock x:Name="GroupResultsInfo" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10"/>
+       <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="GroupResults"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,0,0,12"><ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding Milliseconds, StringFormat=Время проверки: {0} мс}" Foreground="{StaticResource Muted}" FontSize="12"/></StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer></StackPanel>
+      </Expander>
       <Border Background="#EAF0E9" Padding="18" CornerRadius="6" Margin="0,0,0,24"><StackPanel><TextBlock x:Name="ConnectionInfo" Text="AmneziaWG · WireGuard · VLESS · SOCKS5 · Hysteria2 · Shadowsocks" FontWeight="SemiBold"/><TextBlock x:Name="ConnectionHint" Text="Серверы не входят в приложение. Используй собственную конфигурацию или данные своего провайдера." Foreground="{StaticResource Muted}" Margin="0,7,0,0" LineHeight="21"/></StackPanel></Border>
      </StackPanel>
      <StackPanel x:Name="EditorPanel" Visibility="Collapsed">
@@ -31,6 +35,11 @@
       <TextBlock Text="Конфигурация, ссылка подключения или HTTPS-подписка" Margin="0,0,0,6"/><TextBox x:Name="SourceBox" TextChanged="Source_Changed" AcceptsReturn="True" Height="185" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" SpellCheck.IsEnabled="False" MaxLength="4194304"/>
       <TextBlock Text="Здесь видны приватные ключи. Не отправляй скриншоты этого поля." FontSize="12" Foreground="{StaticResource Muted}" Margin="0,7,0,14"/>
       <WrapPanel Margin="0,0,0,14"><Button Content="Из файла" Click="Import_Click"/><Button Content="Вставить из буфера" Click="Paste_Click"/></WrapPanel>
+      <Expander Header="Восстановление соединения" Margin="0,4,0,18"><StackPanel Margin="0,12,0,0">
+       <CheckBox x:Name="AutoReconnectCheck" Content="Переподключаться при обрыве" Margin="0,0,0,12"/>
+       <CheckBox x:Name="FallbackCheck" Content="Использовать совместимые резервные серверы этой группы" IsEnabled="{Binding IsChecked, ElementName=AutoReconnectCheck}" Margin="0,0,0,10"/>
+       <TextBlock Text="До 9 попыток, до 8 резервных серверов в порядке списка. В режиме всего устройства kill switch сохраняется между попытками. Если восстановить связь не удалось, блокировка остаётся до явного отключения. После аварии службы требуется ручное восстановление." TextWrapping="Wrap" Foreground="{StaticResource Muted}"/>
+      </StackPanel></Expander>
       <Expander x:Name="TransportExpander" Header="Фрагментация, шумы и MUX" Margin="0,4,0,18">
        <StackPanel Margin="0,14,0,0">
         <TextBlock Text="Настройки этого профиля сохраняются при обновлении подписки. По умолчанию выключены; применяются при следующем подключении." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,16"/>
@@ -56,7 +65,7 @@
      <StackPanel x:Name="EnginesPanel" Visibility="Collapsed">
       <TextBlock Text="Движки и восстановление" FontSize="26" FontWeight="SemiBold" Margin="0,0,0,18"/>
       <TextBlock x:Name="EngineDetails" LineHeight="26" Margin="0,0,0,18"/>
-      <TextBlock Text="Компоненты поставляются рядом с приложением, в папке engines. Если папка пуста, запусти scripts\Setup-Engines.ps1 из исходного проекта и пересобери приложение." Foreground="{StaticResource Muted}" Margin="0,0,0,18"/>
+      <TextBlock Text="Движки встроены в Go-ядро. Необходимые компоненты и лицензии входят в комплект приложения." Foreground="{StaticResource Muted}" Margin="0,0,0,18"/>
       <Button x:Name="InstallServiceButton" Content="Установить / обновить службу" HorizontalAlignment="Left" Click="InstallService_Click" Margin="0,0,0,12"/>
       <Button x:Name="StartServiceButton" Content="Запустить службу" HorizontalAlignment="Left" Click="StartService_Click" Margin="0,0,0,12"/>
       <TextBlock Text="Служба управляет подключением. Закрытие окна сохраняет VPN; для возврата обычной сети нажми «Отключить». Установка требует подтверждения Windows один раз." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,12"/>

@@ -4,6 +4,7 @@ namespace OneTunnel.Core;
 public enum Protocol { AmneziaWG, WireGuard, VLESS, SOCKS5, Hysteria2, Shadowsocks, HTTP, Trojan, TUIC, AnyTLS, NaiveProxy }
 public sealed record Profile(Guid Id,string Name,Protocol Protocol,string Source)
 {
+    public ReliabilityOptions? Reliability {get;init;}
     public string Group {get;init;}="Без группы";
     public TransportOptions? Transport {get;init;}
     public string Label=>$"{Name}  ·  {Protocol}";
@@ -26,3 +27,7 @@ public sealed record SubscriptionMergeResult(List<Profile> Profiles,int Added,in
 public sealed record ProfileDocument(int Version,List<Profile> Profiles,HashSet<string> CollapsedGroups,Dictionary<string,string> SubscriptionSources);
 public sealed record AppliedProfiles(ProfileDocument Document,Profile? Selected,int Added,int Updated,int Removed,int Duplicates,int Skipped,bool Batch,bool Offline,bool Retired);
 public sealed record DesktopState(string Root,bool Administrator,bool NeedsRecovery,bool Awg,bool Xray,bool SingBox,int MaxImportBytes=0);
+
+public sealed record ReliabilityOptions(bool AutoReconnect=false,bool UseFallbacks=false);
+public sealed record GroupCheckRow(string ID,string Name,string Message,bool Success,bool NetworkTest,long Milliseconds);
+public sealed record GroupCheckResult(string Group,string CheckedAt,List<GroupCheckRow> Rows);

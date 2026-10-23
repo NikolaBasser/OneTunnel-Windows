@@ -2,7 +2,8 @@ namespace OneTunnel.Core;
 
 public static class ProfileBackend
 {
-    public static Task<AppliedProfiles> SaveEditorAsync(string name,string source,string group,Guid? id,TransportInput transport)=>ProfileHost.CallAsync<AppliedProfiles>("ui.editor.save",new{Name=name,Source=source,Group=group,ID=id?.ToString()??"",TransportInput=transport});
+    public static Task<AppliedProfiles> SaveEditorAsync(string name,string source,string group,Guid? id,TransportInput transport,ReliabilityOptions? reliability=null)=>ProfileHost.CallAsync<AppliedProfiles>("ui.editor.save",new{Name=name,Source=source,Group=group,ID=id?.ToString()??"",TransportInput=transport,Reliability=reliability});
+    public static Task<GroupCheckResult> CheckGroupAsync(string group,CancellationToken cancellation=default)=>ProfileHost.CallAsync<GroupCheckResult>("group.check",new{Group=group},1000,cancellation:cancellation);
     public static Task<Profile> LoadEditorAsync(Guid id)=>ProfileHost.CallAsync<Profile>("editor.load",new{ID=id.ToString()});
     public static Task<ImportPreview> PreviewAsync(string source,CancellationToken cancellation)=>ProfileHost.CallAsync<ImportPreview>("editor.preview",new{Source=source},cancellation:cancellation);
     public static Task<ImportPreview> ImportFileAsync(string path)=>ProfileHost.CallAsync<ImportPreview>("editor.import",new{Path=path});

@@ -1,7 +1,7 @@
 namespace OneTunnel.Core;
 
-public sealed record DesktopContext(bool Busy, bool StorageReady, string SelectedID);
-public sealed record DesktopActions(bool CanConnect=false, bool CanDisconnect=false, bool CanToggle=false, bool CanProbe=false, bool CanRecover=false, bool CanAdd=false, bool CanEdit=false, bool CanDelete=false, bool CanSelect=false, bool CanChangeMode=false, bool CanSave=false, bool CanInstallService=false, bool CanStartService=false, bool CanClose=true, string ConnectCaption="Подключить");
+public sealed record DesktopContext(bool Busy, bool StorageReady, string SelectedID,bool CheckingGroup=false);
+public sealed record DesktopActions(bool CanConnect=false, bool CanDisconnect=false, bool CanToggle=false, bool CanProbe=false, bool CanRecover=false, bool CanAdd=false, bool CanEdit=false, bool CanDelete=false, bool CanSelect=false, bool CanChangeMode=false, bool CanSave=false, bool CanInstallService=false, bool CanStartService=false, bool CanClose=true, string ConnectCaption="Подключить",bool CanCheckGroup=false,bool CanCancelGroup=false);
 public sealed record DesktopDisplay(string Status="Проверка службы…", string ConnectionInfo="", string ConnectionHint="", string RecoveryHint="", bool ShowSession=false, int ModeIndex=0);
 public sealed record DesktopObservation(bool Available, CoreResponse Response, long PeerStarted, string Message, ulong CheckedAt);
 public sealed record DesktopReply(bool Available, CoreResponse Response, long PeerStarted, string Message, AppliedProfiles? Prepared = null, DesktopState? Environment = null, DesktopActions? Actions=null, DesktopDisplay? Display=null, ulong CheckedAt=0);
