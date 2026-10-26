@@ -207,3 +207,12 @@ routing, DNS and ICMP. Resolver addresses must fit peer coverage/address familie
 Native policy health checks an uncached encrypted DNS exchange rather than public
 HTTPS; success does not certify arbitrary public access or absence of leaks.
 Shared-native statistics use TUN ingress scope, without adding AWG wire counters.
+
+The pinned core also supports bounded additional engine-native proxy targets,
+inline domain/CIDR rule sets, compound process/network/port rules and AWG 3.1
+options. The existing network rules editor accepts advanced JSON with `Rules`,
+`Targets` and `RuleSets` and preserves it on reopen. Target sources are credentials:
+ordinary profile responses redact them; the explicit editor includes them.
+The core README documents the format, limits, SDK analysis and prediction APIs.
+Remote rule-set fetching and secondary Xray/native OS tunnels are outside this
+implementation. Route explanation is a read-only prediction, not live observation.
