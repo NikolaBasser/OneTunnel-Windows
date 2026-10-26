@@ -148,6 +148,8 @@ server-name bootstrap uses the fixed encrypted infrastructure path, separately
 from the custom tunneled resolver. Native AWG/WG with empty preferences retain imported DNS/AllowedIPs;
 nonempty full-device policies use the shared TUN; local mode is rejected. A matching new
 service build is required; an old strict service refuses unsupported fields.
+Whole-device startup refreshes the interface snapshot before becoming ready so
+executable-path rules apply to the first TUN connection.
 
 Portable backups use password-derived authenticated encryption and include profile,
 network, favorite, group and subscription settings. Restore previews a complete
