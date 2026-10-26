@@ -32,9 +32,10 @@ native dependencies and runtime validation before it can be packaged. No release
 CI
 Push and pull-request checks run synthetic source/bundle-validator checks only; they are not application builds.
 The manual Windows package workflow explicitly checks out and builds the pinned core source.
-Before running it, configure ONETUNNEL_CORE_REPOSITORY as the trusted owner/repository and
-CORE_READ_TOKEN as a read-only token for that private repository. Missing configuration fails
-the build job. No remote repository is assumed or created by this local split.
+It defaults to the public NikolaBasser/OneTunnel-Core repository with the job's read-only GitHub
+token. Optionally set ONETUNNEL_CORE_REPOSITORY to another trusted owner/repository and supply
+CORE_READ_TOKEN when private-source read access is required. The exact pinned revision remains
+mandatory; checkout credentials are not persisted. The workflow does not create a repository.
 
 ISOLATED WORKSPACE CHECK
 Run with the service idle (or absent). The check does not disconnect an existing session.

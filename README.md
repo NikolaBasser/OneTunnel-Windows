@@ -110,6 +110,11 @@ compile or download Go binaries implicitly.
 ## Verification and notices
 
 CI distinguishes synthetic source checks from full builds against the pinned core.
+The manually dispatched integration build defaults to the public
+`NikolaBasser/OneTunnel-Core` repository and the job's read-only GitHub token.
+`ONETUNNEL_CORE_REPOSITORY` can select a trusted alternative;
+`CORE_READ_TOKEN` supplies optional read access to a private source. Both paths
+build the exact pinned core revision without persisting checkout credentials.
 The pinned-core integration job also runs isolated WPF workspace checks with
 synthetic profiles. These checks do not connect a tunnel or modify the installed service.
 An availability result is not a blanket guarantee about a remote server, and native
