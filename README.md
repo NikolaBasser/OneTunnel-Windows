@@ -64,14 +64,14 @@ describe the older 0.1.0 release binary or the installed service.
 | Feature | Stage | Implemented scope and remaining validation |
 | --- | --- | --- |
 | Split routing | Partial | Domain, IP/subnet and application proxy/direct/block rules; shared TUN includes WG/AWG. Synthetic/configuration checks pass; live routing matrix remains. |
-| Auto reconnect | Partial | Bounded retries, traffic-lock retention and cancellation before replacement activation. Ten synthetic state-machine cases cover failures/fallback/cancel; live Wi-Fi, sleep and outage transitions remain. |
-| Backup servers | Partial | Compatible same-group fallback rotation, up to eight candidates; synthetic promotion/exhaustion/cleanup tests pass. Live failure/switching matrix remains. |
+| Auto reconnect | Partial | Bounded retries, traffic-lock retention and cancellation before replacement activation. Ten synthetic state-machine cases cover failures/fallback/cancel. The real production monitor recovered an isolated HTTP CONNECT proxy after an outage, with a fresh statistics session and HTTPS verification. Physical Wi-Fi/sleep and full-device transitions remain. |
+| Backup servers | Partial | Compatible same-group fallback rotation, up to eight candidates; synthetic promotion/exhaustion/cleanup tests pass. The real production monitor switched an isolated HTTP CONNECT proxy to its backup, reset retries, promoted that backup and stopped without restarting. Full-device/no-direct-gap and native failure matrices remain. |
 | Group checks | Ready, bounded scope | Cancellable HTTPS group probes and separate WG/AWG imported-DNS latency. All 38 saved proxy checks completed with listener cleanup:7 HTTPS successes and31 negative outcomes; one saved WG and AWG DNS probe passed. Other protocols have synthetic fixture coverage. Saved TUN policies are configuration-validated only; server availability and leak protection are separate. |
 | DNS settings | Partial | Proxied DoH/DoT, per-domain resolvers and WG/AWG shared-TUN policies. Current-build DNS/IPv6 leak validation remains. |
 | LAN access | Partial | Explicit private-network exceptions for shared TUN, including WG/AWG. Live LAN and protection checks remain. |
-| Auto connect | Partial | Opt-in profile/network rules, current-user startup and manual-stop inhibition across worker restarts. Real startup/network transitions remain. |
-| Windows system proxy | Partial | Owned current-user lease, watchdog and selective restoration. Fake-effect tests pass; real activation/rollback remains. |
-| Statistics and diagnostics | Partial | Current-session totals/rates/duration and sanitized diagnostic reports. Current live-runtime measurements remain. |
+| Auto connect | Partial | Opt-in profile/network rules, current-user startup and manual-stop inhibition across worker restarts. Synthetic category changes are rechecked before preparation and start, with renewed stability delay. Real login/network transitions remain. |
+| Windows system proxy | Partial | Owned current-user lease, watchdog and selective restoration. Real isolated Windows registry/DPAPI acceptance passes typed/missing baseline restore, external edits, partial-write rollback and loopback-listener-loss recovery. Completed watchdog restoration now preserves foreign-edit conflict reporting, including notification retries; isolated registry acceptance passes. Isolated cross-process DPAPI/registry recovery passes owner death, owner-plus-watcher death with a fixed helper deadline, and foreign-edit preservation. Host-job survival and actual WinINET activation remain unverified. |
+| Statistics and diagnostics | Partial, proxy lifecycle verified | Current-session counters/rates/duration and sanitized diagnostic export. Real VLESS and Hysteria2 proxy sessions passed stop/restart, positive monotonic counters, growing duration and fresh session identity checks. Stale counters after stop are fixed. Native/shared-TUN statistics and physical transitions remain unverified. |
 | Subscription management | Ready, scoped | Preview/apply/cancel, provider-reported usage/expiry and opt-in scheduled previews while the app is open and idle. No background refresh after app exit or automatic apply. |
 | Portable backup | Ready, isolated checks | Password-encrypted export and full-replacement restore with preview; wrong-password, tamper and stale-token tests pass. Merge restore is not implemented. |
 | Tray and notifications | Ready, isolated checks | Explicit hide/restore, Go-owned actions, profile selection and opt-in notifications. Selecting a profile does not connect. |
@@ -148,6 +148,8 @@ server-name bootstrap uses the fixed encrypted infrastructure path, separately
 from the custom tunneled resolver. Native AWG/WG with empty preferences retain imported DNS/AllowedIPs;
 nonempty full-device policies use the shared TUN; local mode is rejected. A matching new
 service build is required; an old strict service refuses unsupported fields.
+Whole-device startup refreshes the interface snapshot before becoming ready so
+executable-path rules apply to the first TUN connection.
 
 Portable backups use password-derived authenticated encryption and include profile,
 network, favorite, group and subscription settings. Restore previews a complete
