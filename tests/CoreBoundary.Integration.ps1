@@ -10,8 +10,13 @@ $bundle = [IO.Path]::GetFullPath($CoreBundlePath)
 $manifest = & (Join-Path $projectRoot 'scripts\Validate-CoreBundle.ps1') -Bundle $bundle -Reference (Join-Path $projectRoot 'core-reference.json')
 $output = Join-Path $projectRoot ('artifacts\core-copy-check-' + [guid]::NewGuid().ToString('N'))
 function Build-Consumer {
-    & dotnet build $projectPath --no-restore -c Release -r win-x64 -o $output "-p:CoreBundlePath=$bundle" --nologo
-    if ($LASTEXITCODE -ne 0) { throw 'Windows core consumer build failed.' }
+    $previousModulePath = $env:PSModulePath
+    try {
+        # MSBuild invokes Windows PowerShell5 even from a PowerShell7 build parent.
+        $env:PSModulePath = Join-Path $PSHOME 'Modules'
+        & dotnet build $projectPath --no-restore -c Release -r win-x64 -o $output "-p:CoreBundlePath=$bundle" --nologo
+        if ($LASTEXITCODE -ne 0) { throw 'Windows core consumer build failed.' }
+    } finally { $env:PSModulePath = $previousModulePath }
 }
 Build-Consumer
 foreach ($relative in @('OneTunnel.Profiles.exe','service/OneTunnel.Service.exe','service/libcronet.dll')) {

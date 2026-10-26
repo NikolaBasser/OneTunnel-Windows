@@ -9,6 +9,12 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
+function Get-CoreFileSHA256([string]$Path) {
+    $stream = [IO.File]::OpenRead($Path)
+    $algorithm = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($algorithm.ComputeHash($stream)).Replace('-', '') }
+    finally { $algorithm.Dispose(); $stream.Dispose() }
+}
 $root = [IO.Path]::GetFullPath($Bundle)
 if (!(Test-Path -LiteralPath $root -PathType Container)) { throw 'Core bundle directory is missing.' }
 $ancestor = Get-Item -LiteralPath $root -Force
@@ -56,7 +62,7 @@ foreach ($entry in @($manifest.Files)) {
     $path = [IO.Path]::GetFullPath((Join-Path $root $relative))
     if (!$path.StartsWith($root.TrimEnd('\','/') + [IO.Path]::DirectorySeparatorChar, [StringComparison]::OrdinalIgnoreCase) -or
         !(Test-Path -LiteralPath $path -PathType Leaf)) { throw 'Core bundle file is missing or outside its root.' }
-    if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine $entry.Sha256) { throw "Core bundle checksum mismatch: $relative" }
+    if ((Get-CoreFileSHA256 $path) -ine $entry.Sha256) { throw "Core bundle checksum mismatch: $relative" }
     $declared[$relative] = $true
 }
 $actual = @($items | Where-Object { !$_.PSIsContainer })
