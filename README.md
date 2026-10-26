@@ -53,6 +53,37 @@ Its recovery entry opens the recovery view without executing recovery automatica
 Persistent traffic protection remains active after a connection failure and during
 reconnection. Explicit disconnect/recovery controls release owned protection.
 
+## Feature implementation status
+
+Reviewed on 2026-10-26 against the pinned core and local checks. **Ready** means
+the stated scope is implemented and checked; **Partial** includes implemented
+features whose current-build system/network validation is incomplete. None of
+the original roadmap rows is wholly unimplemented. This source status does not
+describe the older 0.1.0 release binary or the installed service.
+
+| Feature | Stage | Implemented scope and remaining validation |
+| --- | --- | --- |
+| Split routing | Partial | Domain, IP/subnet and application proxy/direct/block rules; shared TUN includes WG/AWG. Synthetic/configuration checks pass; live routing matrix remains. |
+| Auto reconnect | Partial | Bounded retries and traffic-lock retention. Current-build Wi-Fi, sleep and outage transitions remain. |
+| Backup servers | Partial | Compatible same-group fallback rotation, up to eight candidates. Live failure/switching matrix remains. |
+| Group checks | Partial | Cancellation, timestamps and measured HTTPS probe latency for proxy transports. WG/AWG checks remain configuration-only; live group validation remains. |
+| DNS settings | Partial | Proxied DoH/DoT, per-domain resolvers and WG/AWG shared-TUN policies. Current-build DNS/IPv6 leak validation remains. |
+| LAN access | Partial | Explicit private-network exceptions for shared TUN, including WG/AWG. Live LAN and protection checks remain. |
+| Auto connect | Partial | Opt-in profile/network rules, current-user startup and manual-stop inhibition across worker restarts. Real startup/network transitions remain. |
+| Windows system proxy | Partial | Owned current-user lease, watchdog and selective restoration. Fake-effect tests pass; real activation/rollback remains. |
+| Statistics and diagnostics | Partial | Current-session totals/rates/duration and sanitized diagnostic reports. Current live-runtime measurements remain. |
+| Subscription management | Ready, scoped | Preview/apply/cancel, provider-reported usage/expiry and opt-in scheduled previews while the app is open and idle. No background refresh after app exit or automatic apply. |
+| Portable backup | Ready, isolated checks | Password-encrypted export and full-replacement restore with preview; wrong-password, tamper and stale-token tests pass. Merge restore is not implemented. |
+| Tray and notifications | Ready, isolated checks | Explicit hide/restore, Go-owned actions, profile selection and opt-in notifications. Selecting a profile does not connect. |
+| Kill switch lifecycle | Partial | Marker-independent owned WFP cleanup; graceful service stop restores networking, crashes retain protection. Synthetic regressions pass; live crash/reboot/leak matrix remains. |
+| Offline emergency recovery | Implemented | Standalone Windows x64/ARM64 package, exact-provider validation and transactional cleanup. Current package builds/checksums pass; ARM64 execution remains untested. |
+
+Production-tag Go tests/vet, Windows x64 build, pinned-core integration, 59
+synthetic bundle checks and isolated WPF checks passed locally. ARM64 host and
+Linux portable checks are cross-compilation checks, not device/runtime proof.
+The failed active-network canary remains disabled. No installed-service update,
+new live WFP policy or release was performed as part of this audit.
+
 ## Platform and versions
 
 **Windows 10/11 x64** is the supported application target. Native Windows ARM64
