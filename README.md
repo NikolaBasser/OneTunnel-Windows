@@ -66,7 +66,7 @@ describe the older 0.1.0 release binary or the installed service.
 | Split routing | Partial | Domain, IP/subnet and application proxy/direct/block rules; shared TUN includes WG/AWG. Synthetic/configuration checks pass; live routing matrix remains. |
 | Auto reconnect | Partial | Bounded retries, traffic-lock retention and cancellation before replacement activation. Ten synthetic state-machine cases cover failures/fallback/cancel; live Wi-Fi, sleep and outage transitions remain. |
 | Backup servers | Partial | Compatible same-group fallback rotation, up to eight candidates; synthetic promotion/exhaustion/cleanup tests pass. Live failure/switching matrix remains. |
-| Group checks | Partial | Cancellation, timestamps and measured HTTPS probe latency for proxy transports. WG/AWG use bounded imported-DNS probes with separate latency when peer routes permit; otherwise configuration-only. Paired peers and one saved profile of each native type pass; full group validation remains. |
+| Group checks | Ready, bounded scope | Cancellable HTTPS group probes and separate WG/AWG imported-DNS latency. All 38 saved proxy checks completed with listener cleanup:7 HTTPS successes and31 negative outcomes; one saved WG and AWG DNS probe passed. Other protocols have synthetic fixture coverage. Saved TUN policies are configuration-validated only; server availability and leak protection are separate. |
 | DNS settings | Partial | Proxied DoH/DoT, per-domain resolvers and WG/AWG shared-TUN policies. Current-build DNS/IPv6 leak validation remains. |
 | LAN access | Partial | Explicit private-network exceptions for shared TUN, including WG/AWG. Live LAN and protection checks remain. |
 | Auto connect | Partial | Opt-in profile/network rules, current-user startup and manual-stop inhibition across worker restarts. Real startup/network transitions remain. |
@@ -82,7 +82,7 @@ Production-tag Go tests/vet, Windows x64 build, pinned-core integration, 59
 synthetic bundle checks and isolated WPF checks passed locally. ARM64 host and
 Linux portable checks are cross-compilation checks, not device/runtime proof.
 The failed active-network canary remains disabled. No installed-service update,
-new live WFP policy or release was performed as part of this audit.
+new live blocking WFP policy or release was performed as part of this audit.
 
 ## Platform and versions
 
