@@ -64,8 +64,8 @@ describe the older 0.1.0 release binary or the installed service.
 | Feature | Stage | Implemented scope and remaining validation |
 | --- | --- | --- |
 | Split routing | Partial | Domain, IP/subnet and application proxy/direct/block rules; shared TUN includes WG/AWG. Synthetic/configuration checks pass; live routing matrix remains. |
-| Auto reconnect | Partial | Bounded retries and traffic-lock retention. Current-build Wi-Fi, sleep and outage transitions remain. |
-| Backup servers | Partial | Compatible same-group fallback rotation, up to eight candidates. Live failure/switching matrix remains. |
+| Auto reconnect | Partial | Bounded retries, traffic-lock retention and cancellation before replacement activation. Ten synthetic state-machine cases cover failures/fallback/cancel; live Wi-Fi, sleep and outage transitions remain. |
+| Backup servers | Partial | Compatible same-group fallback rotation, up to eight candidates; synthetic promotion/exhaustion/cleanup tests pass. Live failure/switching matrix remains. |
 | Group checks | Partial | Cancellation, timestamps and measured HTTPS probe latency for proxy transports. WG/AWG checks remain configuration-only; live group validation remains. |
 | DNS settings | Partial | Proxied DoH/DoT, per-domain resolvers and WG/AWG shared-TUN policies. Current-build DNS/IPv6 leak validation remains. |
 | LAN access | Partial | Explicit private-network exceptions for shared TUN, including WG/AWG. Live LAN and protection checks remain. |
