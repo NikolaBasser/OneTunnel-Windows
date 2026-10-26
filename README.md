@@ -66,7 +66,7 @@ describe the older 0.1.0 release binary or the installed service.
 | Split routing | Partial | Domain, IP/subnet and application proxy/direct/block rules; shared TUN includes WG/AWG. Synthetic/configuration checks pass; live routing matrix remains. |
 | Auto reconnect | Partial | Bounded retries, traffic-lock retention and cancellation before replacement activation. Ten synthetic state-machine cases cover failures/fallback/cancel; live Wi-Fi, sleep and outage transitions remain. |
 | Backup servers | Partial | Compatible same-group fallback rotation, up to eight candidates; synthetic promotion/exhaustion/cleanup tests pass. Live failure/switching matrix remains. |
-| Group checks | Partial | Cancellation, timestamps and measured HTTPS probe latency for proxy transports. WG/AWG checks remain configuration-only; live group validation remains. |
+| Group checks | Partial | Cancellation, timestamps and measured HTTPS probe latency for proxy transports. WG/AWG use bounded imported-DNS probes with separate latency when peer routes permit; otherwise configuration-only. Paired peers and one saved profile of each native type pass; full group validation remains. |
 | DNS settings | Partial | Proxied DoH/DoT, per-domain resolvers and WG/AWG shared-TUN policies. Current-build DNS/IPv6 leak validation remains. |
 | LAN access | Partial | Explicit private-network exceptions for shared TUN, including WG/AWG. Live LAN and protection checks remain. |
 | Auto connect | Partial | Opt-in profile/network rules, current-user startup and manual-stop inhibition across worker restarts. Real startup/network transitions remain. |
@@ -118,7 +118,7 @@ build the exact pinned core revision without persisting checkout credentials.
 The pinned-core integration job also runs isolated WPF workspace checks with
 synthetic profiles. These checks do not connect a tunnel or modify the installed service.
 An availability result is not a blanket guarantee about a remote server, and native
-WireGuard/AmneziaWG group checks validate configuration rather than establishing a tunnel.
+WireGuard/AmneziaWG group checks probe an eligible imported DNS address through the embedded userspace tunnel without changing OS networking; otherwise they validate configuration only.
 
 [Security policy](.github/SECURITY.md) ·
 [Third-party notices](THIRD-PARTY-NOTICES.txt) ·
@@ -129,7 +129,7 @@ license grant is declared by this README.
 
 Group check results can be sorted by full check duration and filtered by outcome.
 An explicit best-result action selects a successful network check without connecting.
-WireGuard/AmneziaWG configuration-only checks are excluded. Results are kept only
+WireGuard/AmneziaWG configuration-only and DNS-only results are excluded from HTTPS-based best-result selection. Results are kept only
 in user-host memory, become stale after storage changes, and can be cleared.
 The duration includes engine startup, HTTPS probing, and cleanup; it is not ping.
 
@@ -194,7 +194,7 @@ Group checks report total check duration separately from successful HTTPS probe
 latency. HTTPS latency excludes engine startup and cleanup and is not ICMP RTT.
 Saved shared-TUN DNS/routing policies are validated, then left unapplied during
 the local server check; infrastructure endpoint bootstrap stays encrypted.
-Native WG/AWG group checks remain configuration-only and do not report latency.
+Native WG/AWG group checks retain imported AllowedIPs and address families, reporting separate DNS exchange latency when eligible DNS responds. The duration may include the initial handshake. Missing eligible DNS remains configuration-only. DNS success does not certify public internet access or absence of leaks.
 
 AWG/WireGuard with nonempty full-device network preferences use the shared TUN
 and an in-process AWG userspace transport. This mode supports TCP/UDP, preserves
