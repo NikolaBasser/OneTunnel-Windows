@@ -32,9 +32,34 @@ native dependencies and runtime validation before it can be packaged. No release
 CI
 Push and pull-request checks run synthetic source/bundle-validator checks only; they are not application builds.
 The manual Windows package workflow explicitly checks out and builds the pinned core source.
-Before running it, configure ONETUNNEL_CORE_REPOSITORY as the trusted owner/repository and
-CORE_READ_TOKEN as a read-only token for that private repository. Missing configuration fails
-the build job. No remote repository is assumed or created by this local split.
+It defaults to the public NikolaBasser/OneTunnel-Core repository with the job's read-only GitHub
+token. Optionally set ONETUNNEL_CORE_REPOSITORY to another trusted owner/repository and supply
+CORE_READ_TOKEN when private-source read access is required. The exact pinned revision remains
+mandatory; checkout credentials are not persisted. The workflow does not create a repository.
+
+ISOLATED WORKSPACE CHECK
+Run with the service idle (or absent). The check does not disconnect an existing session.
+powershell -NoProfile -Command "dotnet run --project tests/WorkspaceUi.Check/WorkspaceUiCheck.csproj -c Release -r win-x64 -p:CoreBundlePath=C:\path\to\trusted-core-bundle"
+The check creates a new temporary synthetic profile store and prints its capture directory.
+It does not connect a tunnel, probe servers, install a service or change the real profile store.
+
+SAVED SUBSCRIPTIONS
+The Subscriptions page lists saved groups without displaying their private source URLs.
+Check for updates downloads a preview; Apply commits that exact reviewed result.
+Cancel or a cancelled download does not apply changes. Previews expire after ten minutes;
+an intervening profile or group change requires a fresh preview.
+Provider-reported traffic and expiry may be unknown and do not establish live usage accuracy.
+Scheduled refresh is not included. Existing import and connect-time preparation still work.
+Manual subscription management runs in the user host and requires no service update.
+
+SYSTEM TRAY
+Right-click the OneTunnel notification-area icon for the Go-projected status and actions.
+Open or double-click restores the existing window. Minimize retains its taskbar entry.
+The recovery menu opens the existing view; it does not change networking automatically.
+Status notifications are off by default. The tray menu can enable them for this session;
+Windows notification preferences may suppress delivery. This choice is not persisted.
+Close/Exit retains the normal UI-exit behavior and does not disconnect the service.
+This UI-only feature requires no installed-service update.
 
 OUTPUT
 dist/OneTunnel-0.1.0-win-x64/
@@ -52,7 +77,100 @@ RUN
 OneTunnel.exe in the package directory.
 The package includes the .NET runtime, user profile host and Go service.
 Servers and access credentials are configured separately in the application.
+The separate minimize-to-tray button hides the window. Restore it from the tray
+or with Ctrl+Shift+O. This shortcut is registered only while the window is hidden;
+if registration fails, the window stays visible. Ordinary minimize keeps its
+taskbar entry. Explorer restart restores an explicitly hidden window.
+Status notifications can be enabled in the window or tray for the current session.
+They are off by default and are not saved between application launches.
+The Events page offers explicit diagnostics generation, preview, copy and JSON save.
+The report identifies the bundled profile host, not the installed service; engine
+availability hints do not test runtime health. Generation makes no network requests.
+No report is created, copied, saved or uploaded automatically. A service update is
+not required for this user-host feature.
+Use the selected-profile favorite action to add or remove a favorite. Favorites
+are encrypted by the Go profile host and follow stable profile IDs. The favorites
+filter and stored/name/protocol sort affect the view only and reset per session.
+Groups stay contiguous; sorting does not change stored fallback server priority.
+The Groups page manages manual and subscription groups. Rename preserves IDs and
+settings; deletion requires confirmation and also removes the locally saved source.
+Changed snapshots are rejected, so reload the group list before retrying.
+Expand/collapse-all on the connection page includes search/favorites-hidden groups.
+These features need no service update and do not connect or disconnect a tunnel.
 
 LICENSES
 THIRD-PARTY-NOTICES.txt, assets/LICENSE*.txt, third-party/notices/,
 and the service dependency notices in the generated package.
+
+GROUP CHECK RESULTS
+Results are temporary user-host state. Sort/filter do not change profile or fallback
+order. The best-result action uses the entire completed batch, regardless of the
+visible filter, and only changes selection. It never starts a connection.
+Changed profile storage requires a fresh check. No service update is required.
+
+PROFILE COPY AND MOVE
+Open the selected-profile tools on the connection page. Enter a copy name and a
+manual destination group, then create a copy or move the selected manual profile.
+The destination can be an existing manual group or a new group. Saved subscription
+groups cannot be destinations. Reload the tools after a changed storage snapshot.
+Moving keeps the ID, favorite and stored position. Copies append to stored order.
+These actions preserve unfinished editor drafts and do not connect a tunnel.
+No installed-service update is required for these user-host operations.
+
+DNS AND SPLIT ROUTING (PROXY WHOLE-DEVICE MODE)
+Open the selected profile DNS/routing section, choose default, custom DoH or DoT,
+and enter a literal resolver IP plus its verified TLS server name. Blank port
+uses 443 for DoH or 853 for DoT; blank DoH path uses /dns-query; DoT path is empty.
+Enter ordered rules as: kind | action | value. Kinds: domain, domain-suffix, cidr,
+process. Actions: proxy, direct, reject. First matching user rule wins after
+infrastructure rules; unmatched traffic stays proxied. Save applies on a future
+connection, not to a running session. Direct rules explicitly allow direct egress.
+AWG/WG and local proxy mode cannot use these new preferences. Install the matching
+bundled service explicitly before using them; preview startup never updates it.
+Domain matching depends on observed DNS/SNI and process matching on Windows process
+attribution; private application DoH/ECH can reduce domain visibility. A config
+validation test does not prove live routing correctness or absence of DNS leaks.
+
+BACKUP, SCHEDULES AND TRAY PROFILES
+Use Backup in the service/settings view to export to a NEW .otbackup filename.
+Use a strong password of at least12 UTF-8 bytes; no password is stored. Restore
+shows counts and replaces the entire local library only after confirmation.
+Enabled subscription schedules require a separate restore opt-in, off by default.
+Restore preview tokens expire after10 minutes; cleanup is lazy on Go requests and
+host close. Memory clearing is best effort, not guaranteed string-memory erasure.
+Saved subscriptions can prepare change previews every15..10080 minutes while the
+app is open; they never silently apply. Turning a schedule off keeps its interval.
+Use the tray profile submenu to select a profile without connecting. Up to50
+profiles are shown; use the main window for the rest. No service update is needed
+for these user-host features. These features do not alter networking automatically.
+
+DOMAIN DNS AND LAN PREFERENCES
+Additional resolver lines: transport | IP | TLS name | port | path.
+Use https or tls; empty port/path select protocol defaults. Maximum8 resolvers.
+DNS-rule lines: domain or domain-suffix | domain | resolver number (starting1).
+Maximum64 DNS rules, evaluated in order. Resolver traffic stays proxied.
+LAN access defaults off and covers10/8,172.16/12,192.168/16 and fc00::/7 only.
+Explicit user reject/proxy rules take precedence over the appended LAN exception.
+Save affects future shared-TUN proxy connections; native AWG/WG are unsupported.
+Local config tests do not establish live DNS/IPv6 leak or firewall behavior.
+
+CONNECTION STATISTICS
+The connection card renders Go-owned totals, rates, elapsed time and scope.
+Counters reset on reconnect/fallback; no accumulated history is stored.
+Local-proxy totals include connection checks. TUN fast flows include packet bytes;
+AWG/WG expose transport counters. Missing/error samples are unavailable, not zero.
+Error categories use typed causes; engine errors lacking typed causes remain unknown.
+A matching service is needed for metrics; old services continue without them.
+
+WINDOWS USER SETTINGS
+All automation defaults off. Save the chosen profile/mode and trusted/public
+permissions explicitly. Unknown networks count as public. Startup registers only
+this user's validated OneTunnel.exe and is separate from auto-connect.
+An explicit Disconnect inhibits auto-connect; toggle automation off/on to rearm.
+Three failed starts stop automatic attempts until a category transition or rearm.
+Enable Windows proxy separately after a confirmed LOCAL proxy connection; whole-device mode cannot lease the user proxy. Existing PAC/auto-detect must be resolved
+by the user first. Previous typed proxy values are restored selectively; another
+application's edits are not overwritten. Host exit or local listener loss triggers
+an independent watchdog. This does not alter persistent whole-device kill switch.
+Settings run while the user app is open. Backup restore leaves automation off;
+machine startup registration is excluded. Fake-registry tests are not live proof.

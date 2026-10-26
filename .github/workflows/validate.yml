@@ -44,23 +44,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Require configured trusted core source
+      - name: Select trusted pinned core source
         id: core
         env:
-          CORE_REPOSITORY: ${{ vars.ONETUNNEL_CORE_REPOSITORY }}
-          CORE_READ_TOKEN: ${{ secrets.CORE_READ_TOKEN }}
+          CORE_REPOSITORY: ${{ vars.ONETUNNEL_CORE_REPOSITORY || 'NikolaBasser/OneTunnel-Core' }}
         run: |
-          if ($env:CORE_REPOSITORY -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' -or !$env:CORE_READ_TOKEN) {
-            throw 'Configure ONETUNNEL_CORE_REPOSITORY and read-only CORE_READ_TOKEN before running the application build. No split core remote is assumed.'
+          if ($env:CORE_REPOSITORY -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$') {
+            throw 'ONETUNNEL_CORE_REPOSITORY must identify a trusted owner/repository.'
           }
           $pin = Get-Content core-reference.json -Raw | ConvertFrom-Json
           if ($pin.SourceRevision -cnotmatch '^[0-9a-f]{40}$') { throw 'Invalid pinned core commit.' }
           "revision=$($pin.SourceRevision)" | Add-Content $env:GITHUB_OUTPUT
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          repository: ${{ vars.ONETUNNEL_CORE_REPOSITORY }}
+          repository: ${{ vars.ONETUNNEL_CORE_REPOSITORY || 'NikolaBasser/OneTunnel-Core' }}
           ref: ${{ steps.core.outputs.revision }}
-          token: ${{ secrets.CORE_READ_TOKEN }}
+          token: ${{ secrets.CORE_READ_TOKEN || github.token }}
           path: artifacts/core-source
           persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -76,3 +75,5 @@ jobs:
         run: ./scripts/Build.ps1 -Name OneTunnel-ci-win-x64 -CoreBundlePath "$PWD/artifacts/core-bundle"
       - name: Verify actual core output selection
         run: ./tests/CoreBoundary.Integration.ps1 -CoreBundlePath "$PWD/artifacts/core-bundle"
+      - name: Check the workspace with isolated synthetic profiles
+        run: powershell.exe -NoProfile -Command "dotnet run --project tests/WorkspaceUi.Check/WorkspaceUiCheck.csproj -c Release -r win-x64 -p:CoreBundlePath=$PWD/artifacts/core-bundle"

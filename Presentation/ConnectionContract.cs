@@ -19,9 +19,11 @@ public interface IConnectionController
     Task<string> ProbeAsync();
 }
 
-public sealed record CoreStatus(bool Active, bool NeedsRecovery, bool TrafficLocked, bool WholeDevice, bool FullDeviceMode, bool ClockSynchronized, int LocalPort, string Status, Guid? ProfileId, bool Reconnecting=false,int ReconnectAttempt=0);
+public sealed record ConnectionStatistics(int SchemaVersion,string SessionID,ulong ElapsedMilliseconds,ulong? UploadedBytes,ulong? DownloadedBytes,ulong? UploadBytesPerSecond,ulong? DownloadBytesPerSecond,string Scope);
+public sealed record CoreStatus(bool Active, bool NeedsRecovery, bool TrafficLocked, bool WholeDevice, bool FullDeviceMode, bool ClockSynchronized, int LocalPort, string Status, Guid? ProfileId, bool Reconnecting=false,int ReconnectAttempt=0,[property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ConnectionStatistics? Statistics=null);
 public sealed record CoreRequest(int Version, string Command, Profile? Profile = null, bool FullDevice = false);
-public sealed record CoreResponse(int Version, string Instance, CoreStatus State, string? Result = null, string? Error = null, ulong Revision = 0);
+public sealed record ConnectionErrorInfo(string Stage,string Code,bool Retryable);
+public sealed record CoreResponse(int Version, string Instance, CoreStatus State, string? Result = null, string? Error = null, ulong Revision = 0, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ConnectionErrorInfo? ErrorInfo = null);
 
 public static class CoreProtocol
 {
