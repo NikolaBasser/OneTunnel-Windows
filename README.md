@@ -71,7 +71,7 @@ describe the older 0.1.0 release binary or the installed service.
 | LAN access | Partial | Explicit private-network exceptions for shared TUN, including WG/AWG. Live LAN and protection checks remain. |
 | Auto connect | Partial | Opt-in profile/network rules, current-user startup and manual-stop inhibition across worker restarts. Real startup/network transitions remain. |
 | Windows system proxy | Partial | Owned current-user lease, watchdog and selective restoration. Fake-effect tests pass; real activation/rollback remains. |
-| Statistics and diagnostics | Partial | Current-session totals/rates/duration and sanitized diagnostic reports. Current live-runtime measurements remain. |
+| Statistics and diagnostics | Partial, proxy lifecycle verified | Current-session counters/rates/duration and sanitized diagnostic export. Real VLESS and Hysteria2 proxy sessions passed stop/restart, positive monotonic counters, growing duration and fresh session identity checks. Stale counters after stop are fixed. Native/shared-TUN statistics and physical transitions remain unverified. |
 | Subscription management | Ready, scoped | Preview/apply/cancel, provider-reported usage/expiry and opt-in scheduled previews while the app is open and idle. No background refresh after app exit or automatic apply. |
 | Portable backup | Ready, isolated checks | Password-encrypted export and full-replacement restore with preview; wrong-password, tamper and stale-token tests pass. Merge restore is not implemented. |
 | Tray and notifications | Ready, isolated checks | Explicit hide/restore, Go-owned actions, profile selection and opt-in notifications. Selecting a profile does not connect. |
