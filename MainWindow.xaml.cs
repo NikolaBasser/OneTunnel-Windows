@@ -728,9 +728,29 @@ public partial class MainWindow : Window
         FragmentLengthBox.Text = o.FragmentLength; FragmentIntervalBox.Text = o.FragmentInterval;
         NoiseLengthBox.Text = o.NoiseLength; NoiseDelayBox.Text = o.NoiseDelay;
         MuxConcurrencyBox.Text = o.MuxConcurrency.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        MuxProtocolBox.SelectedIndex = o.MuxProtocol switch { "h2mux" => 1, "smux" => 2, "yamux" => 3, _ => 0 };
+        MuxMaxConnectionsBox.Text = o.MuxMaxConnections.ToString(); MuxMinStreamsBox.Text = o.MuxMinStreams.ToString();
+        MuxPaddingBox.IsChecked = o.MuxPadding; XUDPConcurrencyBox.Text = o.XUDPConcurrency.ToString();
+        MuxUDP443Box.SelectedIndex = o.UDP443Policy switch { "skip" => 1, "allow" => 2, "reject" => 3, _ => 0 };
+        UpdateMuxControls();
         TransportExpander.IsExpanded = o.Fragment || o.Noise || o.Mux;
     }
-    private TransportInput ReadTransport() => new(FragmentCheck.IsChecked == true, FragmentLengthBox.Text, FragmentIntervalBox.Text, NoiseCheck.IsChecked == true, NoiseLengthBox.Text, NoiseDelayBox.Text, MuxCheck.IsChecked == true, MuxConcurrencyBox.Text);
+    private static string ChoiceTag(ComboBox box) => (box.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
+    private bool UsesSingMux() => ChoiceTag(MuxProtocolBox) is "h2mux" or "smux" or "yamux";
+    private bool UsesMuxConnectionLimit() => UsesSingMux() && int.TryParse(MuxMaxConnectionsBox.Text, out var count) && count > 0;
+    private void MuxProtocol_Changed(object sender, SelectionChangedEventArgs e) { if (MuxUDP443Box != null) UpdateMuxControls(); }
+    private void MuxConnections_Changed(object sender, TextChangedEventArgs e) { if (MuxUDP443Box != null) UpdateMuxControls(); }
+    private void UpdateMuxControls()
+    {
+        bool sing = UsesSingMux();
+        MuxMaxConnectionsBox.IsEnabled = MuxPaddingBox.IsEnabled = sing;
+        MuxMinStreamsBox.IsEnabled = UsesMuxConnectionLimit();
+        MuxConcurrencyBox.IsEnabled = !UsesMuxConnectionLimit();
+        XUDPConcurrencyBox.IsEnabled = MuxUDP443Box.IsEnabled = !sing;
+    }
+    private TransportInput ReadTransport() => new(FragmentCheck.IsChecked == true, FragmentLengthBox.Text, FragmentIntervalBox.Text, NoiseCheck.IsChecked == true, NoiseLengthBox.Text, NoiseDelayBox.Text, MuxCheck.IsChecked == true, MuxConcurrencyBox.Text,
+        ChoiceTag(MuxProtocolBox), UsesSingMux() ? MuxMaxConnectionsBox.Text : "", UsesMuxConnectionLimit() ? MuxMinStreamsBox.Text : "", UsesSingMux() && MuxPaddingBox.IsChecked == true,
+        UsesSingMux() ? "" : XUDPConcurrencyBox.Text, UsesSingMux() ? "" : ChoiceTag(MuxUDP443Box));
 
     private async void Edit_Click(object sender, RoutedEventArgs e)
     {
@@ -1350,7 +1370,9 @@ public partial class MainWindow : Window
         bool customDNS = supported && GetNetworkDNSMode() != "default";
         NetworkDNSModeBox.IsEnabled = supported && !pending;
         NetworkServerIPBox.IsEnabled = NetworkServerNameBox.IsEnabled = NetworkPortBox.IsEnabled = customDNS && !pending;
-        NetworkPathBox.IsEnabled = supported && GetNetworkDNSMode() == "https" && !pending;
+        NetworkPathBox.IsEnabled = supported && (GetNetworkDNSMode() is "https" or "h3") && !pending;
+        NetworkFakeIPBox.IsEnabled = NetworkCacheModeBox.IsEnabled = supported && !pending;
+        NetworkCacheCapacityBox.IsEnabled = supported && !pending && ChoiceTag(NetworkCacheModeBox) == "bounded";
         NetworkRulesBox.IsEnabled = supported && !pending;
         NetworkResolversBox.IsEnabled = NetworkDNSRulesBox.IsEnabled = NetworkAllowLANBox.IsEnabled = supported && !pending;
         SaveNetworkPreferencesButton.IsEnabled = matching && view!.CanSave && supported && connection.Actions.CanSave && !pending;
@@ -1373,6 +1395,7 @@ public partial class MainWindow : Window
             NetworkDNSModeBox.SelectedIndex = 0;
             NetworkServerIPBox.Clear(); NetworkServerNameBox.Clear(); NetworkPortBox.Clear(); NetworkPathBox.Clear(); NetworkRulesBox.Clear();
             NetworkResolversBox.Clear(); NetworkDNSRulesBox.Clear(); NetworkAllowLANBox.IsChecked = false;
+            NetworkFakeIPBox.IsChecked = false; NetworkCacheModeBox.SelectedIndex = 0; NetworkCacheCapacityBox.Clear();
         }
         NetworkPreferencesStatus.Text = message;
         UpdateNetworkPreferencesControls();
@@ -1414,7 +1437,7 @@ public partial class MainWindow : Window
         bool sameSnapshot = Guid.TryParse(view.ID, out var id) && networkPreferencesFieldsId == id && networkPreferencesFieldsToken == view.Token;
         if (resetFields || !sameSnapshot)
         {
-            int modeIndex = view.Mode switch { "https" => 1, "tls" => 2, _ => 0 };
+            int modeIndex = view.Mode switch { "https" => 1, "tls" => 2, "quic" => 3, "h3" => 4, _ => 0 };
             NetworkDNSModeBox.SelectedIndex = modeIndex;
             NetworkServerIPBox.Text = view.ServerIP;
             NetworkServerNameBox.Text = view.ServerName;
@@ -1424,6 +1447,9 @@ public partial class MainWindow : Window
             NetworkResolversBox.Text = view.ResolversText;
             NetworkDNSRulesBox.Text = view.DNSRulesText;
             NetworkAllowLANBox.IsChecked = view.AllowLAN;
+            NetworkFakeIPBox.IsChecked = view.FakeIP;
+            NetworkCacheModeBox.SelectedIndex = view.CacheMode switch { "disabled" => 1, "bounded" => 2, _ => 0 };
+            NetworkCacheCapacityBox.Text = view.CacheCapacity;
         }
         networkPreferencesFieldsId = Guid.TryParse(view.ID, out id) ? id : null;
         networkPreferencesFieldsToken = view.Token;
@@ -1445,8 +1471,9 @@ public partial class MainWindow : Window
         string mode = GetNetworkDNSMode();
         var input = new NetworkInput(mode, mode == "default" ? "" : NetworkServerIPBox.Text,
             mode == "default" ? "" : NetworkServerNameBox.Text, mode == "default" ? "" : NetworkPortBox.Text,
-            mode == "https" ? NetworkPathBox.Text : "", NetworkRulesBox.Text, NetworkResolversBox.Text,
-            NetworkDNSRulesBox.Text, NetworkAllowLANBox.IsChecked == true);
+            mode is "https" or "h3" ? NetworkPathBox.Text : "", NetworkRulesBox.Text, NetworkResolversBox.Text,
+            NetworkDNSRulesBox.Text, NetworkAllowLANBox.IsChecked == true, NetworkFakeIPBox.IsChecked == true, ChoiceTag(NetworkCacheModeBox),
+            ChoiceTag(NetworkCacheModeBox) == "default" ? "" : NetworkCacheCapacityBox.Text);
         string token = view.Token;
         networkPreferencesSavePending = true;
         busy = true;
