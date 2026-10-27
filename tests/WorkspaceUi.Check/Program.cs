@@ -572,11 +572,13 @@ internal static class Program
         Click("SaveNetworkPreferencesButton"); Wait(() => NetworkIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
         Assert(!NetworkProfile().TryGetProperty("Network", out var clearedNetwork) || clearedNetwork.ValueKind == JsonValueKind.Null, "Explicit default reset removes the custom network policy");
         var nativeFixture = "[Interface]\nPrivateKey = AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=\nAddress = 10.9.0.2/32\nDNS = 1.1.1.1\n[Peer]\nPublicKey = AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA=\nEndpoint = 192.0.2.9:51820\nAllowedIPs = 0.0.0.0/0";
+        nativeFixture += "\n[Peer]\nPublicKey = ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=\nEndpoint = 192.0.2.10:51820\nAllowedIPs = 10.10.0.0/16";
         var nativeAdded = ProfileBackend.SaveEditorAsync("Synthetic native", nativeFixture, "Native test", null, transport).GetAwaiter().GetResult();
         typeof(MainWindow).GetMethod("PresentDocument", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [nativeAdded.Document, nativeAdded.Selected!.Id, true]);
         Wait(() => NetworkIdle() && LibraryIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
         var nativeOriginal = Raw<JsonElement>("store.load").GetProperty("Profiles").EnumerateArray().First(p => p.GetProperty("Id").GetString() == nativeAdded.Selected!.Id.ToString());
         var nativeOriginalSource = nativeOriginal.GetProperty("Source").GetString();
+        Assert(nativeOriginalSource == nativeFixture && nativeOriginalSource.Split("[Peer]").Length == 3, "Editor import preserves both native peers and their route ownership");
         var nativeStatus = Find<TextBlock>("NetworkPreferencesStatus").Text;
         Assert(nativeStatus.Contains("shared TUN") && nativeStatus.Contains("Policy DNS replaces imported DNS") && nativeStatus.Contains("ICMP is unavailable"), "Go reports native full-device policy scope, imported DNS override, and unavailable ICMP");
         Assert(Find<TextBox>("NetworkResolversBox").IsEnabled && Find<TextBox>("NetworkDNSRulesBox").IsEnabled && Find<CheckBox>("NetworkAllowLANBox").IsEnabled, "Native profile enables shared-TUN policy controls");
