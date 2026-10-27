@@ -21,6 +21,12 @@ public sealed record TransportOptions
     public string NoiseDelay {get;init;}="";
     public bool Mux {get;init;}
     public int MuxConcurrency {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] public string? MuxProtocol {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] public int MuxMaxConnections {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] public int MuxMinStreams {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] public bool MuxPadding {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] public int XUDPConcurrency {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] public string? UDP443Policy {get;init;}
 
 }
 public sealed record ImportResult(List<Profile> Profiles,int Duplicates,int Skipped);
@@ -56,19 +62,22 @@ public sealed record NetworkRule(string Kind,string Value,string Action)
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Process {get;init;}
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Outbound {get;init;}
 }
-public sealed record PolicyTarget(string Name,int Protocol,string Source);
+public sealed record PolicyTarget(string Name,int Protocol,string Source,[property: System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Via=null);
 public sealed record RuleSet(string Name,List<NetworkRule> Members);
 public sealed record DNSRule(string Kind,string Value,int ResolverIndex);
 public sealed record NetworkOptions(DNSOptions? DNS,List<NetworkRule> Rules)
 {
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)] public bool FakeIP {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public DNSCacheOptions? DNSCache {get;init;}
     public List<DNSOptions> Resolvers { get; init; } = [];
     public List<DNSRule> DNSRules { get; init; } = [];
     public bool AllowLAN { get; init; }
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public List<PolicyTarget>? Targets {get;init;}
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public List<RuleSet>? RuleSets {get;init;}
 }
-public sealed record NetworkPreferencesView(string ID,string Token,string Message,string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN,bool Supported,bool CanSave);
-public sealed record NetworkInput(string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN);
+public sealed record DNSCacheOptions(bool Disabled,int Capacity);
+public sealed record NetworkPreferencesView(string ID,string Token,string Message,string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN,bool Supported,bool CanSave,bool FakeIP=false,string CacheMode="",string CacheCapacity="");
+public sealed record NetworkInput(string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN,bool FakeIP=false,string CacheMode="",string CacheCapacity="");
 public sealed record BackupExportResult(int ProfileCount);
 public sealed record BackupRestorePreview(string Token,int CurrentProfiles,int ReplacementProfiles,int EnabledSchedules,bool CanApply,string ExpiresAt);
 public sealed record TrayProfileItem(string ID,string Name,string Group);

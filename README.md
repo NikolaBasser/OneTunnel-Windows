@@ -245,3 +245,24 @@ history. This does not enable automatic server switching. Refreshing the profile
 list preserves the selected auto-connect profile and any real unsaved settings.
 
 Automatic quality selection is an explicit profile option under connection recovery. It supports proxy, TUN, WG/AWG and saved DNS/routing policy. The Go service compares real HTTPS timings and requires sustained improvement plus a minimum two-minute hold. Proxy-only quality sessions keep the same loopback port through switches and retries, preserving an explicitly activated system-proxy lease. Native quality probes use isolated userspace transports without changing OS routes. Bypassed/rejected probe routes do not qualify server quality. Selection measures latency/reachability rather than throughput.
+
+The advanced rules JSON editor supports proxy chains with `Targets[].Via`.
+Use `@primary` for the selected server or another target name for an earlier hop;
+then route matching traffic to the final target with `Rules[].Outbound`.
+The core rejects missing links and cycles, retains the existing target count
+limit and does not fall back to direct access when a hop fails. Existing targets
+without `Via` keep their current behavior. Resolver routing remains the configured
+DNS path; transport support is required at every hop.
+
+Profile DNS now also exposes DoQ, DoH3, FakeIP and bounded/disabled cache.
+Shadowsocks/Trojan multiplex settings support h2mux/smux/yamux, padding and
+connection/stream policies; VLESS Xray settings include XUDP and UDP443 policy.
+Unsupported combinations are validated by Go. Advanced fields require the
+matching pinned service; existing defaults are retained.
+
+Latest dedicated-VM acceptance: 323 core package tests and 215 isolated WPF
+checks passed. Real OS TUN covered DoH3 and FakeIP IPv4/IPv6. Twenty repeated
+UDP-TUN starts and one cold start after reboot passed; the original isolated
+startup timeout has no established cause. Global-hotkey checks require an
+interactive user session and were skipped in the latest SYSTEM/session0 run.
+See [the acceptance record](docs/DNS-MUX-ACCEPTANCE-2026-10-27.txt).
