@@ -55,7 +55,7 @@ reconnection. Explicit disconnect/recovery controls release owned protection.
 
 ## Feature implementation status
 
-Reviewed on 2026-10-26 against the pinned core and local checks. **Ready** means
+Reviewed on 2026-10-27 against the pinned core and recorded live checks. **Ready** means
 the stated scope is implemented and checked; **Partial** includes implemented
 features whose current-build system/network validation is incomplete. None of
 the original roadmap rows is wholly unimplemented. This source status does not
@@ -63,26 +63,35 @@ describe the older 0.1.0 release binary or the installed service.
 
 | Feature | Stage | Implemented scope and remaining validation |
 | --- | --- | --- |
-| Split routing | Partial | Domain, IP/subnet and application proxy/direct/block rules; shared TUN includes WG/AWG. Synthetic/configuration checks pass; live routing matrix remains. |
-| Auto reconnect | Partial | Bounded retries, traffic-lock retention and cancellation before replacement activation. Ten synthetic state-machine cases cover failures/fallback/cancel. The real production monitor recovered an isolated HTTP CONNECT proxy after an outage, with a fresh statistics session and HTTPS verification. Physical Wi-Fi/sleep and full-device transitions remain. |
-| Backup servers | Partial | Compatible same-group fallback rotation, up to eight candidates; synthetic promotion/exhaustion/cleanup tests pass. The real production monitor switched an isolated HTTP CONNECT proxy to its backup, reset retries, promoted that backup and stopped without restarting. Full-device/no-direct-gap and native failure matrices remain. |
+| Split routing | Partial, live scope verified | IPv4 shared-TUN domain/CIDR/process direct and reject rules, including initial streams, pass repeated live checks. IPv6 domain/process reject and domain/process/CIDR direct pass five additional controlled runs; earlier default and /128 reject also pass. Direct rules remain intentional exceptions during proxy loss while physical-interface bypass stays blocked. Compound domain-set/process/TCP/port rules select a distinct secondary server; a port mismatch stays on the primary. Native-provider, IPv6 fallback and multiple-uplink matrices remain separate. |
+| Auto reconnect | Partial | Proxy and shared-TUN outage/recovery pass with fresh statistics sessions. The actual server Ethernet interface was disabled for 45.55 seconds and recovered. Physical sleep/wake and transitions between real Wi-Fi networks remain. |
+| Backup servers | Partial, shared TUN verified | Controlled same-group shared-TUN fallback passes outage, promotion and restoration; 442 physical TCP probes observed zero direct bypasses. This does not certify every native transport or provider. |
 | Group checks | Ready, bounded scope | Cancellable HTTPS group probes and separate WG/AWG imported-DNS latency. All 38 saved proxy checks completed with listener cleanup:7 HTTPS successes and31 negative outcomes; one saved WG and AWG DNS probe passed. Other protocols have synthetic fixture coverage. Saved TUN policies are configuration-validated only; server availability and leak protection are separate. |
-| DNS settings | Partial | Proxied DoH/DoT, per-domain resolvers and WG/AWG shared-TUN policies. Current-build DNS/IPv6 leak validation remains. |
-| LAN access | Partial | Explicit private-network exceptions for shared TUN, including WG/AWG. Live LAN and protection checks remain. |
-| Auto connect | Partial | Opt-in profile/network rules, current-user startup and manual-stop inhibition across worker restarts. Synthetic category changes are rechecked before preparation and start, with renewed stability delay. Real login/network transitions remain. |
-| Windows system proxy | Partial | Owned current-user lease, watchdog and selective restoration. Real isolated Windows registry/DPAPI acceptance passes typed/missing baseline restore, external edits, partial-write rollback and loopback-listener-loss recovery. Completed watchdog restoration now preserves foreign-edit conflict reporting, including notification retries; isolated registry acceptance passes. Isolated cross-process DPAPI/registry recovery passes owner death, owner-plus-watcher death with a fixed helper deadline, and foreign-edit preservation. Host-job survival and actual WinINET activation remain unverified. |
-| Statistics and diagnostics | Partial, proxy lifecycle verified | Current-session counters/rates/duration and sanitized diagnostic export. Real VLESS and Hysteria2 proxy sessions passed stop/restart, positive monotonic counters, growing duration and fresh session identity checks. Stale counters after stop are fixed. Native/shared-TUN statistics and physical transitions remain unverified. |
+| DNS settings | Partial, bounded live checks | DoH, DoT, domain-selected alternate DoH and fresh-name resolution pass. Physical port-53 captures to the configured IPv4/IPv6 resolvers include a positive baseline and zero active protected packets. WG/AWG controlled peers pass configured DNS and public TLS. Arbitrary applications, alternative DNS channels and all provider variants are not certified. |
+| LAN access | Partial, primary uplink verified | Main-PC HTTP access to two real private-LAN devices passes AllowLAN; explicit CIDR reject takes priority. Physical external TCP 443/53 remains blocked. Multiple uplinks, more-specific physical routes and every native-provider variant remain outside this proof. |
+| Auto connect | Partial | Current-user startup registry enable/state/idempotence/disable and foreign-edit preservation pass three repetitions. Four real Public/Private classification cases pass with modeled controller/session timing. Actual interactive Windows login and complete automatic connection remain. |
+| Windows system proxy | Partial, WinINET verified | Real WinINET HTTPS, listener/owner loss, production observer recovery, foreign-edit preservation and exact restoration pass three repetitions. Detached child survival outside the owner job also passes. The acceptance launcher was injected; the complete interactive UI-to-watchdog launch path remains. |
+| Statistics and diagnostics | Partial, live runtime verified | Positive shared-TUN counters and fresh reconnect/fallback sessions pass. Controlled encrypted WG/AWG peers pass DNS/public TLS with growing native and TUN counters, outage protection and restoration. Remote-provider compatibility and remaining physical transitions are separate. |
 | Subscription management | Ready, scoped | Preview/apply/cancel, provider-reported usage/expiry and opt-in scheduled previews while the app is open and idle. No background refresh after app exit or automatic apply. |
 | Portable backup | Ready, isolated checks | Password-encrypted export and full-replacement restore with preview; wrong-password, tamper and stale-token tests pass. Merge restore is not implemented. |
 | Tray and notifications | Ready, isolated checks | Explicit hide/restore, Go-owned actions, profile selection and opt-in notifications. Selecting a profile does not connect. |
-| Kill switch lifecycle | Partial | Marker-independent owned WFP cleanup; graceful service stop restores networking, crashes retain protection. Synthetic regressions pass; live crash/reboot/leak matrix remains. |
-| Offline emergency recovery | Implemented | Standalone Windows x64/ARM64 package, exact-provider validation and transactional cleanup. Current package builds/checksums pass; ARM64 execution remains untested. |
+| Kill switch lifecycle | Partial, crash/reboot verified | IPv4/IPv6 outage and real reboot retain protection until independent recovery. An additional IPv6 forced crash confirms both worker and guard process exits, 27 persistent WFP filters, blocked HTTPS/physical TCP and no DNS response, followed by first-attempt restoration. Genuine installed-service SCM Stop passes; active installed-service graceful reboot and the remaining transport matrix remain. |
+| Offline emergency recovery | Implemented, x64 live verified | Standalone x64 recovery works after a real failure and at startup, with owner-scoped transactional cleanup. ARM64 builds/checksums pass; actual Windows ARM64 execution remains untested. |
 
 Production-tag Go tests/vet, Windows x64 build, pinned-core integration, 59
-synthetic bundle checks and isolated WPF checks passed locally. ARM64 host and
-Linux portable checks are cross-compilation checks, not device/runtime proof.
-The failed active-network canary remains disabled. No installed-service update,
-new live blocking WFP policy or release was performed as part of this audit.
+synthetic bundle checks and 219 isolated WPF checks passed. Full pinned-core
+consumer CI and Linux x64/ARM64 portable-package CI also passed. Windows ARM64
+cross-compilation is not device/runtime proof. Live blocking tests used an
+authorized dedicated Windows Server 2025 VM, immutable per-run ownership and
+independent absolute-deadline/boot recovery. The old failed canary remains
+disabled. No new release was published.
+
+The six additional 2026-10-27 acceptance cases used controlled SOCKS gateways
+and a fixed public IPv6 HTTPS target, with positive functional baselines before
+and after protection. Exact process handles prove the forced exits. Each routing
+run checks normal stop and independent deadline recovery; the final server has
+no test WFP objects or tasks and working HTTPS. These new cases did not repeat
+physical DNS packet capture and do not certify every DNS channel or provider.
 
 ## Platform and versions
 
