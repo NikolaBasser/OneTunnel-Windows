@@ -714,8 +714,8 @@ internal static class Program
         typeof(MainWindow).GetMethod("PresentConnectionState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
         Assert(Find<StackPanel>("StatisticsPanel").Visibility == Visibility.Collapsed, "Older service projections hide unavailable statistics");
         var statsContract = new ConnectionStatistics(1, "synthetic-session", 62000, 1048576, 2097152, null, 2048, "proxy-payload");
-        var statsRoundTrip = JsonSerializer.Deserialize<CoreStatus>(JsonSerializer.Serialize(statsSnapshot.Response.State with { Statistics = statsContract }));
-        Assert(statsRoundTrip?.Statistics == statsContract, "Service statistics survive the retained C# observation contract without recomputation");
+        var statsRoundTrip = JsonSerializer.Deserialize<CoreStatus>(JsonSerializer.Serialize(statsSnapshot.Response.State with { Statistics = statsContract, ProxyListenerStable = true }));
+        Assert(statsRoundTrip?.Statistics == statsContract && statsRoundTrip.ProxyListenerStable, "Service statistics survive the retained C# observation contract without recomputation");
         connectionSnapshot.SetValue(connectionObject, statsSnapshot);
         typeof(MainWindow).GetMethod("PresentConnectionState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
         int traySelections = 0;
