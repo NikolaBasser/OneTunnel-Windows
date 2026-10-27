@@ -85,6 +85,7 @@ internal static class Program
         Assert(Find<CheckBox>("QualityCheck").IsEnabled, "Fallback permission enables quality selection");
         Find<CheckBox>("QualityCheck").IsChecked = true;
         Find<Expander>("ReliabilityExpander").IsExpanded = true; Pump();
+        Find<CheckBox>("QualityCheck").BringIntoView(); Pump();
         Assert(Find<CheckBox>("QualityCheck").IsVisible && Find<CheckBox>("QualityCheck").ActualWidth > 200, "Quality selection is reachable in the editor");
         Capture(window, "workspace-quality-selection.png");
         Find<Expander>("ReliabilityExpander").IsExpanded = false;
