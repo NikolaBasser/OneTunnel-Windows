@@ -49,13 +49,23 @@ public sealed record GroupResultDisplayRow(string ID,string Name,string Message,
 public sealed record ProfileOrganizationView(string ID,string Name,string Group,string SuggestedName,string SuggestedGroup,string Token,List<string> ManualTargets,bool CanDuplicate,bool CanMove);
 
 public sealed record DNSOptions(string Transport,string ServerIP,string ServerName,int Port,string Path);
-public sealed record NetworkRule(string Kind,string Value,string Action);
+public sealed record NetworkRule(string Kind,string Value,string Action)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Port {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Network {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Process {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Outbound {get;init;}
+}
+public sealed record PolicyTarget(string Name,int Protocol,string Source);
+public sealed record RuleSet(string Name,List<NetworkRule> Members);
 public sealed record DNSRule(string Kind,string Value,int ResolverIndex);
 public sealed record NetworkOptions(DNSOptions? DNS,List<NetworkRule> Rules)
 {
     public List<DNSOptions> Resolvers { get; init; } = [];
     public List<DNSRule> DNSRules { get; init; } = [];
     public bool AllowLAN { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public List<PolicyTarget>? Targets {get;init;}
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public List<RuleSet>? RuleSets {get;init;}
 }
 public sealed record NetworkPreferencesView(string ID,string Token,string Message,string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN,bool Supported,bool CanSave);
 public sealed record NetworkInput(string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN);
