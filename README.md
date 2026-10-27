@@ -243,3 +243,5 @@ median/range in the existing result rows. History is limited to eight checks per
 profile within thirty minutes of this app session. Clear results also clears the
 history. This does not enable automatic server switching. Refreshing the profile
 list preserves the selected auto-connect profile and any real unsaved settings.
+
+Automatic quality selection is an explicit profile option under connection recovery. It supports proxy, TUN, WG/AWG and saved DNS/routing policy. The Go service compares real HTTPS timings and requires sustained improvement plus a minimum two-minute hold. Proxy-only quality sessions keep the same loopback port through switches and retries, preserving an explicitly activated system-proxy lease. Native quality probes use isolated userspace transports without changing OS routes. Bypassed/rejected probe routes do not qualify server quality. Selection measures latency/reachability rather than throughput.
