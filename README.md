@@ -253,3 +253,16 @@ The core rejects missing links and cycles, retains the existing target count
 limit and does not fall back to direct access when a hop fails. Existing targets
 without `Via` keep their current behavior. Resolver routing remains the configured
 DNS path; transport support is required at every hop.
+
+Profile DNS now also exposes DoQ, DoH3, FakeIP and bounded/disabled cache.
+Shadowsocks/Trojan multiplex settings support h2mux/smux/yamux, padding and
+connection/stream policies; VLESS Xray settings include XUDP and UDP443 policy.
+Unsupported combinations are validated by Go. Advanced fields require the
+matching pinned service; existing defaults are retained.
+
+Latest dedicated-VM acceptance: 323 core package tests and 215 isolated WPF
+checks passed. Real OS TUN covered DoH3 and FakeIP IPv4/IPv6. Twenty repeated
+UDP-TUN starts and one cold start after reboot passed; the original isolated
+startup timeout has no established cause. Global-hotkey checks require an
+interactive user session and were skipped in the latest SYSTEM/session0 run.
+See [the acceptance record](docs/DNS-MUX-ACCEPTANCE-2026-10-27.txt).
