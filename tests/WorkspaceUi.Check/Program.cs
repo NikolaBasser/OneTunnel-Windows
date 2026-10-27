@@ -674,6 +674,15 @@ internal static class Program
         Raw<object?>("favorite.set", new { ID = targetResult.Id.ToString(), Favorite = false });
         Click("ReloadUserSettingsButton"); Wait(UserSettingsIdle);
         var userView = (UserSettingsView)typeof(MainWindow).GetField("userSettingsView", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+        var selectedAutomationProfile = ((System.Collections.IEnumerable)Find<ComboBox>("UserAutoConnectProfileBox").ItemsSource).Cast<Profile>().First();
+        var activeAutomationView = userView with { Preferences = userView.Preferences with { AutoConnect = true, ProfileID = selectedAutomationProfile.Id.ToString() }, CanEnableProxy = true };
+        typeof(MainWindow).GetMethod("PresentUserSettings", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [activeAutomationView, true]);
+        var automationDocument = Raw<ProfileDocument>("store.load");
+        typeof(MainWindow).GetMethod("PresentDocument", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [automationDocument, selectedAutomationProfile.Id, false]);
+        Assert(Find<ComboBox>("UserAutoConnectProfileBox").SelectedItem is Profile reboundAutomationProfile && reboundAutomationProfile.Id == selectedAutomationProfile.Id && Find<Button>("EnableUserProxyButton").IsEnabled, "Refreshing profiles preserves the automatic profile and does not create a draft that blocks proxy activation");
+        Find<CheckBox>("UserFullDeviceBox").IsChecked = true;
+        typeof(MainWindow).GetMethod("PresentDocument", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [automationDocument, selectedAutomationProfile.Id, false]);
+        Assert(Find<CheckBox>("UserFullDeviceBox").IsChecked == true && Find<ComboBox>("UserAutoConnectProfileBox").SelectedItem is Profile draftAutomationProfile && draftAutomationProfile.Id == selectedAutomationProfile.Id && !Find<Button>("EnableUserProxyButton").IsEnabled, "Refreshing profiles preserves a real unsaved automation draft");
         typeof(MainWindow).GetMethod("PresentUserSettings", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [userView with { StartupRecorded = true, StartupEnabled = false }, false]);
         Assert(Find<TextBlock>("UserStartupStatus").Text.Contains("missing or changed"), "Recorded startup ownership is not presented as a confirmed active registration");
         typeof(MainWindow).GetMethod("PresentUserSettings", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [userView, true]);
