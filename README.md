@@ -71,7 +71,7 @@ describe the older 0.1.0 release binary or the installed service.
 | LAN access | Partial, primary uplink verified | Main-PC HTTP access to two real private-LAN devices passes AllowLAN; explicit CIDR reject takes priority. Physical external TCP 443/53 remains blocked. Multiple uplinks, more-specific physical routes and every native-provider variant remain outside this proof. |
 | Auto connect | Partial | Current-user startup registry enable/state/idempotence/disable and foreign-edit preservation pass three repetitions. Four real Public/Private classification cases pass with modeled controller/session timing. Actual interactive Windows login and complete automatic connection remain. |
 | Windows system proxy | Partial, WinINET verified | Real WinINET HTTPS, listener/owner loss, production observer recovery, foreign-edit preservation and exact restoration pass three repetitions. Detached child survival outside the owner job also passes. The acceptance launcher was injected; the complete interactive UI-to-watchdog launch path remains. |
-| Statistics and diagnostics | Partial, live runtime verified | Positive shared-TUN counters and fresh reconnect/fallback sessions pass. Controlled encrypted WG/AWG peers pass IPv4/IPv6 public TLS and configured DNS with growing native and TUN counters, outage protection and restoration. The native IPv6 proof uses IPv6 inner payload over loopback IPv4 UDP peers. Remote-provider and native IPv6 endpoint compatibility remain separate. |
+| Statistics and diagnostics | Partial, live runtime verified | Positive shared-TUN counters and fresh reconnect/fallback sessions pass. Controlled encrypted WG/AWG peers pass IPv4/IPv6 public TLS and configured DNS with growing native and TUN counters, outage protection and restoration. The native IPv6 proof covers IPv6 inner payload with both IPv4 and IPv6 loopback UDP peer endpoints. Remote-provider compatibility remains separate. |
 | Subscription management | Ready, scoped | Preview/apply/cancel, provider-reported usage/expiry and opt-in scheduled previews while the app is open and idle. No background refresh after app exit or automatic apply. |
 | Portable backup | Ready, isolated checks | Password-encrypted export and full-replacement restore with preview; wrong-password, tamper and stale-token tests pass. Merge restore is not implemented. |
 | Tray and notifications | Ready, isolated checks | Explicit hide/restore, Go-owned actions, profile selection and opt-in notifications. Selecting a profile does not connect. |
@@ -93,10 +93,11 @@ run checks normal stop and independent deadline recovery; the final server has
 no test WFP objects or tasks and working HTTPS. These new cases did not repeat
 physical DNS packet capture and do not certify every DNS channel or provider.
 
-Four follow-up VM cases also pass: dual-stack failover, controlled WG IPv6,
-controlled AWG 3.1 IPv6, and an OS reboot of the active unmodified installed
-service. Native peers forward real public IPv6 TLS through encrypted userspace
-tunnels; their outer UDP endpoints are IPv4 loopback, not remote IPv6 providers.
+Six follow-up VM cases also pass: dual-stack failover, controlled WG/AWG 3.1
+IPv6 with each outer UDP address family, and an OS reboot of the active
+unmodified installed service. Native peers forward real public IPv6 TLS through
+encrypted userspace tunnels; outer UDP endpoints are controlled IPv4/IPv6
+loopback peers, not remote IPv6 providers.
 For reboot, a controlled non-forwarding SOCKS fixture establishes the full-TUN
 state and 27 owned filters; successful in-tunnel WAN access is not asserted.
 Boot snapshots precede independent recovery and show normal shutdown cleanup;
