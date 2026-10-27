@@ -13,7 +13,7 @@ public static class ProfileBackend
     public static Task<GroupCheckResult> CheckGroupAsync(string group,CancellationToken cancellation=default)=>ProfileHost.CallAsync<GroupCheckResult>("group.check",new{Group=group},1000,cancellation:cancellation);
     public static Task<GroupResultsView> GroupResultsAsync(string sort,string filter)=>ProfileHost.CallAsync<GroupResultsView>("group.results.view",new{Sort=sort,Filter=filter});
     public static Task<Guid> FastestGroupResultAsync(string token)=>ProfileHost.CallAsync<Guid>("group.results.fastest",new{Token=token});
-    public static Task ClearGroupResultsAsync()=>ProfileHost.CallAsync<object?>("group.results.clear");
+    public static Task ClearGroupResultsAsync(bool clearQuality=false)=>ProfileHost.CallAsync<object?>("group.results.clear",new{ClearQuality=clearQuality});
     public static Task<ProfileOrganizationView> ProfileOrganizationAsync(Guid id)=>ProfileHost.CallAsync<ProfileOrganizationView>("profile.organization",new{ID=id.ToString()});
     public static Task<NetworkPreferencesView> NetworkPreferencesAsync(Guid id)=>ProfileHost.CallAsync<NetworkPreferencesView>("network.preferences.view",new{ID=id.ToString()});
     public static Task<ProfileDocument> SaveNetworkPreferencesAsync(Guid id,string token,NetworkInput input)=>ProfileHost.CallAsync<ProfileDocument>("ui.network.preferences.save",new{ID=id.ToString(),Token=token,NetworkInput=input});

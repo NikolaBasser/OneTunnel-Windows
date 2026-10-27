@@ -237,3 +237,9 @@ ordinary profile responses redact them; the explicit editor includes them.
 The core README documents the format, limits, SDK analysis and prediction APIs.
 Remote rule-set fetching and secondary Xray/native OS tunnels are outside this
 implementation. Route explanation is a read-only prediction, not live observation.
+
+Repeated group checks show the core's recent check history and HTTPS latency
+median/range in the existing result rows. History is limited to eight checks per
+profile within thirty minutes of this app session. Clear results also clears the
+history. This does not enable automatic server switching. Refreshing the profile
+list preserves the selected auto-connect profile and any real unsaved settings.

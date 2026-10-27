@@ -759,7 +759,6 @@ public partial class MainWindow : Window
         RefreshControls();
         try
         {
-            await ProfileBackend.ClearGroupResultsAsync();
             cancellation.Token.ThrowIfCancellationRequested();
             await ProfileBackend.CheckGroupAsync(profile.Group, cancellation.Token);
             cancellation.Token.ThrowIfCancellationRequested();
@@ -851,7 +850,7 @@ public partial class MainWindow : Window
         UpdateGroupResultControls();
         try
         {
-            await ProfileBackend.ClearGroupResultsAsync();
+            await ProfileBackend.ClearGroupResultsAsync(clearQuality: true);
             if (lifetime.IsCancellationRequested) return;
             ClearGroupResultsDisplay("Результаты очищены.");
             Feedback.Text = "Результаты проверки очищены.";
@@ -1031,16 +1030,20 @@ public partial class MainWindow : Window
         subscriptionScheduleVersion++; subscriptionScheduleView = null;
         Storage.Accept(document);RefreshGroups(document.Profiles);
         applyingProfileDocument = true;
+        var automaticProfileId = (UserAutoConnectProfileBox.SelectedItem as Profile)?.Id;
+        bool wasUpdatingUserSettings = updatingUserSettingsControls;
+        updatingUserSettingsControls = true;
         try
         {
             profiles.Clear();foreach(var profile in document.Profiles)profiles.Add(profile);
+            UserAutoConnectProfileBox.SelectedItem = profiles.FirstOrDefault(p => p.Id == automaticProfileId);
             pendingLibrarySelection = selectedId;
             RefreshProfileFilter(true);
             applyingLibrarySelection = true;
             try { ProfilesList.SelectedItem=profiles.FirstOrDefault(p=>p.Id==selectedId)??profiles.FirstOrDefault(); }
             finally { applyingLibrarySelection = false; }
         }
-        finally { applyingProfileDocument = false; }
+        finally { applyingProfileDocument = false; updatingUserSettingsControls = wasUpdatingUserSettings; }
         UpdateLibraryControls();
         if (refreshLibrary) {
             _ = RefreshLibraryProjectionAsync();
