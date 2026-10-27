@@ -63,19 +63,19 @@ describe the older 0.1.0 release binary or the installed service.
 
 | Feature | Stage | Implemented scope and remaining validation |
 | --- | --- | --- |
-| Split routing | Partial, live scope verified | IPv4 shared-TUN domain/CIDR/process direct and reject rules, including initial streams, pass repeated live checks. IPv6 domain/process reject and domain/process/CIDR direct pass five additional controlled runs; earlier default and /128 reject also pass. Direct rules remain intentional exceptions during proxy loss while physical-interface bypass stays blocked. Compound domain-set/process/TCP/port rules select a distinct secondary server; a port mismatch stays on the primary. Native-provider, IPv6 fallback and multiple-uplink matrices remain separate. |
+| Split routing | Partial, live scope verified | IPv4 shared-TUN domain/CIDR/process direct and reject rules, including initial streams, pass repeated live checks. IPv6 domain/process reject and domain/process/CIDR direct pass five additional controlled runs; earlier default and /128 reject also pass. Direct rules remain intentional exceptions during proxy loss while physical-interface bypass stays blocked. Compound domain-set/process/TCP/port rules select a distinct secondary server; a port mismatch stays on the primary. Provider-specific policy variants and multiple-uplink matrices remain separate. |
 | Auto reconnect | Partial | Proxy and shared-TUN outage/recovery pass with fresh statistics sessions. The actual server Ethernet interface was disabled for 45.55 seconds and recovered. Physical sleep/wake and transitions between real Wi-Fi networks remain. |
-| Backup servers | Partial, shared TUN verified | Controlled same-group shared-TUN fallback passes outage, promotion and restoration; 442 physical TCP probes observed zero direct bypasses. This does not certify every native transport or provider. |
+| Backup servers | Partial, shared TUN verified | Controlled same-group shared-TUN fallback passes outage, promotion and restoration. Earlier IPv4 checks recorded 442 physical TCP probes without bypass. An additional dual-stack failover run records 441 physical IPv4 and 441 physical IPv6 probes, zero bypasses/errors, successful IPv6 HTTPS on the promoted backup and a fresh statistics session. This does not certify every native transport or provider. |
 | Group checks | Ready, bounded scope | Cancellable HTTPS group probes and separate WG/AWG imported-DNS latency. All 38 saved proxy checks completed with listener cleanup:7 HTTPS successes and31 negative outcomes; one saved WG and AWG DNS probe passed. Other protocols have synthetic fixture coverage. Saved TUN policies are configuration-validated only; server availability and leak protection are separate. |
 | DNS settings | Partial, bounded live checks | DoH, DoT, domain-selected alternate DoH and fresh-name resolution pass. Physical port-53 captures to the configured IPv4/IPv6 resolvers include a positive baseline and zero active protected packets. WG/AWG controlled peers pass configured DNS and public TLS. Arbitrary applications, alternative DNS channels and all provider variants are not certified. |
 | LAN access | Partial, primary uplink verified | Main-PC HTTP access to two real private-LAN devices passes AllowLAN; explicit CIDR reject takes priority. Physical external TCP 443/53 remains blocked. Multiple uplinks, more-specific physical routes and every native-provider variant remain outside this proof. |
 | Auto connect | Partial | Current-user startup registry enable/state/idempotence/disable and foreign-edit preservation pass three repetitions. Four real Public/Private classification cases pass with modeled controller/session timing. Actual interactive Windows login and complete automatic connection remain. |
 | Windows system proxy | Partial, WinINET verified | Real WinINET HTTPS, listener/owner loss, production observer recovery, foreign-edit preservation and exact restoration pass three repetitions. Detached child survival outside the owner job also passes. The acceptance launcher was injected; the complete interactive UI-to-watchdog launch path remains. |
-| Statistics and diagnostics | Partial, live runtime verified | Positive shared-TUN counters and fresh reconnect/fallback sessions pass. Controlled encrypted WG/AWG peers pass DNS/public TLS with growing native and TUN counters, outage protection and restoration. Remote-provider compatibility and remaining physical transitions are separate. |
+| Statistics and diagnostics | Partial, live runtime verified | Positive shared-TUN counters and fresh reconnect/fallback sessions pass. Controlled encrypted WG/AWG peers pass IPv4/IPv6 public TLS and configured DNS with growing native and TUN counters, outage protection and restoration. The native IPv6 proof uses IPv6 inner payload over loopback IPv4 UDP peers. Remote-provider and native IPv6 endpoint compatibility remain separate. |
 | Subscription management | Ready, scoped | Preview/apply/cancel, provider-reported usage/expiry and opt-in scheduled previews while the app is open and idle. No background refresh after app exit or automatic apply. |
 | Portable backup | Ready, isolated checks | Password-encrypted export and full-replacement restore with preview; wrong-password, tamper and stale-token tests pass. Merge restore is not implemented. |
 | Tray and notifications | Ready, isolated checks | Explicit hide/restore, Go-owned actions, profile selection and opt-in notifications. Selecting a profile does not connect. |
-| Kill switch lifecycle | Partial, crash/reboot verified | IPv4/IPv6 outage and real reboot retain protection until independent recovery. An additional IPv6 forced crash confirms both worker and guard process exits, 27 persistent WFP filters, blocked HTTPS/physical TCP and no DNS response, followed by first-attempt restoration. Genuine installed-service SCM Stop passes; active installed-service graceful reboot and the remaining transport matrix remain. |
+| Kill switch lifecycle | Partial, crash/reboot verified | IPv4/IPv6 outage and real reboot retain protection until independent recovery. An additional IPv6 forced crash confirms both worker and guard process exits, 27 persistent WFP filters, blocked HTTPS/physical TCP and no DNS response, followed by first-attempt restoration. Genuine installed-service SCM Stop and a real OS reboot with the active pinned service pass. Before independent boot recovery, the journal and owned WFP objects are already absent and both address-family baselines work. The remaining transport matrix is separate. |
 | Offline emergency recovery | Implemented, x64 live verified | Standalone x64 recovery works after a real failure and at startup, with owner-scoped transactional cleanup. ARM64 builds/checksums pass; actual Windows ARM64 execution remains untested. |
 
 Production-tag Go tests/vet, Windows x64 build, pinned-core integration, 59
@@ -92,6 +92,17 @@ and after protection. Exact process handles prove the forced exits. Each routing
 run checks normal stop and independent deadline recovery; the final server has
 no test WFP objects or tasks and working HTTPS. These new cases did not repeat
 physical DNS packet capture and do not certify every DNS channel or provider.
+
+Four follow-up VM cases also pass: dual-stack failover, controlled WG IPv6,
+controlled AWG 3.1 IPv6, and an OS reboot of the active unmodified installed
+service. Native peers forward real public IPv6 TLS through encrypted userspace
+tunnels; their outer UDP endpoints are IPv4 loopback, not remote IPv6 providers.
+For reboot, a controlled non-forwarding SOCKS fixture establishes the full-TUN
+state and 27 owned filters; successful in-tunnel WAN access is not asserted.
+Boot snapshots precede independent recovery and show normal shutdown cleanup;
+OS boot timestamps and SCM events corroborate the actual reboot. The final
+service is stopped with exit code zero, test WFP/tasks are absent, and networking
+is restored. New cases do not add physical DNS packet-capture certification.
 
 ## Platform and versions
 
