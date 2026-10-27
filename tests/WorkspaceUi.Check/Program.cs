@@ -80,6 +80,17 @@ internal static class Program
         window.Width = 1240; window.Height = 850; Pump();
         Click("EditButton"); Wait(() => Find<StackPanel>("EditorPanel").IsVisible && Find<TextBox>("SourceBox").Text.Length > 0);
         Assert(Find<CheckBox>("AutoReconnectCheck").IsChecked == true, "Existing reconnection setting rendered");
+        Assert(Find<CheckBox>("QualityCheck").IsChecked == false && !Find<CheckBox>("QualityCheck").IsEnabled, "Quality selection is explicitly opt-in");
+        Find<CheckBox>("FallbackCheck").IsChecked = true; Pump();
+        Assert(Find<CheckBox>("QualityCheck").IsEnabled, "Fallback permission enables quality selection");
+        Find<CheckBox>("QualityCheck").IsChecked = true;
+        Find<Expander>("ReliabilityExpander").IsExpanded = true; Pump();
+        Assert(Find<CheckBox>("QualityCheck").IsVisible && Find<CheckBox>("QualityCheck").ActualWidth > 200, "Quality selection is reachable in the editor");
+        Capture(window, "workspace-quality-selection.png");
+        Find<Expander>("ReliabilityExpander").IsExpanded = false;
+        Find<CheckBox>("FallbackCheck").IsChecked = false; Pump();
+        Assert(!Find<CheckBox>("QualityCheck").IsEnabled, "Quality selection requires fallback opt-in");
+        Find<CheckBox>("FallbackCheck").IsChecked = true; Pump();
         Find<Expander>("TransportExpander").IsExpanded = true;
         Pump();
         Assert(Find<CheckBox>("FragmentCheck").IsVisible, "Transport settings retained");

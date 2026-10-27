@@ -243,3 +243,5 @@ median/range in the existing result rows. History is limited to eight checks per
 profile within thirty minutes of this app session. Clear results also clears the
 history. This does not enable automatic server switching. Refreshing the profile
 list preserves the selected auto-connect profile and any real unsaved settings.
+
+Automatic quality selection is an explicit profile option under connection recovery. It currently supports proxy-only connections without custom DNS/routing. The Go service compares real HTTPS timings, requires sustained improvement and a minimum two-minute hold, and switches through verified retry handling. It starts with the selected server. A switch changes the local proxy port; explicit Windows system-proxy activation must be repeated. Throughput-based selection and native/TUN quality switching remain outside this mode.

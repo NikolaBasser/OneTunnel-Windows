@@ -692,15 +692,15 @@ public partial class MainWindow : Window
         catch { if (!lifetime.IsCancellationRequested) Feedback.Text = "Не удалось проверить расписание обновления."; }
         finally { scheduleTickPending = false; if (!lifetime.IsCancellationRequested) RefreshControls(); }
     }
-    private bool HasEditorContent() => editing != null || NameBox.Text.Length > 0 || SourceBox.Text.Length > 0 || GroupBox.Text.Length > 0 || AutoReconnectCheck.IsChecked == true || FallbackCheck.IsChecked == true || FragmentCheck.IsChecked == true || NoiseCheck.IsChecked == true || MuxCheck.IsChecked == true;
+    private bool HasEditorContent() => editing != null || NameBox.Text.Length > 0 || SourceBox.Text.Length > 0 || GroupBox.Text.Length > 0 || AutoReconnectCheck.IsChecked == true || FallbackCheck.IsChecked == true || QualityCheck.IsChecked == true || FragmentCheck.IsChecked == true || NoiseCheck.IsChecked == true || MuxCheck.IsChecked == true;
     private void ClearEditorContent()
     {
-        editing = null; NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; AutoReconnectCheck.IsChecked = false; FallbackCheck.IsChecked = false;
+        editing = null; NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; AutoReconnectCheck.IsChecked = false; FallbackCheck.IsChecked = false; QualityCheck.IsChecked = false;
         FragmentCheck.IsChecked = false; NoiseCheck.IsChecked = false; MuxCheck.IsChecked = false;
     }
     private void BeginNewProfile(bool subscription)
     {
-        AutoReconnectCheck.IsChecked=false;FallbackCheck.IsChecked=false;
+        AutoReconnectCheck.IsChecked=false;FallbackCheck.IsChecked=false;QualityCheck.IsChecked=false;
         editing = null; LoadTransport(null); NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; ProtocolBox.SelectedIndex = 0;
         EditorTitle.Text = subscription ? "Импорт / обновление подписки" : "Новое подключение";
         SaveProfileButton.Content = subscription ? "Импортировать / обновить" : "Сохранить / импортировать";
@@ -739,7 +739,7 @@ public partial class MainWindow : Window
         await Execute(async () => {
             var edit = await ProfileBackend.LoadEditorAsync(p.Id);
             LoadTransport(edit.Transport);
- AutoReconnectCheck.IsChecked=edit.Reliability?.AutoReconnect??false;FallbackCheck.IsChecked=edit.Reliability?.UseFallbacks??false;
+ AutoReconnectCheck.IsChecked=edit.Reliability?.AutoReconnect??false;FallbackCheck.IsChecked=edit.Reliability?.UseFallbacks??false;QualityCheck.IsChecked=edit.Reliability?.AutoSelect??false;
             GroupBox.Text = edit.Group; editing = edit.Id; NameBox.Text = edit.Name; SourceBox.Text = edit.Source; ProtocolBox.SelectedItem = edit.Protocol; EditorTitle.Text = "Изменить подключение"; ShowPanel("editor");
         });
     }
@@ -924,7 +924,7 @@ public partial class MainWindow : Window
         if (!connection.Actions.CanSave) return;
         await Execute(async () =>
         {
-            var result=await ProfileBackend.SaveEditorAsync(NameBox.Text,SourceBox.Text,GroupBox.Text,editing,ReadTransport(),new(AutoReconnectCheck.IsChecked==true,FallbackCheck.IsChecked==true));
+            var result=await ProfileBackend.SaveEditorAsync(NameBox.Text,SourceBox.Text,GroupBox.Text,editing,ReadTransport(),new(AutoReconnectCheck.IsChecked==true,FallbackCheck.IsChecked==true,AutoReconnectCheck.IsChecked==true && FallbackCheck.IsChecked==true && QualityCheck.IsChecked==true));
             PresentApplied(result);
         });
     }
