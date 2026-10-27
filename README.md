@@ -14,7 +14,10 @@ HTTPS proxies, Trojan, TUIC, AnyTLS, and NaiveProxy.
 - Whole-device traffic protection with explicit disconnect and recovery controls.
 - Profile and subscription import, collapsible configuration groups, and country flags/emoji.
 - Saved subscription groups with provider-reported usage/expiry and a manual refresh preview that requires explicit approval before applying changes.
-- Optional automatic reconnection and compatible backup servers within a group.
+- Optional automatic reconnection, compatible backups and sustained HTTPS-quality selection.
+- Split routing, explicit LAN access, chained proxy targets and up to eight WG/AWG peers.
+- Encrypted DoH/DoT/DoQ/DoH3, domain resolver rules, FakeIP and DNS cache controls.
+- Shadowsocks/Trojan h2mux/smux/yamux controls and VLESS Xray XUDP/UDP443 policies.
 - Group availability checks with cancellation and per-server results.
 - Desktop workspace with profile search by name, group or protocol, and a separate event log.
 - Notification-area status and quick connection actions, with opt-in status notifications available in the window and tray for the current session.
@@ -67,43 +70,48 @@ describe the older 0.1.0 release binary or the installed service.
 | Auto reconnect | Partial | Proxy and shared-TUN outage/recovery pass with fresh statistics sessions. The actual server Ethernet interface was disabled for 45.55 seconds and recovered. Physical sleep/wake and transitions between real Wi-Fi networks remain. |
 | Backup servers | Partial, shared TUN verified | Controlled same-group shared-TUN fallback passes outage, promotion and restoration. Earlier IPv4 checks recorded 442 physical TCP probes without bypass. An additional dual-stack failover run records 441 physical IPv4 and 441 physical IPv6 probes, zero bypasses/errors, successful IPv6 HTTPS on the promoted backup and a fresh statistics session. This does not certify every native transport or provider. |
 | Group checks | Ready, bounded scope | Cancellable HTTPS group probes and separate WG/AWG imported-DNS latency. All 38 saved proxy checks completed with listener cleanup:7 HTTPS successes and31 negative outcomes; one saved WG and AWG DNS probe passed. Other protocols have synthetic fixture coverage. Saved TUN policies are configuration-validated only; server availability and leak protection are separate. |
-| DNS settings | Partial, bounded live checks | DoH, DoT, domain-selected alternate DoH and fresh-name resolution pass. Physical port-53 captures to the configured IPv4/IPv6 resolvers include a positive baseline and zero active protected packets. WG/AWG controlled peers pass configured DNS and public TLS. Arbitrary applications, alternative DNS channels and all provider variants are not certified. |
+| DNS settings | Verified, bounded scope | DoH/DoT/DoQ/DoH3, domain DNS rules, FakeIP A/AAAA and bounded/disabled cache. QUIC/TLS fixtures cover cache, bad identity and proxy outage without direct fallback; DoH3/FakeIP pass real OS TUN IPv4/IPv6. Earlier bounded port-53 capture remains separate evidence, not proof for every DNS channel or application. |
 | LAN access | Partial, primary uplink verified | Main-PC HTTP access to two real private-LAN devices passes AllowLAN; explicit CIDR reject takes priority. Physical external TCP 443/53 remains blocked. Multiple uplinks, more-specific physical routes and every native-provider variant remain outside this proof. |
-| Auto connect | Partial | Current-user startup registry enable/state/idempotence/disable and foreign-edit preservation pass three repetitions. Four real Public/Private classification cases pass with modeled controller/session timing. Actual interactive Windows login and complete automatic connection remain. |
-| Windows system proxy | Partial, WinINET verified | Real WinINET HTTPS, listener/owner loss, production observer recovery, foreign-edit preservation and exact restoration pass three repetitions. Detached child survival outside the owner job also passes. The acceptance launcher was injected; the complete interactive UI-to-watchdog launch path remains. |
-| Statistics and diagnostics | Partial, live runtime verified | Positive shared-TUN counters and fresh reconnect/fallback sessions pass. Controlled encrypted WG/AWG peers pass IPv4/IPv6 public TLS and configured DNS with growing native and TUN counters, outage protection and restoration. The native IPv6 proof covers IPv6 inner payload with both IPv4 and IPv6 loopback UDP peer endpoints. Remote-provider compatibility remains separate. |
+| Auto connect | Verified, proxy login scope | Real Windows logoff/login launches the app with --startup and establishes a functional proxy connection without a manual connect request. Current-user registration, foreign edits and category transitions are also checked. Whole-device login autoconnect, physical sleep and real Wi-Fi changes remain separate. |
+| Windows system proxy | Verified, interactive VM scope | Actual WPF activation through a normal Explorer launch starts the production detached watchdog. Real WinINET HTTPS passes; owner/listener loss restores owned values. PAC conflicts and foreign edits are preserved. Task Scheduler launch attempts did not arm the watcher; other launch contexts are not certified. |
+| Statistics and diagnostics | Verified, bounded scope | Shared-TUN payload counters and native WG/AWG encrypted transport counters grow across controlled TCP/UDP IPv4/IPv6 sessions; reconnect/fallback starts fresh statistics. The native-wrapper counter propagation fix is included. Totals are not provider billing counters; remote-provider compatibility remains separate. |
 | Subscription management | Ready, scoped | Preview/apply/cancel, provider-reported usage/expiry and opt-in scheduled previews while the app is open and idle. No background refresh after app exit or automatic apply. |
 | Portable backup | Ready, isolated checks | Password-encrypted export and full-replacement restore with preview; wrong-password, tamper and stale-token tests pass. Merge restore is not implemented. |
-| Tray and notifications | Ready, isolated checks | Explicit hide/restore, Go-owned actions, profile selection and opt-in notifications. Selecting a profile does not connect. |
+| Tray and notifications | Implemented; earlier interactive and isolated checks | Explicit hide/restore, Go-owned actions, profile selection and opt-in notifications. Latest session0 suite skips global-hotkey blocks; interactive repeat and new DNS/MUX layout review are tracked in [#26](https://github.com/NikolaBasser/OneTunnel-Windows/issues/26). |
 | Kill switch lifecycle | Partial, crash/reboot verified | IPv4/IPv6 outage and real reboot retain protection until independent recovery. An additional IPv6 forced crash confirms both worker and guard process exits, 27 persistent WFP filters, blocked HTTPS/physical TCP and no DNS response, followed by first-attempt restoration. Genuine installed-service SCM Stop and a real OS reboot with the active pinned service pass. Before independent boot recovery, the journal and owned WFP objects are already absent and both address-family baselines work. The remaining transport matrix is separate. |
 | Offline emergency recovery | Implemented, x64 live verified | Standalone x64 recovery works after a real failure and at startup, with owner-scoped transactional cleanup. ARM64 builds/checksums pass; actual Windows ARM64 execution remains untested. |
+| Automatic quality selection | Verified, bounded scope | Proxy, shared TUN and native WG/AWG switching preserve policy and use sustained HTTPS improvement. Proxy-only switching keeps the listener for an existing system-proxy lease. Measures latency/reachability, not throughput. |
+| Proxy chains | Verified, Shadowsocks UDP scope | Two/three hops and real three-hop OS TUN pass IPv4/IPv6, 512/4096-byte payloads and every-hop outage/recovery without direct fallback. Other protocol/topology combinations remain separate. |
+| Multiple WG/AWG peers | Verified, two-peer scope | Native/shared OS interfaces pass TCP/UDP IPv4/IPv6, peer failure isolation, restoration and counters; AWG 3.1 has repeated regression coverage. The eight-peer import limit is not eight-peer live acceptance. |
+| Multiplexing | Verified, controlled servers | SS/Trojan h2mux/smux/yamux, padding and connection/stream policies pass 24 combinations with concurrent HTTP, UDP and recovery. VLESS XUDP and UDP443 allow/skip/reject pass. Server compatibility is required. |
+| UDP-TUN startup | Investigation open | A cold start after reboot and 20 repeated cycles pass, with and without safety-only WFP tracing. The initial isolated 80-second timeout remains unexplained: [Core #24](https://github.com/NikolaBasser/OneTunnel-Core/issues/24). |
 
-Production-tag Go tests/vet, Windows x64 build, pinned-core integration, 59
-synthetic bundle checks and 219 isolated WPF checks passed. Full pinned-core
-consumer CI and Linux x64/ARM64 portable-package CI also passed. Windows ARM64
-cross-compilation is not device/runtime proof. Live blocking tests used an
-authorized dedicated Windows Server 2025 VM, immutable per-run ownership and
-independent absolute-deadline/boot recovery. The old failed canary remains
-disabled. No new release was published.
+Latest dedicated Windows Server 2025 x64 VM regression: **323 top-level core
+tests** and **215 isolated WPF assertions** passed. The session0 WPF run explicitly
+skips interactive global-hotkey blocks; its capture does not establish the layout
+of the newly added controls. Earlier interactive tray, genuine Windows login and
+UI-to-watchdog checks are separate results, not rerun claims for this session.
 
-The six additional 2026-10-27 acceptance cases used controlled SOCKS gateways
-and a fixed public IPv6 HTTPS target, with positive functional baselines before
-and after protection. Exact process handles prove the forced exits. Each routing
-run checks normal stop and independent deadline recovery; the final server has
-no test WFP objects or tasks and working HTTPS. These new cases did not repeat
-physical DNS packet capture and do not certify every DNS channel or provider.
+Live OS tests cover dual-stack failover, native/shared two-peer WG/AWG, UDP
+chains, DoH3/FakeIP and active installed-service reboot. The native IPv6 fixtures
+use controlled outer UDP endpoints, not arbitrary remote providers. The graceful
+reboot case verifies shutdown cleanup, not successful WAN traffic through its
+non-forwarding SOCKS fixture. Crash/outage tests retain protection until recovery.
+The latest VM cleanup leaves no test WFP objects, adapters or recovery tasks;
+the installed service is running idle. Latest runtime tests used only the VM;
+the two-device main-PC LAN result in the table is earlier acceptance.
 
-Six follow-up VM cases also pass: dual-stack failover, controlled WG/AWG 3.1
-IPv6 with each outer UDP address family, and an OS reboot of the active
-unmodified installed service. Native peers forward real public IPv6 TLS through
-encrypted userspace tunnels; outer UDP endpoints are controlled IPv4/IPv6
-loopback peers, not remote IPv6 providers.
-For reboot, a controlled non-forwarding SOCKS fixture establishes the full-TUN
-state and 27 owned filters; successful in-tunnel WAN access is not asserted.
-Boot snapshots precede independent recovery and show normal shutdown cleanup;
-OS boot timestamps and SCM events corroborate the actual reboot. The final
-service is stopped with exit code zero, test WFP/tasks are absent, and networking
-is restored. New cases do not add physical DNS packet-capture certification.
+[Core main CI](https://github.com/NikolaBasser/OneTunnel-Core/actions/runs/40531976406),
+[Windows main source checks](https://github.com/NikolaBasser/OneTunnel-Windows/actions/runs/40531990640)
+and [full pinned-core Windows integration](https://github.com/NikolaBasser/OneTunnel-Windows/actions/runs/40531199702)
+passed. Product code matches the checked integration tree; subsequent README edits
+are documentation only. See the
+[DNS/MUX acceptance record](docs/DNS-MUX-ACCEPTANCE-2026-10-27.txt).
+These checks do not certify every DNS channel, transport, application or provider.
+No new release was published. Remaining work is tracked in
+[Core #24](https://github.com/NikolaBasser/OneTunnel-Core/issues/24) (startup timeout),
+[Core #25](https://github.com/NikolaBasser/OneTunnel-Core/issues/25) (hardware coverage)
+and [Windows #26](https://github.com/NikolaBasser/OneTunnel-Windows/issues/26) (interactive UI review).
 
 ## Platform and versions
 
@@ -164,7 +172,7 @@ Proxy profiles can store encrypted DNS and explicit split routing preferences fo
 whole-device mode. Ordered domain, domain-suffix, IP/subnet and executable-path
 rules choose proxy, direct or reject; unmatched traffic stays proxied. Direct rules
 are intentional exceptions to VPN routing, not an automatic LAN bypass. Custom
-DoH/DoT uses a literal resolver IP, verified TLS identity and proxy detour. Upstream
+DoH/DoT/DoQ/DoH3 use literal resolver IPs, verified TLS identity and proxy detours. Upstream
 server-name bootstrap uses the fixed encrypted infrastructure path, separately
 from the custom tunneled resolver. Native AWG/WG with empty preferences retain imported DNS/AllowedIPs;
 nonempty full-device policies use the shared TUN; local mode is rejected. A matching new
@@ -183,7 +191,8 @@ Tray profile selection uses the Go projection and never starts a connection.
 
 Shared-TUN proxy policies support up to eight additional encrypted resolvers and
 64 ordered exact/suffix domain DNS rules. Resolver indices select verified-TLS
-DoH/DoT endpoints routed through the proxy; the default resolver remains final.
+DoH/DoT/DoQ/DoH3 endpoints routed through the proxy; explicit domain rules precede
+optional FakeIP and the default resolver remains final.
 An opt-in LAN exception sends only RFC1918 IPv4 and IPv6 ULA directly after
 explicit user rules. It defaults off, does not exclude OS routes, and never
 removes persistent traffic protection. Native AWG/WG without network preferences remain configuration-driven.
@@ -259,10 +268,3 @@ Shadowsocks/Trojan multiplex settings support h2mux/smux/yamux, padding and
 connection/stream policies; VLESS Xray settings include XUDP and UDP443 policy.
 Unsupported combinations are validated by Go. Advanced fields require the
 matching pinned service; existing defaults are retained.
-
-Latest dedicated-VM acceptance: 323 core package tests and 215 isolated WPF
-checks passed. Real OS TUN covered DoH3 and FakeIP IPv4/IPv6. Twenty repeated
-UDP-TUN starts and one cold start after reboot passed; the original isolated
-startup timeout has no established cause. Global-hotkey checks require an
-interactive user session and were skipped in the latest SYSTEM/session0 run.
-See [the acceptance record](docs/DNS-MUX-ACCEPTANCE-2026-10-27.txt).
