@@ -37,10 +37,10 @@ internal static class Program
         rawDocument["SubscriptionSources"] = new JsonObject { ["Personal subscription"] = "https://subscription.example/synthetic-test-only" };
         rawDocument["SubscriptionMetadata"] = new JsonObject { ["Personal subscription"] = new JsonObject { ["Upload"] = 200, ["Download"] = 300, ["Total"] = 1000, ["Expire"] = 1900000000, ["UpdatedAt"] = "2026-10-23T00:00:00Z" } };
         Raw<object?>("store.save", new { Document = rawDocument });
-		var policyWire = """{"DNS":null,"Rules":[{"Kind":"rule-set","Value":"sites","Action":"proxy","Outbound":"work","Network":"tcp","Port":"443","Process":"c:\\apps\\browser.exe"}],"Targets":[{"Name":"work","Protocol":3,"Source":"socks5://127.0.0.1:18080"}],"RuleSets":[{"Name":"sites","Members":[{"Kind":"domain-suffix","Value":"example.com","Action":""}]}]}""";
+		var policyWire = """{"DNS":null,"Rules":[{"Kind":"rule-set","Value":"sites","Action":"proxy","Outbound":"work","Network":"tcp","Port":"443","Process":"c:\\apps\\browser.exe"}],"Targets":[{"Name":"work","Protocol":3,"Source":"socks5://127.0.0.1:18080","Via":"@primary"}],"RuleSets":[{"Name":"sites","Members":[{"Kind":"domain-suffix","Value":"example.com","Action":""}]}]}""";
 		var policy = JsonSerializer.Deserialize<NetworkOptions>(policyWire)!;
 		var policyCopy = JsonSerializer.Deserialize<NetworkOptions>(JsonSerializer.Serialize(policy))!;
-		Assert(policyCopy.Targets![0].Source == "socks5://127.0.0.1:18080" && policyCopy.RuleSets![0].Members[0].Value == "example.com" && policyCopy.Rules[0].Outbound == "work" && policyCopy.Rules[0].Port == "443" && policyCopy.Rules[0].Network == "tcp" && policyCopy.Rules[0].Process == @"c:\apps\browser.exe", "Presentation DTO preserves advanced Go policy fields");
+		Assert(policyCopy.Targets![0].Source == "socks5://127.0.0.1:18080" && policyCopy.Targets[0].Via == "@primary" && policyCopy.RuleSets![0].Members[0].Value == "example.com" && policyCopy.Rules[0].Outbound == "work" && policyCopy.Rules[0].Port == "443" && policyCopy.Rules[0].Network == "tcp" && policyCopy.Rules[0].Process == @"c:\apps\browser.exe", "Presentation DTO preserves advanced Go policy fields");
         using var resource = typeof(Program).Assembly.GetManifestResourceStream("TestApp.xaml")!;
         var xml = System.Xml.Linq.XDocument.Load(resource);
         System.Xml.Linq.XNamespace ns = "http://schemas.microsoft.com/winfx/2006/xaml/presentation";

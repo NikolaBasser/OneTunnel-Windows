@@ -56,7 +56,7 @@ public sealed record NetworkRule(string Kind,string Value,string Action)
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Process {get;init;}
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Outbound {get;init;}
 }
-public sealed record PolicyTarget(string Name,int Protocol,string Source);
+public sealed record PolicyTarget(string Name,int Protocol,string Source,[property: System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Via=null);
 public sealed record RuleSet(string Name,List<NetworkRule> Members);
 public sealed record DNSRule(string Kind,string Value,int ResolverIndex);
 public sealed record NetworkOptions(DNSOptions? DNS,List<NetworkRule> Rules)
