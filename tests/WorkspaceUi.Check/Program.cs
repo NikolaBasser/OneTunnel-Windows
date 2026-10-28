@@ -50,6 +50,9 @@ internal static class Program
         TrayChecks.Run();
         var window = new MainWindow { ShowInTaskbar = false, Left = -5000, Top = -5000 };
         window.Show();
+        // Session0 has a small virtual desktop; let captures exercise the requested window size.
+        HwndSource.FromHwnd(new WindowInteropHelper(window).Handle)!.AddHook(CaptureWindowBounds);
+        window.Width = 1379; window.Width = 1380;
         T Find<T>(string name) where T : FrameworkElement => (T)(window.FindName(name) ?? throw new Exception("Missing control: " + name));
         void Pump() { var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) }; timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame); }
         void Wait(Func<bool> condition) { var until = DateTime.UtcNow.AddSeconds(25); while (!condition() && DateTime.UtcNow < until) Pump(); if (!condition()) throw new Exception("UI condition timed out; feedback=" + Find<TextBlock>("Feedback").Text + "; org=" + Find<TextBlock>("ProfileOrganizationStatus").Text); }
@@ -70,14 +73,42 @@ internal static class Program
         Capture(window, "workspace-empty-results.png");
         search.Text = ""; Pump(); Assert(list.Items.Count == 3, "Clearing search restores profiles");
         Assert(before.SequenceEqual(SHA256.HashData(File.ReadAllBytes(profileFile))), "Search does not write profile storage");
+        typeof(MainWindow).GetMethod("SidebarGroup_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [new Button { Tag = "Work profiles" }, new RoutedEventArgs()]);
+        Pump(); Assert(list.Items.Count == 1 && list.Items.OfType<Profile>().Single().Group == "Work profiles", "Control sidebar filters the selected group without changing stored order");
+        Click("HomeNavigationButton"); Wait(() => LibraryIdle() && list.Items.Count == 3);
+        Assert(before.SequenceEqual(SHA256.HashData(File.ReadAllBytes(profileFile))), "Sidebar navigation preserves encrypted profile storage");
+        list.SelectedIndex = 0; Wait(() => LibraryIdle() && Find<Button>("FavoriteButton").IsEnabled);
+        var selectedBeforeStar = ((Profile)list.SelectedItem).Id;
+        var otherStarId = list.Items.OfType<Profile>().First(profile => profile.Id != selectedBeforeStar).Id;
+        var starTask = PrivateTask("FavoriteProfileAsync", otherStarId); Wait(() => starTask.IsCompleted && LibraryIdle()); starTask.GetAwaiter().GetResult();
+        Assert(((Profile)list.SelectedItem).Id == selectedBeforeStar && Storage.FavoriteIDs.Contains(otherStarId), "Row favorite updates the target profile without selecting it or connecting");
+        var unstarTask = PrivateTask("FavoriteProfileAsync", otherStarId); Wait(() => unstarTask.IsCompleted && LibraryIdle()); unstarTask.GetAwaiter().GetResult();
+        before = SHA256.HashData(File.ReadAllBytes(profileFile));
+        var timingProfile = list.Items.OfType<Profile>().First();
+        var timing = new OneTunnel.Controls.ProfileTimingConverter();
+        var timingRow = new GroupResultDisplayRow(timingProfile.Id.ToString(), timingProfile.Name, "fixture", true, true, 12, "HTTPS · 12 мс", 12);
+        Assert((string)timing.Convert([timingProfile.Id, new[] { timingRow }, false], typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture) == "12 мс", "Control rows format supplied HTTPS latency without inventing measurements");
+        Assert((string)timing.Convert([timingProfile.Id, new[] { timingRow }, true], typeof(string), null!, System.Globalization.CultureInfo.InvariantCulture) == "—", "Control rows hide stale check timings");
         list.SelectedIndex = 0; Wait(() => Find<Button>("EditButton").IsEnabled);
         Capture(window, "workspace-default.png");
         window.Width = window.MinWidth; window.Height = window.MinHeight; Pump();
+        Assert(list.TranslatePoint(new Point(0, 0), window).Y < window.ActualHeight - 160, "Server rows remain above the fold at minimum size");
+        var connectBounds = Find<Button>("PrimaryConnectButton").TranslatePoint(new Point(0, Find<Button>("PrimaryConnectButton").ActualHeight), window);
+        Assert(connectBounds.Y < window.ActualHeight - 65, "Connect action remains above the fold at minimum size");
         Capture(window, "workspace-minimum.png");
-        foreach (var name in new[] { "AddProfileButton", "ConnectButton", "SearchBox", "ProfilesList", "HideToTrayButton", "TrayNotificationsBox", "FavoriteButton", "LibrarySortBox", "FavoritesOnlyBox" }) {
+        foreach (var name in new[] { "ImportConnectionButton", "PrimaryConnectButton", "SearchBox", "ProfilesList", "LibraryMenuButton", "InspectorMenuButton", "InspectorFavorite" }) {
             var element = Find<FrameworkElement>(name); Assert(element.IsVisible && element.ActualWidth > 20 && element.ActualHeight > 10, name + " remains visible at minimum size");
         }
         window.Width = 1240; window.Height = 850; Pump();
+        Panel("settings"); Wait(() => Find<Button>("ReloadUserSettingsButton").IsEnabled);
+        var automaticDraft = Find<CheckBox>("UserAutoConnectBox").IsChecked;
+        typeof(MainWindow).GetMethod("SettingsSection_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [new Button { Tag = "UserSystemProxyBox" }, new RoutedEventArgs()]);
+        Pump(); Assert(Find<Border>("ProxySettingsSection").IsVisible && !Find<Border>("AutoConnectSettingsSection").IsVisible && Find<Button>("SaveUserSettingsButton").IsVisible && Find<CheckBox>("UserAutoConnectBox").IsChecked == automaticDraft, "Settings navigation switches sections while retaining drafts and the common save action");
+        Capture(window, "control-system-proxy.png");
+        typeof(MainWindow).GetMethod("SettingsSection_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [new Button { Tag = "UserAutoConnectBox" }, new RoutedEventArgs()]); Pump();
+        Capture(window, "control-settings.png");
+        window.Width = window.MinWidth; window.Height = window.MinHeight; Pump(); Capture(window, "control-settings-minimum.png");
+        window.Width = 1240; window.Height = 850; Panel("connection"); Pump();
         Click("EditButton"); Wait(() => Find<StackPanel>("EditorPanel").IsVisible && Find<TextBox>("SourceBox").Text.Length > 0);
         Assert(Find<CheckBox>("AutoReconnectCheck").IsChecked == true, "Existing reconnection setting rendered");
         Assert(Find<CheckBox>("QualityCheck").IsChecked == false && !Find<CheckBox>("QualityCheck").IsEnabled, "Quality selection is explicitly opt-in");
@@ -198,6 +229,7 @@ internal static class Program
         Assert(Find<TextBox>("NameBox").Text == "Synthetic unfinished draft", "Editing another profile preserves the draft");
         typeof(MainWindow).GetMethod("CancelEditor_Click", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [window, new RoutedEventArgs()]);
         Assert(Find<TextBox>("SourceBox").Text.Length == 0 && Find<TextBox>("NameBox").Text.Length == 0, "Explicit cancel clears private editor input");
+        typeof(MainWindow).GetMethod("SetGrouping", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [true]); Pump();
         var groupExpander = Descendants(window).OfType<Expander>().First(e => e.DataContext is System.Windows.Data.CollectionViewGroup);
         string groupName = ((System.Windows.Data.CollectionViewGroup)groupExpander.DataContext).Name.ToString()!;
         groupExpander.IsExpanded = false; Pump();
@@ -407,7 +439,7 @@ internal static class Program
         RenderResults(syntheticResults); Pump();
         Assert(Find<ItemsControl>("GroupResults").Items.Cast<GroupResultDisplayRow>().SequenceEqual(resultRows), "Result rendering preserves Go-owned row order and timing labels");
         Assert(Find<Button>("SelectFastestResultButton").IsEnabled, "Eligible Go view enables explicit selection");
-        Capture(window, "group-results-default.png");
+        Panel("results"); Pump(); Capture(window, "group-results-default.png");
         window.Width = window.MinWidth; window.Height = window.MinHeight; Pump();
         Assert(Find<ComboBox>("GroupResultSortBox").ActualWidth > 100 && Find<Button>("ClearGroupResultsButton").ActualHeight > 10, "Result controls retain usable size at minimum window dimensions");
         Capture(window, "group-results-minimum.png");
@@ -456,6 +488,7 @@ internal static class Program
         bool OrganizationIdle() => !(bool)typeof(MainWindow).GetField("profileOrganizationPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)! && !(bool)typeof(MainWindow).GetField("profileOrganizationMutationPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
         search.Clear(); favoritesBox.IsChecked = false; Wait(LibraryIdle);
         list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == targetResult.Id);
+        Panel("organization");
         Find<Expander>("ProfileOrganizationPanel").IsExpanded = true;
         Wait(() => OrganizationIdle() && Find<Button>("DuplicateProfileButton").IsEnabled);
         var organizationDraft = Find<TextBox>("NameBox").Text;
@@ -527,6 +560,7 @@ internal static class Program
         bool NetworkIdle() => !(bool)typeof(MainWindow).GetField("networkPreferencesPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)! && !(bool)typeof(MainWindow).GetField("networkPreferencesSavePending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
         search.Clear(); favoritesBox.IsChecked = false; Wait(LibraryIdle);
         list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == targetResult.Id);
+        Panel("network");
         Find<Expander>("NetworkPreferencesPanel").IsExpanded = true;
         Wait(() => NetworkIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
         var networkDraft = Find<TextBox>("NameBox").Text;
@@ -560,7 +594,7 @@ internal static class Program
         Assert(NetworkProfile().GetProperty("Network").GetProperty("DNS").GetProperty("Path").GetString() == "/custom-dns" && Find<TextBox>("NetworkPathBox").IsEnabled, "HTTP3 keeps the editable HTTPS DNS path");
         Click("ReloadNetworkPreferencesButton"); Wait(() => NetworkIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
         Assert(Find<CheckBox>("NetworkFakeIPBox").IsChecked == true && Find<ComboBox>("NetworkCacheModeBox").SelectedIndex == 2 && Find<TextBox>("NetworkCacheCapacityBox").Text == "512", "Advanced DNS controls reload without dropping preferences");
-        Capture(window, "workspace-advanced-dns.png");
+        Find<ComboBox>("NetworkDNSModeBox").BringIntoView(); Pump(); Capture(window, "workspace-advanced-dns.png");
         Find<CheckBox>("NetworkFakeIPBox").IsChecked = false; Find<ComboBox>("NetworkCacheModeBox").SelectedIndex = 0; Find<TextBox>("NetworkCacheCapacityBox").Clear();
         Click("SaveNetworkPreferencesButton"); Wait(() => NetworkIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
         var validDomainDNSBytes = File.ReadAllBytes(profileFile);
@@ -701,13 +735,13 @@ internal static class Program
         Wait(() => Find<Button>("SaveUserSettingsButton").IsEnabled); Click("SaveUserSettingsButton"); Wait(UserSettingsIdle);
         var userPreferences = Raw<JsonElement>("store.load").GetProperty("UserSettings");
         Assert(userPreferences.GetProperty("UseSystemProxy").GetBoolean() && !userPreferences.GetProperty("AutoConnect").GetBoolean() && userPreferences.GetProperty("AllowTrusted").GetBoolean(), "Go saves proxy permission separately from activation and auto-connect");
-        Assert(!Find<Button>("EnableUserProxyButton").IsEnabled && Find<TextBlock>("UserProxyStatus").Text == "System proxy: off" && Find<TextBox>("NameBox").Text == automationDraft, "Saving permissions never activates a proxy or changes the editor draft");
+        Assert(!Find<Button>("EnableUserProxyButton").IsEnabled && Find<TextBlock>("UserProxyStatus").Text == "Системный прокси выключен" && Find<TextBox>("NameBox").Text == automationDraft, "Saving permissions never activates a proxy or changes the editor draft");
         Find<CheckBox>("UserFullDeviceBox").IsChecked = true;
         typeof(MainWindow).GetMethod("UserSettingsTimer_Tick", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [null, EventArgs.Empty]); Wait(UserSettingsIdle);
         Assert(Find<CheckBox>("UserFullDeviceBox").IsChecked == true, "Go status ticks preserve unsaved automation drafts");
         Raw<object?>("favorite.set", new { ID = targetResult.Id.ToString(), Favorite = true });
         var refreshUserSettings = PrivateTask("LoadUserSettingsAsync", false); Wait(() => refreshUserSettings.IsCompleted && UserSettingsIdle()); refreshUserSettings.GetAwaiter().GetResult();
-        Assert(Find<CheckBox>("UserFullDeviceBox").IsChecked == true && !Find<Button>("SaveUserSettingsButton").IsEnabled && Find<TextBlock>("UserSettingsStatus").Text.Contains("draft"), "Changed Go revision keeps the draft but blocks a stale preference save");
+        Assert(Find<CheckBox>("UserFullDeviceBox").IsChecked == true && !Find<Button>("SaveUserSettingsButton").IsEnabled && Find<TextBlock>("UserSettingsStatus").Text.Contains("введённые"), "Changed Go revision keeps the draft but blocks a stale preference save");
         Raw<object?>("favorite.set", new { ID = targetResult.Id.ToString(), Favorite = false });
         Click("ReloadUserSettingsButton"); Wait(UserSettingsIdle);
         var userView = (UserSettingsView)typeof(MainWindow).GetField("userSettingsView", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
@@ -721,7 +755,7 @@ internal static class Program
         typeof(MainWindow).GetMethod("PresentDocument", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [automationDocument, selectedAutomationProfile.Id, false]);
         Assert(Find<CheckBox>("UserFullDeviceBox").IsChecked == true && Find<ComboBox>("UserAutoConnectProfileBox").SelectedItem is Profile draftAutomationProfile && draftAutomationProfile.Id == selectedAutomationProfile.Id && !Find<Button>("EnableUserProxyButton").IsEnabled, "Refreshing profiles preserves a real unsaved automation draft");
         typeof(MainWindow).GetMethod("PresentUserSettings", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [userView with { StartupRecorded = true, StartupEnabled = false }, false]);
-        Assert(Find<TextBlock>("UserStartupStatus").Text.Contains("missing or changed"), "Recorded startup ownership is not presented as a confirmed active registration");
+        Assert(Find<TextBlock>("UserStartupStatus").Text.Contains("отсутствует или изменена"), "Recorded startup ownership is not presented as a confirmed active registration");
         typeof(MainWindow).GetMethod("PresentUserSettings", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [userView, true]);
         Find<CheckBox>("UserSystemProxyBox").IsChecked = false; Find<CheckBox>("UserAllowTrustedBox").IsChecked = false;
         Find<CheckBox>("UserAllowPublicBox").IsChecked = false; Find<CheckBox>("UserFullDeviceBox").IsChecked = false; Find<ComboBox>("UserAutoConnectProfileBox").SelectedItem = null;
@@ -729,6 +763,7 @@ internal static class Program
         var resetUserDocument = Raw<JsonElement>("store.load");
         Assert(!resetUserDocument.TryGetProperty("UserSettings", out var resetUserPreferences) || resetUserPreferences.ValueKind == JsonValueKind.Null, "Explicitly clearing preferences restores disabled defaults without registry effects");
         Assert(Find<TextBox>("NameBox").Text == automationDraft && Raw<JsonElement>("store.load").GetProperty("FavoriteIDs").GetArrayLength() == 1, "Automation tools preserve editor drafts and unrelated favorites");
+        typeof(MainWindow).GetMethod("SetGrouping", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [false]);
         Panel("connection");
         var statsSnapshot = (DesktopReply)connectionSnapshot.GetValue(connectionObject)!;
         var statsDisplay = statsSnapshot.Display! with { ShowStatistics = true, Uploaded = "Uploaded: 1.00 MiB", Downloaded = "Downloaded: 2.00 MiB", UploadRate = "Upload: —", DownloadRate = "Download: 2 KiB/s", Elapsed = "Elapsed: 00:01:02", StatisticsScopeHint = "Current attempt; payload and packet bytes" };
@@ -754,6 +789,69 @@ internal static class Program
             ((System.Windows.Forms.ToolStripMenuItem)menuFixture.TrayProfilesMenuItem.DropDownItems[0]).PerformClick();
             Assert(traySelections == 1, "Go-disabled tray profile cannot select or connect");
         }
+        // Design-only data remains inside this suite's synthetic store; no connection command is sent.
+        var referenceOriginal = Raw<JsonElement>("store.load").GetRawText();
+        var changedEvent = connectionObject.GetType().GetField("Changed", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var originalChangedEvent = changedEvent.GetValue(connectionObject);
+        changedEvent.SetValue(connectionObject, null);
+        try {
+            ((DispatcherTimer?)typeof(MainWindow).GetField("userSettingsTimer", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window))?.Stop();
+            var empty = JsonNode.Parse(referenceOriginal)!.AsObject(); empty["Profiles"] = new JsonArray(); empty["FavoriteIDs"] = new JsonArray();
+            Raw<object?>("store.save", new { Document = empty });
+            AppliedProfiles? lastReference = null;
+            var referenceNames = new[] { "🇳🇱 Amsterdam", "🇫🇮 Helsinki", "🇺🇸 Office", "Proxy", "🇺🇸 New York", "🇯🇵 Tokyo", "🇩🇪 Frankfurt", "🇸🇬 Singapore" };
+            var referenceProtocols = new[] { Protocol.VLESS, Protocol.AmneziaWG, Protocol.WireGuard, Protocol.SOCKS5, Protocol.VLESS, Protocol.Shadowsocks, Protocol.WireGuard, Protocol.Hysteria2 };
+            var referenceTimings = new long[] { 42, 68, 21, 93, 112, 184, 57, 210 };
+            for (int i = 0; i < 8; i++) lastReference = ProfileBackend.SaveEditorAsync(referenceNames[i], $"socks5://192.0.2.{i + 1}:1080", i < 3 ? "Личные" : i < 6 ? "Работа" : "Прокси", null, transport, new()).GetAwaiter().GetResult();
+            var demoProfiles = lastReference!.Document.Profiles.Select((profile, i) => profile with { Protocol = referenceProtocols[i] }).ToList();
+            var demoDocument = lastReference.Document with { Profiles = demoProfiles };
+            typeof(MainWindow).GetMethod("PresentDocument", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [demoDocument, demoProfiles[0].Id, true]);
+            typeof(MainWindow).GetMethod("SetGrouping", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [false]);
+            Panel("connection"); search.Clear(); Find<CheckBox>("FavoritesOnlyBox").IsChecked = false;
+            Wait(() => LibraryIdle() && NetworkIdle() && OrganizationIdle() && list.Items.Count == 8);
+            for (int settling = 0; settling < 5; settling++) Pump();
+            var demoDisplay = statsSnapshot.Display! with { Status = "Подключено", ShowSession = true, ModeIndex = 1, ShowStatistics = true, Uploaded = "28,7 МБ", Downloaded = "12,4 МБ", Elapsed = "00:18:32" };
+            var demoState = statsSnapshot.Response.State with { Active = true, WholeDevice = true, FullDeviceMode = true, ProfileId = demoProfiles[0].Id };
+            var demoSnapshot = statsSnapshot with { Response = statsSnapshot.Response with { State = demoState }, Display = demoDisplay, Actions = new(CanDisconnect: true, CanToggle: true, CanSelect: true, CanEdit: true, ConnectCaption: "Отключить") };
+            connectionSnapshot.SetValue(connectionObject, demoSnapshot);
+            RenderResults(new("Демонстрация", "2026-10-28", demoProfiles.Select((profile, i) => new GroupResultDisplayRow(profile.Id.ToString(), profile.Name, "Демо", true, true, referenceTimings[i], "Демонстрационная задержка", referenceTimings[i])).ToList(), true, false, false, "demo-only", ""));
+            typeof(MainWindow).GetMethod("PresentConnectionState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
+            Find<Border>("FeedbackNotice").Visibility = Visibility.Collapsed;
+            Find<TextBlock>("FooterStatus").Text += " · демонстрация без сети";
+            CaptureLogical(window, "A-control-connected.png", 1280, 760);
+            list.SelectedItem = demoProfiles[1];
+            Wait(() => LibraryIdle() && NetworkIdle() && OrganizationIdle());
+            for (int settling = 0; settling < 5; settling++) Pump();
+            connectionSnapshot.SetValue(connectionObject, demoSnapshot);
+            typeof(MainWindow).GetMethod("PresentConnectionState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
+            Assert(((Profile)list.SelectedItem).Id == demoProfiles[1].Id && Find<TextBlock>("StatusLabel").Text == "Не подключено" && Find<TextBlock>("FooterStatus").Text.Contains("Amsterdam"), "Selected and active profiles remain distinct in the design fixture");
+            Find<TextBlock>("FooterStatus").Text += " · демонстрация без сети";
+            CaptureLogical(window, "B-control-other-selected.png", 1280, 760);
+            list.SelectedItem = demoProfiles[0];
+            Wait(() => LibraryIdle() && NetworkIdle() && OrganizationIdle());
+            for (int settling = 0; settling < 5; settling++) Pump();
+            connectionSnapshot.SetValue(connectionObject, demoSnapshot);
+            typeof(MainWindow).GetMethod("PresentConnectionState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
+            Find<TextBlock>("FooterStatus").Text += " · демонстрация без сети";
+            CaptureLogical(window, "D-control-minimum.png", 1060, 641);
+            CaptureLogical(window, "D-control-scale125.png", 1280, 760, 1.25);
+            CaptureLogical(window, "D-control-scale150.png", 1280, 760, 1.5);
+            connectionSnapshot.SetValue(connectionObject, statsSnapshot); Panel("settings"); Pump();
+            CaptureLogical(window, "C-settings.png", 960, 640);
+            CaptureLogical(window, "D-settings-scale150.png", 960, 640, 1.5);
+            var popupBox = Find<ComboBox>("UserAutoConnectProfileBox");
+            popupBox.IsEnabled = true; popupBox.IsDropDownOpen = true; Pump();
+            var popup = (System.Windows.Controls.Primitives.Popup)popupBox.Template.FindName("PART_Popup", popupBox);
+            Assert(popup.IsOpen && popup.Child is FrameworkElement { ActualHeight: > 10 }, "Dark ComboBox popup opens with a measured visual surface on the VM");
+            popupBox.IsDropDownOpen = false;
+            Console.WriteLine("SKIP: native mouse hover, global keys and real monitor DPI need an interactive user session; scale captures are offscreen rasterization checks.");
+        }
+        finally {
+            Raw<object?>("store.save", new { Document = JsonNode.Parse(referenceOriginal) });
+            connectionSnapshot.SetValue(connectionObject, statsSnapshot);
+            changedEvent.SetValue(connectionObject, originalChangedEvent);
+        }
+
         typeof(MainWindow).GetField("allowClose", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(window, true);
         window.Close();
         Assert(tray!.StatusItem.IsDisposed && tray.ExitItem.IsDisposed, "Window Close disposes the tray even on the capture/test close path");
@@ -785,6 +883,14 @@ internal static class Program
         finally { CryptographicOperations.ZeroMemory(bytes); }
     }
     private static void Assert(bool value, string message) { if (!value) throw new Exception(message); Console.WriteLine("PASS: " + message); }
+    private static nint CaptureWindowBounds(nint hwnd, int message, nint wParam, nint lParam, ref bool handled)
+    {
+        if (message == 0x0024) {
+            Marshal.WriteInt32(lParam, 32, 1920); Marshal.WriteInt32(lParam, 36, 1280);
+            handled = true;
+        }
+        return 0;
+    }
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool RegisterHotKey(nint window, int id, uint modifiers, uint key);
@@ -880,6 +986,43 @@ internal static class Program
             var child = VisualTreeHelper.GetChild(root, i); yield return child;
             foreach (var nested in Descendants(child)) yield return nested;
         }
+    }
+    private static void CaptureLogical(Window window, string name, double width, double height, double scale = 1)
+    {
+        var content = (FrameworkElement)window.Content;
+        double nativeNonClientHeight = window.ActualHeight - content.ActualHeight;
+        // Test-only: WPF caches the small session0 desktop's tracking limits.
+        foreach (var namePart in new[] { "_trackMaxWidthDeviceUnits", "_windowMaxWidthDeviceUnits" }) typeof(Window).GetField(namePart, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(window, 2048d);
+        foreach (var namePart in new[] { "_trackMaxHeightDeviceUnits", "_windowMaxHeightDeviceUnits" }) typeof(Window).GetField(namePart, BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(window, 1600d);
+        window.Width = width + 16; window.Height = height + 39;
+        window.UpdateLayout();
+        var frame = new DispatcherFrame();
+        var timer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(90) };
+        timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame);
+        window.UpdateLayout();
+        Assert(Math.Abs(content.ActualWidth - width) < .1 && Math.Abs(content.ActualHeight - height) < .1, "Native test window has the requested client dimensions for " + name);
+        if (name == "A-control-connected.png") {
+            var inspector = (FrameworkElement)window.FindName("InspectorPanel");
+            var profileList = (ListBox)window.FindName("ProfilesList");
+            Assert(Math.Abs(inspector.TranslatePoint(new Point(0, 0), content).X - 940) < .1 && Math.Abs(inspector.ActualWidth - 340) < .1 && Math.Abs(((Grid)content).ColumnDefinitions[0].ActualWidth - 208) < .1, "Control reference geometry is exactly 208 / 1 / 730 / 1 / 340 DIP");
+            Assert(profileList.ItemContainerGenerator.ContainerFromIndex(7) is FrameworkElement last && Math.Abs(last.ActualHeight - 50) < .1 && last.TranslatePoint(new Point(0, last.ActualHeight), content).Y < height - 30, "Eight 50-DIP server rows fit above the single footer");
+        }
+        var bitmap = new RenderTargetBitmap((int)(width * scale), (int)(height * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
+        var visual = new DrawingVisual();
+        using (var drawing = visual.RenderOpen()) drawing.DrawRectangle(new VisualBrush(content) { ViewboxUnits = BrushMappingMode.Absolute, Viewbox = new Rect(0, 0, width, height), Stretch = Stretch.Fill }, null, new Rect(0, 0, width, height));
+        bitmap.Render(visual);
+        var encoder = new PngBitmapEncoder(); encoder.Frames.Add(BitmapFrame.Create(bitmap));
+        using (var file = File.Create(Path.Combine(Output, name))) encoder.Save(file);
+        var metrics = new { LogicalWidth = width, LogicalHeight = height, RenderScale = scale,
+            NativeDpi = VisualTreeHelper.GetDpi(content).PixelsPerInchX,
+            NativeNonClientHeight = nativeNonClientHeight,
+            Sidebar = ((Grid)content).ColumnDefinitions[0].ActualWidth,
+            Inspector = ((FrameworkElement)window.FindName("InspectorPanel")).ActualWidth,
+            BodyWidth = content.ActualWidth, BodyHeight = content.ActualHeight,
+            Font = window.FontFamily.Source,
+            FontAvailable = Fonts.SystemFontFamilies.Any(font => font.Source == "Segoe UI Variable") };
+        File.WriteAllText(Path.Combine(Output, name + ".json"), JsonSerializer.Serialize(metrics));
+        content.InvalidateMeasure(); window.UpdateLayout();
     }
     private static void Capture(Window window, string name)
     {

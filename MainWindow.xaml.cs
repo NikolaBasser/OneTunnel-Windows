@@ -27,6 +27,10 @@ public partial class MainWindow : Window
     private bool restoringGroupExpansion;
     private string? appliedSearch;
     private Guid? appliedSession;
+    private string? sidebarGroup;
+    private string visiblePanel = "connection";
+    private string settingsSection = "connection";
+    private sealed record SidebarGroup(string Name, int Count, bool Selected);
     private Profile? selected => ProfilesList.SelectedItem as Profile;
     private SubscriptionSummary? selectedSubscription => SubscriptionGroupsList.SelectedItem as SubscriptionSummary;
     private GroupSummary? selectedGroup => ConfigurationGroupsList.SelectedItem as GroupSummary;
@@ -99,7 +103,7 @@ public partial class MainWindow : Window
         var profileItems = System.Windows.Data.CollectionViewSource.GetDefaultView(profiles);
         profileCollectionView = profileItems as System.Windows.Data.ListCollectionView;
         profileItems.Filter = MatchesProfile;
-        profileItems.GroupDescriptions.Add(new System.Windows.Data.PropertyGroupDescription(nameof(Profile.Group)));
+        InitializeControlV2();
         try { foreach (var p in Storage.Load()) profiles.Add(p); storageReady = true; }
         catch { Feedback.Text = "Не удалось прочитать хранилище профилей. Файл сохранён; новые записи заблокированы. Проверь права доступа и учётную запись Windows."; }
         RefreshGroups();
@@ -156,7 +160,7 @@ public partial class MainWindow : Window
         var display=connection.Display;
         StatusLabel.Text=display.Status;
         RefreshProfileFilter();
-        if (connection.ProfileId is { } id && profiles.FirstOrDefault(p => p.Id == id) is { } active) ProfilesList.SelectedItem = active;
+        if (selected == null && connection.ProfileId is { } id && profiles.FirstOrDefault(p => p.Id == id) is { } active) ProfilesList.SelectedItem = active;
         if(display.ShowSession) {
             ModeBox.SelectedIndex=display.ModeIndex;
             ConnectionInfo.Text=display.ConnectionInfo;
@@ -172,14 +176,48 @@ public partial class MainWindow : Window
         if(display.ErrorDiagnostic!="") Feedback.Text=display.ErrorDiagnostic;
         if(display.RecoveryHint!="") Feedback.Text=display.RecoveryHint;
         UpdateTray();
+        UpdateControlInspector();
     }
     private void Log(string message)
     {
         var lines = (EventLog.Text + $"{DateTime.Now:HH:mm:ss}  {message}\n").Split('\n');
         EventLog.Text = string.Join('\n', lines.TakeLast(40)); EventLog.ScrollToEnd();
     }
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr window, int attribute, ref int value, int size);
+
+    private void UpdateControlNavigation() => PresentControlNavigation();
+    private void SidebarGroup_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || !connection.Actions.CanSelect || sender is not Button { Tag: string group }) return;
+        sidebarGroup = group;
+        SearchBox.Clear(); FavoritesOnlyBox.IsChecked = false;
+        ShowPanel("connection"); RefreshProfileFilter(true);
+    }
+    private void SidebarFavorites_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || !connection.Actions.CanSelect) return;
+        sidebarGroup = null; SearchBox.Clear(); FavoritesOnlyBox.IsChecked = true;
+        ShowPanel("connection"); RefreshProfileFilter(true);
+    }
+    private void SettingsSection_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy || sender is not Button { Tag: string name }) return;
+        if (visiblePanel != "settings") ShowPanel("settings");
+        settingsSection = name switch { "UserSystemProxyBox" => "proxy", "UserStartupPath" => "startup", _ => "connection" };
+        PresentSettingsSection(); WorkspaceScroll.ScrollToTop();
+    }
+    private void PresentSettingsSection() => PresentControlSettings();
+    private void NetworkSettings_Click(object sender, RoutedEventArgs e)
+    {
+        if (busy) return;
+        ShowPanel("network");
+    }
     private void ShowPanel(string panel)
     {
+        visiblePanel = panel;
+        UpdateControlNavigation();
+        if (panel == "settings") PresentSettingsSection();
         ConnectionPanel.Visibility = panel == "connection" ? Visibility.Visible : Visibility.Collapsed;
         EditorPanel.Visibility = panel == "editor" ? Visibility.Visible : Visibility.Collapsed;
         EditorActions.Visibility = panel == "editor" ? Visibility.Visible : Visibility.Collapsed;
@@ -189,8 +227,8 @@ public partial class MainWindow : Window
         SubscriptionsPanel.Visibility = panel == "subscriptions" ? Visibility.Visible : Visibility.Collapsed;
         UserSettingsPanel.Visibility = panel == "settings" ? Visibility.Visible : Visibility.Collapsed;
         ImportConnectionButton.Visibility = panel == "connection" ? Visibility.Visible : Visibility.Collapsed;
-        PageTitle.Text = panel switch { "editor" => "Импорт / подписка", "subscriptions" => "Подписки", "groups" => "Группы", "engines" => "Движки и восстановление", "activity" => "События", "settings" => "User settings", _ => "Подключения" };
-        PageDescription.Text = panel switch { "editor" => "Импортируй профиль или обнови его из источника", "subscriptions" => "Сохранённые группы и ручное обновление профилей", "groups" => "Управление группами профилей и подписок", "engines" => "Состояние компонентов и восстановление соединения", "activity" => "Журнал событий приложения", "settings" => "Current-user automation, proxy, and startup controls", _ => "Профили, сохранённые на этом компьютере" };
+        PageTitle.Text = panel switch { "editor" => "Импорт / подписка", "subscriptions" => "Подписки", "groups" => "Группы", "engines" => "Движки и восстановление", "activity" => "События", "settings" => "Настройки", _ => sidebarGroup ?? (FavoritesOnlyBox.IsChecked == true ? "Избранное" : "Все серверы") };
+        PageDescription.Text = panel switch { "editor" => "Импортируй профиль или обнови его из источника", "subscriptions" => "Сохранённые группы и ручное обновление профилей", "groups" => "Управление группами профилей и подписок", "engines" => "Состояние компонентов и восстановление соединения", "activity" => "Журнал событий приложения", "settings" => "Подключение, системный прокси и запуск приложения", _ => "Профили, сохранённые на этом компьютере" };
         if (panel == "subscriptions") _ = LoadSubscriptionsAsync();
         if (panel == "settings") _ = LoadUserSettingsAsync();
         if (panel == "engines")
@@ -198,6 +236,7 @@ public partial class MainWindow : Window
             var state=DesktopEnvironment.State;
             EngineDetails.Text = $"AmneziaWG / WireGuard — {(state.Awg ? "компонент найден" : "не установлен")}\nSOCKS5 / Shadowsocks / HTTP(S) / Trojan / TUIC / AnyTLS / NaiveProxy / TUN (sing-box) — {(state.SingBox ? "компонент найден" : "не установлен")}\nVLESS / Hysteria2 (Xray) — {(state.Xray ? "компонент найден" : "не установлен")}\nПрофили, импорт и подписки: Go-ядро\nУправляющая служба: {(connection.Available ? "доступна" : "нет связи — установи или запусти службу")}\nДля обычной работы права администратора интерфейсу не требуются.";
         }
+        ApplyControlLayout(panel);
     }
     private async void RefreshControls()
     {
@@ -224,6 +263,7 @@ public partial class MainWindow : Window
         CancelSubscriptionPreviewButton.IsEnabled=pendingSubscriptionPreview != null && !busy;
         SubscriptionApplyUnavailable.Visibility=pendingSubscriptionPreview != null && (!pendingSubscriptionPreview.CanApply || !actions.CanSave) ? Visibility.Visible : Visibility.Collapsed;
         ProfilesList.IsEnabled=actions.CanSelect && !fastestSelectionPending;
+        SidebarGroups.IsEnabled=SidebarFavoritesButton.IsEnabled=ProfilesList.IsEnabled;
         ModeBox.IsEnabled=actions.CanChangeMode;
         RecoveryButton.IsEnabled=LegacyRecoveryButton.IsEnabled=actions.CanRecover;
         InstallServiceButton.IsEnabled=actions.CanInstallService;
@@ -240,6 +280,7 @@ public partial class MainWindow : Window
         UpdateUserSettingsControls();
         UpdateSubscriptionScheduleControls();
         UpdateBackupControls();
+        UpdateControlInspector();
     }
     private async Task RefreshTrayProfilesAsync()
     {
@@ -276,6 +317,7 @@ public partial class MainWindow : Window
             if (lifetime.IsCancellationRequested || selectionRequest != traySelectionVersion || !connection.Actions.CanSelect) return;
             if (!Guid.TryParse(selectedId, out var actualId) || actualId != requestedId || profiles.FirstOrDefault(profile => profile.Id == actualId) is not { } profile) throw new InvalidDataException();
             SearchBox.Clear();
+            sidebarGroup = null;
             updatingLibraryControls = true;
             try { favoritesOnly = false; FavoritesOnlyBox.IsChecked = false; }
             finally { updatingLibraryControls = false; }
@@ -368,6 +410,8 @@ public partial class MainWindow : Window
         try
         {
             windowHandle = new WindowInteropHelper(this).Handle;
+            int dark = 1;
+            _ = DwmSetWindowAttribute(windowHandle, 20, ref dark, sizeof(int));
             windowSource = HwndSource.FromHwnd(windowHandle);
             if (windowSource == null || windowHandle == IntPtr.Zero) return;
             windowSource.AddHook(WindowNativeHook);
@@ -842,6 +886,7 @@ public partial class MainWindow : Window
     private void PresentGroupResults(GroupResultsView view)
     {
         groupResultsView = view;
+        GroupResults.Tag = view.Stale;
         GroupResults.ItemsSource = view.Rows;
         GroupResultsInfo.Text = view.HasResults
             ? $"{view.Group} · {view.CheckedAt}\n{view.Message}{(view.Stale ? "\nХранилище изменилось. Запусти новую проверку группы." : "")}" : view.Message;
@@ -919,6 +964,7 @@ public partial class MainWindow : Window
         if (!connection.Actions.CanSelect) return;
         var profile = profiles.FirstOrDefault(item => item.Id == id) ?? throw new InvalidOperationException("Selected profile is no longer available.");
         bool refreshLibrary = favoritesOnly || FavoritesOnlyBox.IsChecked == true;
+        sidebarGroup = null;
         pendingLibrarySelection = id;
         if (!string.IsNullOrWhiteSpace(SearchBox.Text)) SearchBox.Clear();
         if (refreshLibrary)
@@ -1006,6 +1052,7 @@ public partial class MainWindow : Window
         backupRestorePreview = view; AddRestoreSchedulesBox.IsChecked = false;
         BackupStatus.Text = $"Будет заменено профилей: {view.CurrentProfiles} → {view.ReplacementProfiles}. В копии расписаний: {view.EnabledSchedules}. Предпросмотр действует до {view.ExpiresAt}.";
         UpdateBackupControls();
+        UpdateControlInspector();
     }
 
     private async void CancelBackupPreview_Click(object sender, RoutedEventArgs e) => await CancelBackupRestoreAsync();
@@ -1075,6 +1122,7 @@ public partial class MainWindow : Window
     }
     private void PresentApplied(AppliedProfiles result)
     {
+        sidebarGroup = null;
         SearchBox.Clear();PresentDocument(result.Document,result.Selected?.Id??selected?.Id);ClearEditorContent();ShowPanel("connection");
         Feedback.Text=result.Batch?$"Подписка обновлена / импортирована. Обновлено: {result.Updated}. Добавлено: {result.Added}. Устаревших удалено: {result.Removed}. Повторов: {result.Duplicates}. Неподдерживаемых: {result.Skipped}.":"Профиль сохранён. Ключи защищены учётной записью Windows.";
         Log(result.Batch?"Импорт завершён Go-ядром.":"Профиль сохранён.");
@@ -1083,6 +1131,7 @@ public partial class MainWindow : Window
     {
         if (item is not Profile profile) return false;
         if (connection.ProfileId == profile.Id) return true;
+        if (sidebarGroup != null && profile.Group != sidebarGroup) return false;
         if (libraryProjectionLoaded && !libraryIDs.Contains(profile.Id)) return false;
         string query = SearchBox?.Text.Trim() ?? "";
         return query.Length == 0 || profile.Name.Contains(query, StringComparison.OrdinalIgnoreCase) || profile.Group.Contains(query, StringComparison.OrdinalIgnoreCase) || profile.Protocol.ToString().Contains(query, StringComparison.OrdinalIgnoreCase);
@@ -1091,6 +1140,7 @@ public partial class MainWindow : Window
     private void RefreshProfileFilter(bool force = false)
     {
         if (!IsInitialized || SearchBox == null || ProfilesList == null || EmptyProfilesHint == null) return;
+        UpdateControlNavigation();
         string query = SearchBox.Text.Trim();
         if (!force && appliedSearch == query && appliedSession == connection.ProfileId) return;
         // Record inputs before Refresh raises synchronous selection events.
@@ -1115,25 +1165,21 @@ public partial class MainWindow : Window
         librarySort = (LibrarySortBox.SelectedItem as ComboBoxItem)?.Tag?.ToString() ?? "stored";
         _ = RefreshLibraryProjectionAsync();
     }
-    private async void Favorite_Click(object sender, RoutedEventArgs e)
+    private async void Favorite_Click(object sender, RoutedEventArgs e) { if (selected is { } profile) await FavoriteProfileAsync(profile.Id); }
+    private async Task FavoriteProfileAsync(Guid id)
     {
-        if (favoritePending || libraryPending || selected is not { } profile || busy || !connection.Actions.CanEdit) return;
-        favoritePending = true;
-        UpdateLibraryControls();
-        try
-        {
-            var result = await ProfileBackend.FavoriteAsync(profile.Id, !Storage.FavoriteIDs.Contains(profile.Id));
+        if (favoritePending || libraryPending || busy || !connection.Actions.CanEdit || !profiles.Any(profile => profile.Id == id)) return;
+        var preserveSelection = selected?.Id;
+        favoritePending = true; UpdateLibraryControls();
+        try {
+            var result = await ProfileBackend.FavoriteAsync(id, !Storage.FavoriteIDs.Contains(id));
             if (lifetime.IsCancellationRequested) return;
-            PresentDocument(result, profile.Id, refreshLibrary: false);
+            PresentDocument(result, preserveSelection, refreshLibrary: false);
             Feedback.Text = "Избранное обновлено.";
             await RefreshLibraryProjectionAsync();
         }
         catch { Feedback.Text = "Не удалось подтвердить изменение избранного. Повтори действие, чтобы обновить состояние."; }
-        finally
-        {
-            favoritePending = false;
-            if (!lifetime.IsCancellationRequested) UpdateLibraryControls();
-        }
+        finally { favoritePending = false; if (!lifetime.IsCancellationRequested) { UpdateLibraryControls(); UpdateControlInspector(); } }
     }
     private async Task RefreshLibraryProjectionAsync()
     {
@@ -1738,7 +1784,7 @@ public partial class MainWindow : Window
     private void Cancel_Click(object sender, RoutedEventArgs e) { ShowPanel("connection"); }
     private void CancelEditor_Click(object sender, RoutedEventArgs e) { ClearEditorContent(); ShowPanel("connection"); }
     private void Engines_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("engines"); }
-    private void Home_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("connection"); }
+    private void Home_Click(object sender, RoutedEventArgs e) { if (!busy) { sidebarGroup = null; FavoritesOnlyBox.IsChecked = false; ShowPanel("connection"); RefreshProfileFilter(true); } }
     private void Events_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("activity"); }
     private void UserSettings_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("settings"); }
 
@@ -1757,7 +1803,7 @@ public partial class MainWindow : Window
         catch
         {
             if (request == userSettingsRequestVersion && !lifetime.IsCancellationRequested)
-                UserSettingsStatus.Text = "Settings are unavailable. Refresh and try again.";
+                UserSettingsStatus.Text = "Настройки недоступны. Обнови сведения и повтори попытку.";
         }
         finally
         {
@@ -1786,7 +1832,7 @@ public partial class MainWindow : Window
         catch
         {
             if (request == userSettingsRequestVersion && !lifetime.IsCancellationRequested && UserSettingsPanel.Visibility == Visibility.Visible)
-                UserSettingsStatus.Text = "Automation status is unavailable. It will be checked again shortly.";
+                UserSettingsStatus.Text = "Состояние автоматического подключения недоступно. Проверка будет повторена.";
         }
         finally
         {
@@ -1814,7 +1860,7 @@ public partial class MainWindow : Window
             }
             finally { updatingUserSettingsControls = false; }
         }
-        UserSettingsStatus.Text = view.Message;
+        UserSettingsStatus.Text = LocalizeUserNotice(view.Message);
         UpdateUserSettingsControls();
     }
 
@@ -1847,12 +1893,12 @@ public partial class MainWindow : Window
         DisableUserProxyButton.IsEnabled = !busy && !pending && !userSettingsDraftDirty && view?.CanDisableProxy == true;
         EnableUserStartupButton.IsEnabled = !busy && !pending && !userSettingsDraftDirty && view?.CanEnableStartup == true;
         DisableUserStartupButton.IsEnabled = !busy && !pending && !userSettingsDraftDirty && view?.CanDisableStartup == true;
-        UserNetworkCategory.Text = "Network category: " + (view?.NetworkCategory is { Length: > 0 } category ? category : "unavailable");
+        UserNetworkCategory.Text = "Сеть: " + (view?.NetworkCategory switch { "public" => "общедоступная", "private" => "частная", "domain" => "доменная", _ => "не определена" });
         UserAutoConnectInhibited.Visibility = view?.AutoConnectInhibited == true ? Visibility.Visible : Visibility.Collapsed;
-        UserProxyStatus.Text = view == null ? "System proxy: status unavailable" : view.ProxyEnabled ? "System proxy: enabled for this user's current session" : "System proxy: off";
-        UserStartupStatus.Text = view == null ? "Startup: status unavailable" : !view.StartupRecorded ? "Startup: not registered" : view.StartupEnabled ? "Startup: registered for this user" : "Startup: ownership recorded, but registration is missing or changed";
+        UserProxyStatus.Text = view == null ? "Системный прокси: состояние недоступно" : view.ProxyEnabled ? "Системный прокси включён для текущего пользователя" : "Системный прокси выключен";
+        UserStartupStatus.Text = view == null ? "Автозапуск: состояние недоступно" : !view.StartupRecorded ? "Автозапуск выключен" : view.StartupEnabled ? "Автозапуск включён для текущего пользователя" : "Запись автозапуска отсутствует или изменена другим приложением";
         UserStartupPath.Text = Environment.ProcessPath ?? "Unavailable";
-        if (staleDraft) UserSettingsStatus.Text = "Settings changed since this draft was loaded. Reload settings before saving; the draft has been preserved.";
+        if (staleDraft) UserSettingsStatus.Text = "Настройки изменились. Обнови сведения перед сохранением; введённые значения сохранены.";
     }
 
     private async void SaveUserSettings_Click(object sender, RoutedEventArgs e)
@@ -1878,7 +1924,7 @@ public partial class MainWindow : Window
             var saved = await ProfileBackend.UserSettingsAsync(lifetime.Token);
             if (request != userSettingsRequestVersion || lifetime.IsCancellationRequested) return;
             PresentUserSettings(saved, resetDraft: true);
-            UserSettingsStatus.Text = saved.Message;
+            UserSettingsStatus.Text = LocalizeUserNotice(saved.Message);
         }
         catch
         {
@@ -1896,22 +1942,22 @@ public partial class MainWindow : Window
         if (MessageBox.Show(this, confirmation, "OneTunnel user settings", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
         if (userSettingsView is not { } current || !string.Equals(current.Token, view.Token, StringComparison.Ordinal))
         {
-            UserSettingsStatus.Text = "Settings changed while the confirmation was open. Review the current status and try again.";
+            UserSettingsStatus.Text = "Настройки изменились во время подтверждения. Проверь их текущее состояние и повтори действие.";
             return;
         }
         int request = ++userSettingsRequestVersion;
-        userSettingsActionPending = true; UserSettingsStatus.Text = "Applying the confirmed change…"; UpdateUserSettingsControls();
+        userSettingsActionPending = true; UserSettingsStatus.Text = "Применение подтверждённого изменения…"; UpdateUserSettingsControls();
         try
         {
             var updated = await action(current.Token);
             if (request != userSettingsRequestVersion || lifetime.IsCancellationRequested) return;
             PresentUserSettings(updated, resetDraft: true);
-            UserSettingsStatus.Text = string.IsNullOrWhiteSpace(updated.Message) ? completed : updated.Message;
+            UserSettingsStatus.Text = string.IsNullOrWhiteSpace(updated.Message) ? completed : LocalizeUserNotice(updated.Message);
         }
         catch
         {
             if (request == userSettingsRequestVersion && !lifetime.IsCancellationRequested)
-                UserSettingsStatus.Text = "The action could not be confirmed or completed. Refresh settings before retrying.";
+                UserSettingsStatus.Text = "Не удалось подтвердить или завершить действие. Обнови сведения и повтори попытку.";
         }
         finally { userSettingsActionPending = false; UpdateUserSettingsControls(); }
     }

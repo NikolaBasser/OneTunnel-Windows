@@ -1,0 +1,24 @@
+Control UI acceptance — 2026-10-28
+
+Graphite Control layout: adjacent groups/table/inspector (208/1/*/1/340 DIP),
+compact toolbar, flat virtualized rows, selected/active profile distinction,
+row favorites and existing actions, single footer and sidebar settings.
+Core/DTO/profile formats unchanged; pinned core revision remains
+58635bacf75784f299a94dbc1f356faa961e1609.
+
+Windows Server 2025 x64 VM: 232 PASS, 2 SKIP, exit code 0.
+Proxy/startup registry fingerprints unchanged after tests.
+Final VM: service Running, no WFP providers or TUN adapters left by this run.
+Synthetic connected screenshots verify UI state only, without VPN traffic.
+Release package DLL hashes match the VM-tested application binaries.
+
+Package: OneTunnel-0.1.0-Control-TZ-final.zip
+SHA256: 9A75A980E64F2709F0BB668EDB05CB67F77A85507C4AB53BC1B427F956B6A614
+
+Not verified: live keyboard/mouse/hover, global restore shortcut in a user
+session, actual Windows DPI changes, native drag/maximize, Windows 10 and
+high contrast. 125/150% captures use render scaling, not OS DPI changes.
+Segoe UI fallback was used because Segoe UI Variable is absent on the VM.
+Public snapshots redact profile Source: endpoint fields are not fabricated;
+the existing explicit editor retains full access. Legacy dialog localization
+is not exhaustive. Settings use the allowed embedded-window alternative.

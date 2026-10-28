@@ -15,6 +15,10 @@ public sealed class EmojiText : TextBlock
     private static readonly ConcurrentDictionary<string, BitmapSource> Cache = new(StringComparer.Ordinal);
     public static string AssetDirectory => Path.Combine(AppContext.BaseDirectory, "assets", "emoji");
     public string Value { get => (string)GetValue(ValueProperty); set => SetValue(ValueProperty, value); }
+    public static readonly DependencyProperty EmojiSizeProperty = DependencyProperty.Register(nameof(EmojiSize), typeof(double), typeof(EmojiText), new FrameworkPropertyMetadata(0d, FrameworkPropertyMetadataOptions.AffectsMeasure, (d, _) => ((EmojiText)d).Refresh()));
+    public double EmojiSize { get => (double)GetValue(EmojiSizeProperty); set => SetValue(EmojiSizeProperty, value); }
+    public static readonly DependencyProperty ShowServerFallbackProperty = DependencyProperty.Register(nameof(ShowServerFallback), typeof(bool), typeof(EmojiText), new FrameworkPropertyMetadata(false, FrameworkPropertyMetadataOptions.AffectsMeasure, (d, _) => ((EmojiText)d).Refresh()));
+    public bool ShowServerFallback { get => (bool)GetValue(ShowServerFallbackProperty); set => SetValue(ShowServerFallbackProperty, value); }
     public int RenderedEmojiCount { get; private set; }
     static EmojiText() { FontSizeProperty.OverrideMetadata(typeof(EmojiText), new FrameworkPropertyMetadata(SystemFonts.MessageFontSize, FrameworkPropertyMetadataOptions.Inherits, (d, _) => ((EmojiText)d).Refresh())); }
     public EmojiText() { SetResourceReference(StyleProperty, typeof(TextBlock)); }
@@ -35,13 +39,22 @@ public sealed class EmojiText : TextBlock
             {
                 var bitmap = Cache.GetOrAdd(key, _ => { var b = new BitmapImage(); b.BeginInit(); b.CacheOption = BitmapCacheOption.OnLoad; b.UriSource = new Uri(path); b.EndInit(); b.Freeze(); return b; });
                 Flush();
-                var image = new Image { Source = bitmap, Width = FontSize * 1.22, Height = FontSize * 1.22, Stretch = Stretch.Uniform, Margin = new Thickness(0.5, 0, 0.5, 0), IsHitTestVisible = false };
+                double size = EmojiSize > 0 ? EmojiSize : FontSize * 1.22;
+                bool flag = key.StartsWith("1f1", StringComparison.Ordinal) && key.Split('-').Length == 2;
+                var image = new Image { Source = bitmap, Width = size, Height = EmojiSize > 0 && flag ? size * .75 : size, Stretch = Stretch.Uniform, Margin = new Thickness(0, 0, EmojiSize > 0 ? 12 : .5, 0), IsHitTestVisible = false };
                 AutomationProperties.SetName(image, element);
                 Inlines.Add(new InlineUIContainer(image) { BaselineAlignment = BaselineAlignment.Center }); RenderedEmojiCount++;
             }
             catch (Exception ex) when (ex is IOException or NotSupportedException or System.IO.FileFormatException) { text.Append(element); }
         }
         Flush();
+        if (ShowServerFallback && RenderedEmojiCount == 0 && !string.IsNullOrWhiteSpace(value)) {
+            double size = EmojiSize > 0 ? EmojiSize : 24;
+            var icon = new System.Windows.Shapes.Path { Data = Geometry.Parse("M1,1H23V8H1Z M1,11H23V18H1Z M4,4H7 M4,14H7"), StrokeThickness = 1.2, Width = size, Height = size * .75, Stretch = Stretch.Fill, Margin = new Thickness(0, 0, 12, 0) };
+            icon.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "TextSecondary");
+            AutomationProperties.SetName(icon, "Сервер");
+            Inlines.InsertBefore(Inlines.FirstInline, new InlineUIContainer(icon) { BaselineAlignment = BaselineAlignment.Center });
+        }
     }
     public static IReadOnlyList<(string Flag, string Name)> Countries()
     {

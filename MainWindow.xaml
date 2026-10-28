@@ -1,113 +1,1015 @@
-<Window x:Class="OneTunnel.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ui="clr-namespace:OneTunnel.Controls" Title="OneTunnel — подключения" Width="1240" Height="850" MinWidth="1000" MinHeight="680" WindowStartupLocation="CenterScreen" Closing="Window_Closing">
- <Grid Background="{StaticResource Canvas}">
-  <Grid.ColumnDefinitions><ColumnDefinition Width="200"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-  <Border Background="{StaticResource Rail}" BorderBrush="{StaticResource Line}" BorderThickness="0,0,1,0">
-   <Grid Margin="16,24,14,18"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <StackPanel><TextBlock Text="OneTunnel" FontSize="25" FontWeight="SemiBold"/><TextBlock Text="Подключения на этом компьютере" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,5,0,24" TextWrapping="Wrap"/></StackPanel>
-    <StackPanel Grid.Row="1">
-     <Button x:Name="HomeNavigationButton" Content="Подключения" HorizontalContentAlignment="Left" Click="Home_Click"/>
-     <Button x:Name="AddProfileButton" Content="Добавить профиль" HorizontalContentAlignment="Left" Click="Add_Click"/>
-     <Button x:Name="SubscriptionButton" Content="Подписки" HorizontalContentAlignment="Left" Click="Subscriptions_Click"/>
-     <Button x:Name="GroupsNavigationButton" Content="Группы" HorizontalContentAlignment="Left" Click="Groups_Click"/>
-     <Button x:Name="EventsNavigationButton" Content="События" HorizontalContentAlignment="Left" Click="Events_Click"/>
-     <Button x:Name="UserSettingsNavigationButton" Content="User settings" HorizontalContentAlignment="Left" Click="UserSettings_Click"/>
-    </StackPanel>
-    <StackPanel Grid.Row="2"><TextBlock Text="Windows x64" Foreground="{StaticResource Muted}" FontSize="12" Margin="4,0,0,8"/><Button Content="Движки и восстановление" HorizontalContentAlignment="Left" Click="Engines_Click"/><CheckBox x:Name="TrayNotificationsBox" IsEnabled="False" Margin="4,8,4,12" Checked="TrayNotifications_Changed" Unchecked="TrayNotifications_Changed" ToolTip="Уведомления включаются только на время работы приложения."><TextBlock Text="Уведомлять об изменении статуса" TextWrapping="Wrap" MaxWidth="130" FontSize="12"/></CheckBox><Button x:Name="HideToTrayButton" Content="Свернуть в трей" IsEnabled="False" HorizontalContentAlignment="Left" ToolTip="Скрывает окно. Нажми Ctrl+Shift+O, чтобы вернуть его." Click="HideToTray_Click"/><TextBlock Text="Вернуть: Ctrl+Shift+O" Foreground="{StaticResource Muted}" FontSize="12" Margin="4,0,0,0"/></StackPanel>
-   </Grid>
-  </Border>
-  <Grid Grid.Column="1" Margin="28,22,28,18"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-   <Grid Margin="0,0,0,18"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel Margin="0,0,18,0"><TextBlock x:Name="PageTitle" Text="Подключения" FontSize="26" FontWeight="SemiBold"/><TextBlock x:Name="PageDescription" Text="Профили, сохранённые на этом компьютере" Foreground="{StaticResource Muted}" Margin="0,4,0,0"/></StackPanel><Button Grid.Column="1" x:Name="ImportConnectionButton" Content="Импортировать подключение" Background="{StaticResource Accent}" Foreground="White" HorizontalAlignment="Right" VerticalAlignment="Center" Click="Subscription_Click"/></Grid>
-   <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-    <Grid>
-     <Grid x:Name="ConnectionPanel"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-      <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="18" Margin="0,0,0,16">
-       <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-        <StackPanel>
-         <StackPanel><ui:EmojiText x:Name="ProfileTitle" Value="Добавь первое подключение" FontSize="22" FontWeight="SemiBold" Margin="0,0,12,4"/><Border Background="{StaticResource StatusSurface}" CornerRadius="4" Padding="9,5" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,0,0,10"><TextBlock x:Name="StatusLabel" Text="Отключено" FontSize="12" MaxWidth="300"/></Border></StackPanel>
-         <TextBlock x:Name="ProfileDescription" Text="Импортируй конфигурацию или подписку. Профили хранятся на этом компьютере." Foreground="{StaticResource Muted}" Margin="0,0,0,10"/>
-         <StackPanel x:Name="ModePanel" Visibility="Collapsed"><TextBlock Text="Куда направлять трафик" FontWeight="SemiBold" Margin="0,0,0,6"/><ComboBox x:Name="ModeBox" SelectedIndex="0" MaxWidth="450" HorizontalAlignment="Left" MinWidth="340" SelectionChanged="Mode_Changed"><ComboBoxItem Content="Локальный прокси · только выбранные приложения"/><ComboBoxItem Content="Всё устройство · системный туннель"/></ComboBox><TextBlock x:Name="ModeHelp" Foreground="{StaticResource Muted}" Margin="0,7,0,0"/></StackPanel>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" x:Class="OneTunnel.MainWindow" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ui="clr-namespace:OneTunnel.Controls" Style="{StaticResource {x:Type Window}}" Title="OneTunnel" Width="1296" Height="799" MinWidth="1076" MinHeight="680" WindowStartupLocation="CenterScreen" Closing="Window_Closing">
+  <Window.Resources>
+    <ui:ProfileTimingConverter x:Key="ProfileTiming" />
+    <ui:FavoriteStateConverter x:Key="FavoriteState" />
+  </Window.Resources>
+  <Grid Background="{StaticResource Canvas}">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="*" />
+      <RowDefinition Height="30" />
+    </Grid.RowDefinitions>
+    <Grid.ColumnDefinitions>
+      <ColumnDefinition Width="208" />
+      <ColumnDefinition Width="1" />
+      <ColumnDefinition Width="*" />
+      <ColumnDefinition Width="1" />
+      <ColumnDefinition Width="340" />
+    </Grid.ColumnDefinitions>
+    <Border Background="{StaticResource SidebarBackground}">
+      <Grid Margin="12,20,12,16">
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*" />
+          <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+        <Grid x:Name="LibraryNavigation">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+          </Grid.RowDefinitions>
+          <TextBlock x:Name="SidebarHeading" Text="Группы" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="4,0,0,12" />
+          <Button x:Name="HomeNavigationButton" Grid.Row="1" Style="{StaticResource RailButton}" Click="Home_Click">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Path Data="M1,1H7V7H1Z M11,1H17V7H11Z M1,11H7V17H1Z M11,11H17V17H11Z" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" />
+              <TextBlock Grid.Column="1" Text="Все серверы" Margin="10,0,4,0" />
+              <TextBlock x:Name="AllServerCount" Grid.Column="2" Foreground="{StaticResource TextSecondary}" />
+            </Grid>
+          </Button>
+          <Button x:Name="SidebarFavoritesButton" Grid.Row="2" Style="{StaticResource RailButton}" Click="SidebarFavorites_Click">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="20" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <Path Data="{StaticResource StarGeometry}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" />
+              <TextBlock Grid.Column="1" Text="Избранное" Margin="10,0,4,0" />
+              <TextBlock x:Name="FavoriteServerCount" Grid.Column="2" Foreground="{StaticResource TextSecondary}" />
+            </Grid>
+          </Button>
+          <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,8,0,0">
+            <ItemsControl x:Name="SidebarGroups">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                  <Button Tag="{Binding Name}" Click="SidebarGroup_Click" HorizontalContentAlignment="Stretch">
+                    <Button.Style>
+                      <Style TargetType="Button" BasedOn="{StaticResource RailButton}">
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding Selected}" Value="True">
+                            <Setter Property="Background" Value="{StaticResource Selected}" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                    </Button.Style>
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="20" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <Path Data="M1,4H7L9,6H17V16H1Z" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" />
+                      <TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Name}" Margin="10,0,4,0" />
+                      <TextBlock Grid.Column="2" Text="{Binding Count}" Foreground="{StaticResource TextSecondary}" />
+                    </Grid>
+                  </Button>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </Grid>
+        <Button x:Name="UserSettingsNavigationButton" Grid.Row="1" Style="{StaticResource RailButton}" Click="UserSettings_Click" Margin="0,12,0,0">
+          <StackPanel Orientation="Horizontal">
+            <Path Data="M9,1V4 M9,14V17 M1,9H4 M14,9H17 M3,3L5,5 M13,13L15,15 M3,15L5,13 M13,5L15,3 M9,5A4,4 0 1 1 8.99,5" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
+            <TextBlock Text="Настройки" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <StackPanel x:Name="SettingsSections" Visibility="Collapsed">
+          <Button Content="К серверам" Style="{StaticResource RailButton}" Click="Home_Click" Margin="0,0,0,16" />
+          <Button Tag="general" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+            <StackPanel Orientation="Horizontal">
+              <Path Data="M9,1V4 M9,14V17 M1,9H4 M14,9H17 M3,3L5,5 M13,13L15,15 M3,15L5,13 M13,5L15,3 M9,5A4,4 0 1 1 8.99,5" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
+              <TextBlock Text="Основные" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Tag="connection" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+            <StackPanel Orientation="Horizontal">
+              <Path Data="M7,3L10,0H15V5L12,8 M11,15L8,18H3V13L6,10 M6,12L12,6" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
+              <TextBlock Text="Подключение" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Tag="proxy" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+            <StackPanel Orientation="Horizontal">
+              <Path Data="M1,5H17 M12,1L17,5L12,9 M17,13H1 M6,9L1,13L6,17" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
+              <TextBlock Text="Системный прокси" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Tag="network" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+            <StackPanel Orientation="Horizontal">
+              <Path Data="M9,3V10 M3,10H15 M3,10V16 M15,10V16 M6,0H12V5H6Z M0,14H6V18H0Z M12,14H18V18H12Z" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
+              <TextBlock Text="DNS и маршруты" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Tag="activity" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+            <StackPanel Orientation="Horizontal">
+              <Path Data="M1,9H5L7,3L11,15L13,9H17" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
+              <TextBlock Text="Диагностика" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Tag="engines" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+            <StackPanel Orientation="Horizontal">
+              <Path Data="M2,2H16V7H2Z M2,11H16V16H2Z M5,5H7 M5,14H7" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
+              <TextBlock Text="Служба и копии" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+          <Button Tag="about" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+            <StackPanel Orientation="Horizontal">
+              <Path Data="M9,0A9,9 0 1 0 9,18A9,9 0 1 0 9,0 M9,8V14 M9,4V5" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
+              <TextBlock Text="О приложении" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
         </StackPanel>
-        <Border Grid.Column="1" Background="{StaticResource InfoSurface}" CornerRadius="6" Padding="13" Margin="18,0,0,0" MaxWidth="255"><StackPanel><TextBlock x:Name="ConnectionInfo" Text="AmneziaWG · WireGuard · VLESS · SOCKS5 · Hysteria2 · Shadowsocks" FontWeight="SemiBold"/><TextBlock x:Name="ConnectionHint" Text="Серверы не входят в приложение. Используй собственную конфигурацию или данные своего провайдера." Foreground="{StaticResource Muted}" Margin="0,6,0,0"/><StackPanel x:Name="StatisticsPanel" Visibility="Collapsed" Margin="0,10,0,0"><TextBlock Text="Current connection" FontWeight="SemiBold"/><StackPanel Orientation="Horizontal"><TextBlock Text="Uploaded: "/><TextBlock x:Name="StatisticsUploaded"/></StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="Downloaded: "/><TextBlock x:Name="StatisticsDownloaded"/></StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="Upload: "/><TextBlock x:Name="StatisticsUploadRate"/></StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="Download: "/><TextBlock x:Name="StatisticsDownloadRate"/></StackPanel><StackPanel Orientation="Horizontal"><TextBlock Text="Elapsed: "/><TextBlock x:Name="StatisticsElapsed"/></StackPanel><TextBlock x:Name="StatisticsScopeHint" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0"/></StackPanel></StackPanel></Border>
-       </Grid>
-      </Border>
-      <WrapPanel Grid.Row="1" Margin="0,0,0,13"><Button x:Name="ConnectButton" Content="Подключить" Background="{StaticResource Accent}" Foreground="White" IsEnabled="False" Click="Connect_Click"/><Button x:Name="CancelGroupButton" Visibility="Collapsed" Content="Отменить проверку" IsEnabled="False" Click="CancelGroup_Click"/><Button x:Name="CheckGroupButton" Content="Проверить группу" IsEnabled="False" Click="CheckGroup_Click"/><Button x:Name="ProbeButton" Content="Проверить доступ" IsEnabled="False" Click="Probe_Click"/><Button x:Name="EditButton" Content="Изменить" IsEnabled="False" Click="Edit_Click"/><Button x:Name="DeleteButton" Content="Удалить" IsEnabled="False" Click="Delete_Click"/></WrapPanel>
-      <StackPanel Grid.Row="2" Margin="0,0,0,12"><WrapPanel VerticalAlignment="Center"><CheckBox x:Name="FavoritesOnlyBox" Content="Только избранное" VerticalAlignment="Center" Margin="4,4,14,4" Checked="LibraryFilter_Changed" Unchecked="LibraryFilter_Changed"/><ComboBox x:Name="LibrarySortBox" Width="178" SelectedIndex="0" SelectionChanged="LibrarySort_Changed" ToolTip="Порядок профилей"><ComboBoxItem Content="Порядок хранения" Tag="stored"/><ComboBoxItem Content="По названию" Tag="name"/><ComboBoxItem Content="По протоколу" Tag="protocol"/></ComboBox><Button x:Name="FavoriteButton" Content="Добавить в избранное" IsEnabled="False" Click="Favorite_Click"/><TextBlock x:Name="LibraryStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4"/></WrapPanel><Grid Margin="0,8,0,0"><TextBox x:Name="SearchBox" MinHeight="40" ToolTip="Поиск по названию, группе и протоколу" TextChanged="Search_Changed"/><TextBlock IsHitTestVisible="False" Text="Поиск по профилю, группе или протоколу" Foreground="{StaticResource Muted}" Margin="12,0,0,0" VerticalAlignment="Center"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid></StackPanel>
-      <Grid Grid.Row="3"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid Margin="2,0,2,5"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel Orientation="Horizontal"><TextBlock Text="Профили" FontSize="17" FontWeight="SemiBold"/><TextBlock x:Name="ProfileCount" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="10,0,0,0"/></StackPanel><WrapPanel Grid.Column="1"><Button x:Name="ExpandAllGroupsButton" Content="Развернуть группы" Padding="8,4" Margin="2" Click="ExpandAllGroups_Click"/><Button x:Name="CollapseAllGroupsButton" Content="Свернуть группы" Padding="8,4" Margin="2" Click="CollapseAllGroups_Click"/></WrapPanel></Grid>
-       <Grid Grid.Row="1"><ListBox x:Name="ProfilesList" SelectionChanged="Profiles_SelectionChanged" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" MinHeight="140" MaxHeight="430" IsTabStop="True">
-        <ListBox.GroupStyle><GroupStyle><GroupStyle.ContainerStyle><Style TargetType="GroupItem"><Setter Property="Template"><Setter.Value><ControlTemplate TargetType="GroupItem"><Expander IsExpanded="True" Loaded="Group_Loaded" Expanded="Group_Changed" Collapsed="Group_Changed" Margin="0,4,0,8"><Expander.Header><StackPanel Orientation="Horizontal"><ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" MaxWidth="560" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding ItemCount, StringFormat=({0})}" Margin="8,0,0,0" Foreground="{StaticResource Muted}"/></StackPanel></Expander.Header><ItemsPresenter/></Expander></ControlTemplate></Setter.Value></Setter></Style></GroupStyle.ContainerStyle></GroupStyle></ListBox.GroupStyle>
-        <ListBox.ItemTemplate><DataTemplate><Grid Margin="3,2"><Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Name}" VerticalAlignment="Center" Margin="12,0,12,0"/><TextBlock Grid.Column="1" Text="{Binding Protocol}" Foreground="{StaticResource Muted}" TextTrimming="CharacterEllipsis" ToolTip="{Binding Protocol}" VerticalAlignment="Center" Margin="8,0,10,0"/></Grid></DataTemplate></ListBox.ItemTemplate>
-       </ListBox><TextBlock Grid.Row="1" x:Name="EmptyProfilesHint" Text="Профили не найдены. Очисти поиск или импортируй подключение." Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="22" Visibility="Collapsed" IsHitTestVisible="False"/></Grid>
       </Grid>
-      <Expander x:Name="NetworkPreferencesPanel" Grid.Row="5" Header="DNS и правила маршрутизации" IsExpanded="False" Margin="0,0,0,12"><StackPanel Margin="0,10,0,0"><TextBlock Text="Network preferences use the shared TUN in full-device mode for proxy profiles and for AWG/WireGuard when a nonempty policy is saved. Native profiles keep imported DNS and routing until this opt-in; policy DNS replaces imported DNS and peer AllowedIPs stay unchanged. TCP/UDP only; ICMP is unavailable. Reset all preferences to restore the native path. Apply changes by manually installing an updated OneTunnel service bundle; the installed service is not changed automatically." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10"/><TextBlock Text="Пользовательские правила задают исключения из маршрутизации всего трафика через VPN. Правило direct отправляет совпавший трафик напрямую в сеть и может раскрыть его внешний адрес. Правила проверяются сверху вниз, первое совпадение важнее. Имена доменов не всегда видны при шифровании DNS/ECH, а процессы зависят от атрибуции Windows." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10"/><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel Margin="0,0,8,0"><TextBlock Text="DNS" Margin="0,0,0,4"/><ComboBox x:Name="NetworkDNSModeBox" SelectedIndex="0" SelectionChanged="NetworkDNSMode_Changed"><ComboBoxItem Content="По умолчанию" Tag="default"/><ComboBoxItem Content="DNS over HTTPS" Tag="https"/><ComboBoxItem Content="DNS over TLS" Tag="tls"/><ComboBoxItem Content="DNS over QUIC" Tag="quic"/><ComboBoxItem Content="DNS over HTTP/3" Tag="h3"/></ComboBox></StackPanel><StackPanel Grid.Column="1" Margin="8,0,0,0"><TextBlock Text="IP DNS-сервера" Margin="0,0,0,4"/><TextBox x:Name="NetworkServerIPBox" ToolTip="Литеральный IPv4 или IPv6-адрес; DNS-запросы идут через прокси. Начальное соединение с внешним DNS использует фиксированный зашифрованный HTTPS bootstrap инфраструктуры; этот пользовательский резолвер его не заменяет."/></StackPanel></Grid><Grid Margin="0,8,0,0"><Grid.ColumnDefinitions><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions><StackPanel Margin="0,0,8,0"><TextBlock Text="Имя TLS-сервера" Margin="0,0,0,4"/><TextBox x:Name="NetworkServerNameBox"/></StackPanel><StackPanel Grid.Column="1" Margin="8,0,8,0"><TextBlock Text="Порт (пусто — по умолчанию)" TextWrapping="Wrap" Margin="0,0,0,4"/><TextBox x:Name="NetworkPortBox"/></StackPanel><StackPanel Grid.Column="2" Margin="8,0,0,0"><TextBlock Text="Путь DoH (HTTPS / HTTP3)" Margin="0,0,0,4"/><TextBox x:Name="NetworkPathBox"/></StackPanel></Grid><CheckBox x:Name="NetworkFakeIPBox" Content="FakeIP · сопоставлять DNS-имена с адресами внутри туннеля" Margin="4,10,4,4" ToolTip="Только общий TUN. Сопоставления живут в памяти до отключения; DNS-правила с отдельным резолвером имеют приоритет."/><WrapPanel Margin="0,6,0,6"><StackPanel Margin="0,0,16,0"><TextBlock Text="Кэш DNS" Margin="0,0,0,4"/><ComboBox x:Name="NetworkCacheModeBox" Width="200" SelectedIndex="0" SelectionChanged="NetworkDNSMode_Changed"><ComboBoxItem Content="По умолчанию" Tag="default"/><ComboBoxItem Content="Отключён" Tag="disabled"/><ComboBoxItem Content="Ограничить размер" Tag="bounded"/></ComboBox></StackPanel><StackPanel><TextBlock Text="Записей (128–65536)" Margin="0,0,0,4"/><TextBox x:Name="NetworkCacheCapacityBox" Width="170" MaxLength="5"/></StackPanel></WrapPanel><TextBlock Text="Правила: тип | действие | значение. Примеры: domain | proxy | login.example; domain-suffix | direct | example.org; cidr | reject | 192.0.2.0/24; process | proxy | C:\Apps\Browser\browser.exe. Типы: domain, domain-suffix, cidr, process. Действия: proxy, direct, reject. Максимум 64 правила; порядок строк сохраняется." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5"/><TextBox x:Name="NetworkRulesBox" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="110" MaxHeight="220" FontFamily="Consolas"/><TextBlock Text="Additional DNS resolvers: transport | IP | TLS name | port | path (one per line; blank port and path use defaults). These resolvers also use the proxy." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5"/><TextBox x:Name="NetworkResolversBox" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="72" MaxHeight="160" FontFamily="Consolas"/><TextBlock Text="DNS rules: domain or domain-suffix | domain | resolver number (starting at 1). Line order is preserved; the default DNS rule remains last." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5"/><TextBox x:Name="NetworkDNSRulesBox" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="72" MaxHeight="160" FontFamily="Consolas"/><CheckBox x:Name="NetworkAllowLANBox" Content="Allow direct access to private IPv4 and IPv6 ULA networks" IsChecked="False" Margin="4,10,4,4" ToolTip="Adds a tunnel bypass only for private IPv4 and IPv6 ULA ranges. Off by default."/><WrapPanel Margin="0,8,0,0"><Button x:Name="SaveNetworkPreferencesButton" Content="Сохранить DNS и правила" Background="{StaticResource Accent}" Foreground="White" IsEnabled="False" Click="SaveNetworkPreferences_Click"/><Button x:Name="ReloadNetworkPreferencesButton" Content="Обновить сведения" IsEnabled="False" Click="ReloadNetworkPreferences_Click"/><TextBlock x:Name="NetworkPreferencesStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4"/></WrapPanel></StackPanel></Expander>      <Expander x:Name="ProfileOrganizationPanel" Grid.Row="4" Header="Копировать или переместить профиль" IsExpanded="False" Margin="0,0,0,12"><StackPanel Margin="0,10,0,0"><TextBlock Text="Копия не подключается автоматически. Управляемые подпиской профили можно копировать, но перемещать можно только между ручными группами. Перемещение сохраняет место профиля в порядке хранения и резервного подключения." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10"/><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><StackPanel Margin="0,0,8,0"><TextBlock Text="Название копии" Margin="0,0,0,4"/><TextBox x:Name="ProfileOrganizationNameBox"/></StackPanel><StackPanel Grid.Column="1" Margin="8,0,0,0"><TextBlock Text="Целевая группа" Margin="0,0,0,4"/><ComboBox x:Name="ProfileOrganizationGroupBox" IsEditable="True" IsTextSearchEnabled="True"/></StackPanel></Grid><WrapPanel Margin="0,8,0,0"><Button x:Name="DuplicateProfileButton" Content="Создать копию" IsEnabled="False" Background="{StaticResource Accent}" Foreground="White" Click="DuplicateProfile_Click"/><Button x:Name="MoveProfileButton" Content="Переместить" IsEnabled="False" Click="MoveProfile_Click"/><Button x:Name="ReloadProfileOrganizationButton" Content="Обновить сведения" IsEnabled="False" Click="ReloadProfileOrganization_Click"/><TextBlock x:Name="ProfileOrganizationStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4"/></WrapPanel></StackPanel></Expander>
-      <Expander x:Name="GroupResultsPanel" Grid.Row="6" Header="Результаты проверки группы" Visibility="Collapsed" Margin="0,0,0,16"><StackPanel Margin="0,12,0,0"><TextBlock Text="Время включает запуск движка, HTTPS-проверку и очистку. Это не ping и не скорость загрузки. WG/AWG и профили с пользовательскими DNS или правилами маршрутизации показывают только результат проверки конфигурации и не участвуют в выборе лучшего результата." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10"/><WrapPanel Margin="0,0,0,8"><ComboBox x:Name="GroupResultSortBox" Width="178" SelectedIndex="0" SelectionChanged="GroupResultOptions_Changed" ToolTip="Порядок результатов"><ComboBoxItem Content="Порядок профилей" Tag="stored"/><ComboBoxItem Content="По времени проверки" Tag="duration"/></ComboBox><ComboBox x:Name="GroupResultFilterBox" Width="160" SelectedIndex="0" SelectionChanged="GroupResultOptions_Changed" ToolTip="Фильтр результатов"><ComboBoxItem Content="Все результаты" Tag="all"/><ComboBoxItem Content="Доступные" Tag="reachable"/><ComboBoxItem Content="С ошибкой" Tag="failed"/><ComboBoxItem Content="Только конфигурация" Tag="config-only"/></ComboBox><Button x:Name="SelectFastestResultButton" Content="Выбрать лучший результат" IsEnabled="False" Click="SelectFastestResult_Click" ToolTip="Выбирает лучший результат из всей проверки, независимо от текущего фильтра."/><Button x:Name="ClearGroupResultsButton" Content="Очистить результаты" IsEnabled="False" Click="ClearGroupResults_Click"/></WrapPanel><TextBlock x:Name="GroupResultsInfo" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10"/><ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="GroupResults"><ItemsControl.ItemTemplate><DataTemplate><StackPanel Margin="0,0,0,12"><ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold"/><TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,4,0,0"/><TextBlock Text="{Binding TimingLabel}" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="12"/></StackPanel></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer></StackPanel></Expander>
-     </Grid>
-     <StackPanel x:Name="SubscriptionsPanel" Visibility="Collapsed">
-      <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="Сохранённые группы подписок" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center"/><Button x:Name="ReloadSubscriptionsButton" Grid.Column="1" Content="Обновить список" Click="ReloadSubscriptions_Click"/><Button x:Name="ImportSubscriptionButton" Grid.Column="2" Content="Импортировать подписку" Click="Subscription_Click"/></Grid>
-      <TextBlock Text="Данные об использовании и сроке действия сообщает провайдер. Они могут отсутствовать." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10"/>
-      <ListBox x:Name="SubscriptionGroupsList" SelectionChanged="SubscriptionGroups_SelectionChanged" MaxHeight="250" MinHeight="76" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
-       <ListBox.ItemTemplate><DataTemplate><Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><ui:EmojiText Value="{Binding Group}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding ProfileCount, StringFormat={}{0} проф.}" Foreground="{StaticResource Muted}" Margin="0,3,0,0"/></StackPanel><TextBlock Grid.Column="1" Text="{Binding UpdatedAt}" Foreground="{StaticResource Muted}" TextWrapping="Wrap" MaxWidth="220" VerticalAlignment="Center" Margin="12,0,0,0"/></Grid></Border></DataTemplate></ListBox.ItemTemplate>
-      </ListBox>
-      <TextBlock x:Name="SubscriptionEmptyHint" Text="Сохранённых подписок пока нет. Импортируй подписку, чтобы добавить группу." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="10,10,10,18" Visibility="Collapsed"/>
-      <Border x:Name="SubscriptionDetails" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,8,0,16" Visibility="Collapsed">
-       <StackPanel><TextBlock x:Name="SubscriptionGroupTitle" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock x:Name="SubscriptionProfileCount" Foreground="{StaticResource Muted}" Margin="0,4,0,14"/>
-        <Grid Margin="0,0,0,14"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Использование" FontWeight="SemiBold"/><TextBlock x:Name="SubscriptionUsage" Grid.Column="1" Text="Не сообщается" TextWrapping="Wrap" Margin="8,0,18,0"/><TextBlock Text="Срок" Grid.Column="2" FontWeight="SemiBold"/><TextBlock x:Name="SubscriptionExpiry" Grid.Column="3" Text="Не сообщается" TextWrapping="Wrap" Margin="8,0,0,0"/></Grid>
-        <TextBlock x:Name="SubscriptionUpdatedAt" Foreground="{StaticResource Muted}" Margin="0,0,0,14"/>
-        <WrapPanel><Button x:Name="CancelSubscriptionDownloadButton" Content="Отменить загрузку" Click="CancelSubscriptionDownload_Click" Visibility="Collapsed"/><Button x:Name="RefreshSubscriptionButton" Content="Проверить обновления" Background="{StaticResource Accent}" Foreground="White" Click="RefreshSubscription_Click"/><TextBlock x:Name="SubscriptionRefreshUnavailable" Text="Обновление сейчас недоступно" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="8,0,0,0" Visibility="Collapsed"/></WrapPanel>
-               <Border Background="{StaticResource InfoSurface}" CornerRadius="6" Padding="12" Margin="0,14,0,0"><StackPanel><TextBlock Text="Расписание проверки обновлений" FontWeight="SemiBold"/><TextBlock Text="Работает, пока окно OneTunnel открыто. По расписанию создаётся только предпросмотр; профили не применяются автоматически." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,4,0,8"/><WrapPanel><CheckBox x:Name="ScheduleEnabledBox" Content="Включить расписание" VerticalAlignment="Center" Margin="4,4,12,4"/><TextBlock Text="Интервал, минут" VerticalAlignment="Center" Margin="4,0,6,0"/><TextBox x:Name="ScheduleIntervalBox" Width="100"/></WrapPanel><WrapPanel Margin="0,8,0,0"><Button x:Name="SaveSubscriptionScheduleButton" Content="Сохранить расписание" IsEnabled="False" Click="SaveSubscriptionSchedule_Click"/><TextBlock x:Name="ScheduleStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4"/></WrapPanel></StackPanel></Border></StackPanel>
-      </Border>
-      <Border x:Name="SubscriptionPreviewPanel" Background="{StaticResource InfoSurface}" CornerRadius="6" Padding="16" Margin="0,0,0,16" Visibility="Collapsed">
-       <StackPanel><TextBlock Text="Предпросмотр изменений" FontSize="18" FontWeight="SemiBold"/><TextBlock x:Name="SubscriptionPreviewInfo" TextWrapping="Wrap" Margin="0,6,0,10"/><TextBlock x:Name="SubscriptionPreviewMetadata" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10"/><ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto"><ItemsControl x:Name="SubscriptionChangesList"><ItemsControl.ItemTemplate><DataTemplate><Grid Margin="0,3"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><TextBlock Text="{Binding Kind}" FontWeight="SemiBold" Margin="0,0,12,0"/><ui:EmojiText Grid.Column="1" Value="{Binding Name}" TextWrapping="Wrap"/><TextBlock Grid.Column="2" Text="{Binding Protocol}" Foreground="{StaticResource Muted}" Margin="12,0,0,0"/></Grid></DataTemplate></ItemsControl.ItemTemplate></ItemsControl></ScrollViewer><WrapPanel Margin="0,14,0,0"><Button x:Name="ApplySubscriptionButton" Content="Применить изменения" Background="{StaticResource Accent}" Foreground="White" Click="ApplySubscription_Click"/><Button x:Name="CancelSubscriptionPreviewButton" Content="Отменить" Click="CancelSubscriptionPreview_Click"/><TextBlock x:Name="SubscriptionApplyUnavailable" Text="Предпросмотр нельзя применить сейчас" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="8,0,0,0" Visibility="Collapsed"/></WrapPanel></StackPanel>
-      </Border>
-     </StackPanel>
-     <StackPanel x:Name="EditorPanel" Visibility="Collapsed">
-      <TextBlock x:Name="EditorTitle" Text="Новое подключение" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,18"/>
-      <Grid Margin="0,0,0,6"><TextBlock Text="Название" VerticalAlignment="Center"/><Button x:Name="EmojiPickerButton" Content="Эмодзи и флаги" HorizontalAlignment="Right" Padding="10,5" Margin="0" Click="EmojiPicker_Click"/></Grid><TextBox x:Name="NameBox" MaxLength="4096" Margin="0,0,0,6" FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol"/><ui:EmojiText x:Name="NamePreview" Value="{Binding Text, ElementName=NameBox}" FontSize="16" MinHeight="20" Margin="0,0,0,12"/>
-      <TextBlock Text="Группа (для подписки — название группы)" Margin="0,0,0,6"/><ComboBox x:Name="GroupBox" IsEditable="True" Margin="0,0,0,14"/>
-      <TextBlock x:Name="DetectedProtocol" Text="Протокол определится по конфигурации" Foreground="{StaticResource Muted}" Margin="0,0,0,14"/><ComboBox x:Name="ProtocolBox" Visibility="Collapsed"/>
-      <TextBlock Text="Конфигурация, ссылка подключения или HTTPS-подписка" Margin="0,0,0,6"/><TextBox x:Name="SourceBox" TextChanged="Source_Changed" AcceptsReturn="True" Height="185" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" SpellCheck.IsEnabled="False" MaxLength="4194304"/>
-      <TextBlock Text="Здесь видны приватные ключи. Не отправляй скриншоты этого поля." FontSize="12" Foreground="{StaticResource Muted}" Margin="0,7,0,14"/><WrapPanel Margin="0,0,0,14"><Button Content="Из файла" Click="Import_Click"/><Button Content="Вставить из буфера" Click="Paste_Click"/></WrapPanel>
-      <Expander x:Name="ReliabilityExpander" Header="Восстановление соединения" Margin="0,4,0,18"><StackPanel Margin="0,12,0,0"><CheckBox x:Name="AutoReconnectCheck" Content="Переподключаться при обрыве" Margin="0,0,0,12"/><CheckBox x:Name="FallbackCheck" Content="Использовать совместимые резервные серверы этой группы" IsEnabled="{Binding IsChecked, ElementName=AutoReconnectCheck}" Margin="0,0,0,10"/><CheckBox x:Name="QualityCheck" Content="Автоматически выбирать сервер по качеству" IsEnabled="{Binding IsChecked, ElementName=FallbackCheck}" Margin="0,0,0,10"/><TextBlock Text="Выбор по качеству: три успешных HTTPS-замера, выигрыш от 25% и 50 мс, удержание сервера от 2 минут. Начинается с выбранного сервера. Настройки DNS и маршрутов сохраняются. При переключении локальный адрес системного прокси остаётся прежним. Если правила запрещают проверочный адрес или направляют его в обход сервера, замер не используется для выбора." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10"/><TextBlock Text="До 9 попыток, до 8 резервных серверов в порядке списка. В режиме всего устройства kill switch сохраняется между попытками. Если восстановить связь не удалось, блокировка остаётся до явного отключения. После аварии службы требуется ручное восстановление." TextWrapping="Wrap" Foreground="{StaticResource Muted}"/></StackPanel></Expander>
-      <Expander x:Name="TransportExpander" Header="Фрагментация, шумы и MUX" Margin="0,4,0,18"><StackPanel Margin="0,14,0,0"><TextBlock Text="Настройки этого профиля сохраняются при обновлении подписки. По умолчанию выключены; применяются при следующем подключении." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,16"/><CheckBox x:Name="FragmentCheck" Content="Фрагментация TLS" FontWeight="SemiBold" Margin="0,0,0,6"/><TextBlock Text="VLESS с TLS/REALITY поверх TCP. Делит приветствие TLS на части; может замедлить подключение." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/><WrapPanel IsEnabled="{Binding IsChecked, ElementName=FragmentCheck}" Margin="0,0,0,18"><StackPanel Margin="0,0,20,0"><Label Content="Размер частей, байт" Target="{Binding ElementName=FragmentLengthBox}"/><TextBox x:Name="FragmentLengthBox" Text="100-200" Width="140" MaxLength="12"/></StackPanel><StackPanel><Label Content="Интервал, мс" Target="{Binding ElementName=FragmentIntervalBox}"/><TextBox x:Name="FragmentIntervalBox" Text="10-20" Width="140" MaxLength="12"/></StackPanel></WrapPanel><CheckBox x:Name="NoiseCheck" Content="Шумы UDP" FontWeight="SemiBold" Margin="0,0,0,6"/><TextBlock Text="Случайный пакет перед UDP-соединением: Hysteria2 или VLESS KCP/Hysteria. Сервер должен принимать такой трафик." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/><WrapPanel IsEnabled="{Binding IsChecked, ElementName=NoiseCheck}" Margin="0,0,0,18"><StackPanel Margin="0,0,20,0"><Label Content="Размер пакета, байт" Target="{Binding ElementName=NoiseLengthBox}"/><TextBox x:Name="NoiseLengthBox" Text="50-150" Width="140" MaxLength="12"/></StackPanel><StackPanel><Label Content="Задержка, мс" Target="{Binding ElementName=NoiseDelayBox}"/><TextBox x:Name="NoiseDelayBox" Text="10-20" Width="140" MaxLength="12"/></StackPanel></WrapPanel><CheckBox x:Name="MuxCheck" Content="MUX · несколько потоков в одном соединении" FontWeight="SemiBold" Margin="0,0,0,6"/><TextBlock Text="Xray MUX/XUDP — VLESS TCP/WS/HTTPUpgrade без Vision. h2mux/smux/yamux — Shadowsocks и Trojan. Режим должен поддерживаться сервером. У XHTTP, gRPC и Hysteria объединение потоков встроено. Для h2mux/smux/yamux укажи число соединений или оставь 0, чтобы ограничивать потоки в сессии." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/><StackPanel IsEnabled="{Binding IsChecked, ElementName=MuxCheck}" HorizontalAlignment="Left"><Label Content="Одновременных потоков (1–128)" Target="{Binding ElementName=MuxConcurrencyBox}"/><TextBox x:Name="MuxConcurrencyBox" Text="8" Width="140" MaxLength="3" HorizontalAlignment="Left"/><WrapPanel Margin="0,8,0,0"><StackPanel Margin="0,0,16,8"><Label Content="Режим MUX"/><ComboBox x:Name="MuxProtocolBox" Width="180" SelectedIndex="0" SelectionChanged="MuxProtocol_Changed"><ComboBoxItem Content="Xray MUX / XUDP" Tag=""/><ComboBoxItem Content="h2mux" Tag="h2mux"/><ComboBoxItem Content="smux" Tag="smux"/><ComboBoxItem Content="yamux" Tag="yamux"/></ComboBox></StackPanel><StackPanel Margin="0,0,16,8"><Label Content="Соединений (0 — авто)"/><TextBox x:Name="MuxMaxConnectionsBox" Width="160" Text="0" MaxLength="2" TextChanged="MuxConnections_Changed"/></StackPanel><StackPanel Margin="0,0,0,8"><Label Content="Минимум потоков"/><TextBox x:Name="MuxMinStreamsBox" Width="140" Text="0" MaxLength="3"/></StackPanel></WrapPanel><CheckBox x:Name="MuxPaddingBox" Content="Padding для h2mux/smux/yamux" Margin="4,0,4,8"/><WrapPanel><StackPanel Margin="0,0,16,0"><Label Content="Потоков XUDP (0 — авто)"/><TextBox x:Name="XUDPConcurrencyBox" Width="180" Text="0" MaxLength="3"/></StackPanel><StackPanel><Label Content="UDP 443 в XUDP"/><ComboBox x:Name="MuxUDP443Box" Width="180" SelectedIndex="0"><ComboBoxItem Content="По умолчанию (skip)" Tag=""/><ComboBoxItem Content="Пропускать вне XUDP" Tag="skip"/><ComboBoxItem Content="Разрешить в XUDP" Tag="allow"/><ComboBoxItem Content="Отклонять" Tag="reject"/></ComboBox></StackPanel></WrapPanel></StackPanel></StackPanel></Expander>
-      <TextBlock Text="Подписка: импорт отдельных серверов без маршрутизации и балансировщиков Xray. Повторный импорт пропускает дубликаты; автопроверки обновлений нет." Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,12"/>
-     </StackPanel>
-     <StackPanel x:Name="EnginesPanel" Visibility="Collapsed"><TextBlock Text="Движки и восстановление" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,18"/><TextBlock x:Name="EngineDetails" TextWrapping="Wrap" LineHeight="26" Margin="0,0,0,18"/>      <Border x:Name="BackupPanel" Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,18"><StackPanel><TextBlock Text="Зашифрованная резервная копия" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="Копия содержит библиотеку, настройки и источники подписок в зашифрованном файле. Пароль не сохраняется. Восстановление полностью заменит локальную библиотеку только после подтверждения." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,6,0,10"/><TextBlock Text="Пароль для экспорта" Margin="0,0,0,4"/><PasswordBox x:Name="BackupPasswordBox" MaxLength="1024"/><Button x:Name="ExportBackupButton" Content="Экспортировать резервную копию…" Background="{StaticResource Accent}" Foreground="White" HorizontalAlignment="Left" Click="ExportBackup_Click"/><Separator Margin="0,12,0,12"/><TextBlock Text="Пароль для восстановления" Margin="0,0,0,4"/><PasswordBox x:Name="RestorePasswordBox" MaxLength="1024"/><WrapPanel Margin="0,8,0,0"><Button x:Name="PreviewBackupButton" Content="Проверить резервную копию…" Click="PreviewBackup_Click"/><Button x:Name="CancelBackupPreviewButton" Content="Отменить проверку" IsEnabled="False" Click="CancelBackupPreview_Click"/><CheckBox x:Name="AddRestoreSchedulesBox" Content="Включить расписания из копии (при открытом окне OneTunnel)" IsChecked="False" Margin="4,8,4,4"/><Button x:Name="ApplyBackupRestoreButton" Content="Заменить локальную библиотеку…" IsEnabled="False" Background="{StaticResource Accent}" Foreground="White" Click="ApplyBackupRestore_Click"/></WrapPanel><TextBlock x:Name="BackupStatus" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0"/></StackPanel></Border><TextBlock Text="Движки встроены в Go-ядро. Необходимые компоненты и лицензии входят в комплект приложения." Foreground="{StaticResource Muted}" Margin="0,0,0,18"/><Button x:Name="InstallServiceButton" Content="Установить / обновить службу" HorizontalAlignment="Left" Click="InstallService_Click" Margin="0,0,0,12"/><Button x:Name="StartServiceButton" Content="Запустить службу" HorizontalAlignment="Left" Click="StartService_Click" Margin="0,0,0,12"/><TextBlock Text="Служба управляет подключением. Закрытие окна сохраняет VPN; для возврата обычной сети нажми «Отключить». Установка требует подтверждения Windows один раз." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,12"/><Button x:Name="LegacyRecoveryButton" Content="Восстановить подключение прежней версии от администратора" HorizontalAlignment="Left" Click="Elevate_Click" Margin="0,0,0,16"/><TextBlock Text="После аварийного завершения восстановление удалит только туннель OneTunnel и его временные настройки. Системный прокси Windows приложение не меняет." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/><WrapPanel Margin="0,0,0,24"><Button x:Name="RecoveryButton" Content="Очистить оставшееся подключение" Click="Recovery_Click"/><Button Content="Назад к подключению" Click="Cancel_Click"/></WrapPanel></StackPanel>
-     <StackPanel x:Name="ActivityPanel" Visibility="Collapsed"><TextBlock Text="События" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,14"/><TextBlock Text="Последние события приложения" Foreground="{StaticResource Muted}" Margin="0,0,0,12"/><TextBox x:Name="EventLog" IsReadOnly="True" MinHeight="220" FontSize="12" Background="White" BorderBrush="{StaticResource Line}" Padding="12" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap"/><Border Background="{StaticResource InfoSurface}" CornerRadius="6" Padding="16" Margin="0,18,0,0"><StackPanel><TextBlock Text="Диагностический отчёт" FontSize="18" FontWeight="SemiBold"/><TextBlock Text="Содержит безопасное резюме комплекта и профилей. Не включает секреты и не проверяет подключение, утечки или kill switch." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,12"/><WrapPanel><Button x:Name="GenerateDiagnosticsButton" Content="Сформировать отчёт" Background="{StaticResource Accent}" Foreground="White" Click="GenerateDiagnostics_Click"/><Button x:Name="CopyDiagnosticsButton" Content="Копировать" IsEnabled="False" Click="CopyDiagnostics_Click"/><Button x:Name="SaveDiagnosticsButton" Content="Сохранить…" IsEnabled="False" Click="SaveDiagnostics_Click"/></WrapPanel><TextBox x:Name="DiagnosticsReport" IsReadOnly="True" AcceptsReturn="True" Height="240" FontFamily="Consolas" FontSize="12" Background="White" BorderBrush="{StaticResource Line}" Padding="12" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="NoWrap"/></StackPanel></Border></StackPanel>
-          <StackPanel x:Name="UserSettingsPanel" Visibility="Collapsed">
-      <TextBlock Text="User automation and Windows integration" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,8"/>
-      <TextBlock Text="Automatic connection is off by default. Unknown networks are treated as public. Saving preferences does not activate the Windows proxy or register startup; those actions require separate confirmation." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,14"/>
-      <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,14"><StackPanel>
-       <TextBlock Text="Automatic connection" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
-       <CheckBox x:Name="UserAutoConnectBox" Content="Enable automatic connection" IsChecked="False" Checked="UserSettingsDraft_Changed" Unchecked="UserSettingsDraft_Changed" Margin="4,4,4,8"/>
-       <Grid Margin="0,0,0,6"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><TextBlock Text="Profile" VerticalAlignment="Center" Margin="4,0,12,0"/><ComboBox x:Name="UserAutoConnectProfileBox" Grid.Column="1" DisplayMemberPath="Label" SelectionChanged="UserAutoConnectProfile_Changed" MinWidth="260"/></Grid>
-       <CheckBox x:Name="UserFullDeviceBox" Content="Use full-device mode" IsChecked="False" Checked="UserSettingsDraft_Changed" Unchecked="UserSettingsDraft_Changed" Margin="4,4"/>
-       <CheckBox x:Name="UserAllowTrustedBox" Content="Allow automatic connection on trusted networks (Private or Domain)" IsChecked="False" Checked="UserSettingsDraft_Changed" Unchecked="UserSettingsDraft_Changed" Margin="4,4"/>
-       <CheckBox x:Name="UserAllowPublicBox" Content="Allow automatic connection on public or unknown networks" IsChecked="False" Checked="UserSettingsDraft_Changed" Unchecked="UserSettingsDraft_Changed" Margin="4,4"/>
-       <TextBlock x:Name="UserNetworkCategory" Text="Network category: unavailable" Foreground="{StaticResource Muted}" Margin="4,8,4,2"/>
-       <TextBlock x:Name="UserAutoConnectInhibited" Text="Automatic reconnect is inhibited after a manual disconnect." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,2,4,4" Visibility="Collapsed"/>
-       <WrapPanel Margin="0,8,0,0"><Button x:Name="SaveUserSettingsButton" Content="Save preferences" Background="{StaticResource Accent}" Foreground="White" IsEnabled="False" Click="SaveUserSettings_Click"/><Button x:Name="ReloadUserSettingsButton" Content="Reload settings" Click="ReloadUserSettings_Click"/></WrapPanel>
-      </StackPanel></Border>
-      <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,14"><StackPanel>
-       <TextBlock Text="Windows system proxy" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
-       <CheckBox x:Name="UserSystemProxyBox" Content="Allow OneTunnel to use the current user's Windows system proxy" IsChecked="False" Checked="UserSettingsDraft_Changed" Unchecked="UserSettingsDraft_Changed" Margin="4,4,4,8"/>
-       <TextBlock Text="When enabled, OneTunnel uses the confirmed local listener and preserves the previous current-user proxy settings for restoration. PAC and automatic proxy settings are preserved." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,0,4,8"/>
-       <TextBlock x:Name="UserProxyStatus" Text="System proxy: off" Foreground="{StaticResource Muted}" Margin="4,0,4,4"/>
-       <WrapPanel><Button x:Name="EnableUserProxyButton" Content="Enable system proxy…" IsEnabled="False" Click="EnableUserProxy_Click"/><Button x:Name="DisableUserProxyButton" Content="Disable system proxy…" IsEnabled="False" Click="DisableUserProxy_Click"/></WrapPanel>
-      </StackPanel></Border>
-      <Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,14"><StackPanel>
-       <TextBlock Text="Windows startup" FontSize="18" FontWeight="SemiBold" Margin="0,0,0,8"/>
-       <TextBlock Text="Startup registration is a separate current-user setting. It does not connect automatically." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,0,4,8"/>
-       <TextBlock Text="Application path" FontWeight="SemiBold" Margin="4,0,4,4"/>
-       <TextBox x:Name="UserStartupPath" IsReadOnly="True" Text="Unavailable" TextWrapping="Wrap" Margin="4,0,4,8"/>
-       <TextBlock x:Name="UserStartupStatus" Text="Startup: not registered" Foreground="{StaticResource Muted}" Margin="4,0,4,4"/>
-       <WrapPanel><Button x:Name="EnableUserStartupButton" Content="Register startup…" IsEnabled="False" Click="EnableUserStartup_Click"/><Button x:Name="DisableUserStartupButton" Content="Remove startup…" IsEnabled="False" Click="DisableUserStartup_Click"/></WrapPanel>
-      </StackPanel></Border>
-      <TextBlock x:Name="UserSettingsStatus" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,0,4,12"/>
-     </StackPanel>
-     <StackPanel x:Name="GroupsPanel" Visibility="Collapsed"><TextBlock Text="Группы подключений" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,8"/><TextBlock Text="Управление группами профилей и сохранённых подписок." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/><TextBlock Text="Удаление группы подписки также удаляет локальный источник для обновления. Удалённые профили не импортируются автоматически." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12"/><WrapPanel Margin="0,0,0,8"><Button x:Name="ReloadGroupsButton" Content="Обновить список" Click="ReloadGroups_Click"/><TextBlock x:Name="GroupsStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4"/></WrapPanel><ListBox x:Name="ConfigurationGroupsList" SelectionChanged="ConfigurationGroupsList_SelectionChanged" Background="Transparent" BorderThickness="0" MaxHeight="360" MinHeight="120" HorizontalContentAlignment="Stretch"><ListBox.ItemTemplate><DataTemplate><Border Background="White" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><StackPanel><ui:EmojiText Value="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap"/><TextBlock Text="{Binding ProfileCount, StringFormat={}{0} проф.}" Foreground="{StaticResource Muted}" Margin="0,3,0,0"/></StackPanel><TextBlock Grid.Column="1" Text="Подписка" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,0,0"><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsSubscription}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></Grid></Border></DataTemplate></ListBox.ItemTemplate></ListBox><TextBlock x:Name="GroupsEmptyHint" Text="Групп пока нет." Foreground="{StaticResource Muted}" HorizontalAlignment="Center" Margin="16" Visibility="Collapsed"/><TextBlock Text="Название группы" FontWeight="SemiBold" Margin="0,14,0,6"/><TextBox x:Name="RenameGroupBox" IsEnabled="False"/><WrapPanel Margin="0,8,0,0"><Button x:Name="RenameGroupButton" Content="Переименовать" IsEnabled="False" Background="{StaticResource Accent}" Foreground="White" Click="RenameGroup_Click"/><Button x:Name="DeleteGroupButton" Content="Удалить группу" IsEnabled="False" Click="DeleteGroup_Click"/></WrapPanel></StackPanel>
+    </Border>
+    <Grid Grid.Column="2" Margin="16,16,16,0" x:Name="WorkspaceHost" Background="{StaticResource ContentBackground}">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+      <Grid x:Name="WorkspaceHeader" Margin="0,0,0,16">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="244" />
+          <ColumnDefinition Width="44" />
+          <ColumnDefinition Width="44" />
+        </Grid.ColumnDefinitions>
+        <TextBlock x:Name="PageTitle" Text="Подключения" FontSize="24" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+        <Border x:Name="SearchContainer" Grid.Column="1" Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="6">
+          <Grid>
+            <Path Data="M7,1A6,6 0 1 0 7,13A6,6 0 1 0 7,1 M11.5,11.5L17,17" Stroke="{StaticResource Muted}" StrokeThickness="1.4" Width="17" Height="17" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0,0,0" />
+            <TextBlock Text="Поиск серверов" Foreground="{StaticResource Muted}" Margin="32,0,28,0" IsHitTestVisible="False" VerticalAlignment="Center">
+              <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                  <Setter Property="Visibility" Value="Collapsed" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                      <Setter Property="Visibility" Value="Visible" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </TextBlock.Style>
+            </TextBlock>
+            <TextBox x:Name="SearchBox" MinHeight="36" ToolTip="Поиск по названию, группе и протоколу" TextChanged="Search_Changed" Height="36" Padding="32,5,30,5" Background="Transparent" BorderThickness="0" />
+            <Button x:Name="ClearSearchButton" Width="26" Height="28" MinHeight="0" Margin="0,0,2,0" Padding="7" HorizontalAlignment="Right" VerticalAlignment="Center" Background="Transparent" BorderThickness="0" ToolTip="Очистить поиск" AutomationProperties.Name="Очистить поиск" Click="ClearSearch_Click">
+              <Button.Style>
+                <Style TargetType="Button" BasedOn="{StaticResource StarButton}">
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding Text, ElementName=SearchBox}" Value="">
+                      <Setter Property="Visibility" Value="Collapsed" />
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Button.Style>
+              <Path Data="M1,1L9,9 M9,1L1,9" Stroke="{StaticResource Muted}" StrokeThickness="1.4" />
+            </Button>
+          </Grid>
+        </Border>
+        <Button Grid.Column="2" x:Name="ImportConnectionButton" Background="{StaticResource Surface}" Foreground="White" HorizontalAlignment="Right" VerticalAlignment="Center" Click="Subscription_Click" Width="36" Height="36" Padding="9" Margin="8,0,0,0" BorderBrush="{StaticResource Line}" ToolTip="Добавить или импортировать профиль" AutomationProperties.Name="Добавить или импортировать профиль">
+          <Path Data="M8,1V15 M1,8H15" Stroke="{StaticResource Ink}" StrokeThickness="1.5" />
+        </Button>
+        <Button x:Name="LibraryMenuButton" Grid.Column="3" Width="36" Height="36" Margin="8,0,0,0" Padding="9" ToolTip="Действия с библиотекой" AutomationProperties.Name="Действия с библиотекой" Click="LibraryMenu_Click">
+          <Path Data="M7,2L7,3 M7,7L7,8 M7,12L7,13" Stroke="{StaticResource Ink}" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+        </Button>
+      </Grid>
+      <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" x:Name="WorkspaceScroll">
+        <Grid>
+          <Grid x:Name="ConnectionPanel">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="34" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid Margin="8,0,8,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="110" />
+                <ColumnDefinition Width="88" />
+                <ColumnDefinition Width="36" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="Сервер" Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="1" Text="Протокол" Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center" />
+              <TextBlock Grid.Column="2" Text="Задержка" Foreground="{StaticResource TextSecondary}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
+            </Grid>
+            <ListBox x:Name="ProfilesList" SelectionChanged="Profiles_SelectionChanged" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" MinHeight="0" IsTabStop="True" Grid.Row="1" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True">
+              <ListBox.ItemContainerStyle>
+                <Style TargetType="ListBoxItem" BasedOn="{StaticResource ProfileRowBase}">
+                  <Setter Property="Height" Value="50" />
+                  <Setter Property="Padding" Value="0" />
+                  <Setter Property="Margin" Value="0" />
+                </Style>
+              </ListBox.ItemContainerStyle>
+              <ListBox.GroupStyle>
+                <GroupStyle>
+                  <GroupStyle.ContainerStyle>
+                    <Style TargetType="GroupItem">
+                      <Setter Property="Template">
+                        <Setter.Value>
+                          <ControlTemplate TargetType="GroupItem">
+                            <Expander IsExpanded="True" Loaded="Group_Loaded" Expanded="Group_Changed" Collapsed="Group_Changed" Margin="0,4,0,8">
+                              <Expander.Header>
+                                <StackPanel Orientation="Horizontal">
+                                  <ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" MaxWidth="560" TextTrimming="CharacterEllipsis" />
+                                  <TextBlock Text="{Binding ItemCount, StringFormat=({0})}" Margin="8,0,0,0" Foreground="{StaticResource Muted}" />
+                                </StackPanel>
+                              </Expander.Header>
+                              <ItemsPresenter />
+                            </Expander>
+                          </ControlTemplate>
+                        </Setter.Value>
+                      </Setter>
+                    </Style>
+                  </GroupStyle.ContainerStyle>
+                </GroupStyle>
+              </ListBox.GroupStyle>
+              <ListBox.ItemTemplate>
+                <DataTemplate xmlns:ui="clr-namespace:OneTunnel.Controls">
+                  <Grid Height="48">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="*" />
+                      <ColumnDefinition Width="110" />
+                      <ColumnDefinition Width="88" />
+                      <ColumnDefinition Width="36" />
+                    </Grid.ColumnDefinitions>
+                    <ui:EmojiText Value="{Binding Name}" EmojiSize="24" FontSize="14" FontWeight="Normal" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Name}" VerticalAlignment="Center" Margin="4,0,12,0" ShowServerFallback="True" />
+                    <TextBlock Grid.Column="1" Text="{Binding Protocol}" Foreground="{StaticResource TextSecondary}" FontSize="14" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    <TextBlock Grid.Column="2" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="14" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap">
+                      <TextBlock.Text>
+                        <MultiBinding Converter="{StaticResource ProfileTiming}">
+                          <Binding Path="Id" />
+                          <Binding ElementName="GroupResults" Path="ItemsSource" />
+                          <Binding ElementName="GroupResults" Path="Tag" />
+                        </MultiBinding>
+                      </TextBlock.Text>
+                      <TextBlock.Foreground>
+                        <MultiBinding Converter="{StaticResource ProfileTiming}" ConverterParameter="brush">
+                          <Binding Path="Id" />
+                          <Binding ElementName="GroupResults" Path="ItemsSource" />
+                          <Binding ElementName="GroupResults" Path="Tag" />
+                        </MultiBinding>
+                      </TextBlock.Foreground>
+                    </TextBlock>
+                    <Button Grid.Column="3" Style="{StaticResource StarButton}" Tag="{Binding Id}" Click="RowFavorite_Click" ToolTip="Избранное" AutomationProperties.Name="Изменить избранное">
+                      <Button.IsEnabled>
+                        <Binding ElementName="FavoriteButton" Path="IsEnabled" />
+                      </Button.IsEnabled>
+                      <Path Data="{StaticResource StarGeometry}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform">
+                        <Path.Style>
+                          <Style TargetType="Path">
+                            <Setter Property="Fill" Value="Transparent" />
+                            <Style.Triggers>
+                              <DataTrigger Value="True">
+                                <DataTrigger.Binding>
+                                  <MultiBinding Converter="{StaticResource FavoriteState}">
+                                    <Binding Path="Id" />
+                                    <Binding RelativeSource="{RelativeSource AncestorType=Window}" Path="FavoriteSnapshot" />
+                                  </MultiBinding>
+                                </DataTrigger.Binding>
+                                <Setter Property="Fill" Value="{StaticResource AccentText}" />
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </Path.Style>
+                      </Path>
+                    </Button>
+                    <Ellipse xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" Grid.Column="0" Width="7" Height="7" Fill="{StaticResource AccentText}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0" ToolTip="Активное соединение" AutomationProperties.Name="Активное соединение">
+                      <Ellipse.Style>
+                        <Style TargetType="Ellipse">
+                          <Setter Property="Visibility" Value="Collapsed" />
+                          <Style.Triggers>
+                            <DataTrigger Value="True">
+                              <DataTrigger.Binding>
+                                <MultiBinding Converter="{StaticResource FavoriteState}" ConverterParameter="active">
+                                  <Binding Path="Id" />
+                                  <Binding RelativeSource="{RelativeSource AncestorType=Window}" Path="ActiveProfile" />
+                                </MultiBinding>
+                              </DataTrigger.Binding>
+                              <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                          </Style.Triggers>
+                        </Style>
+                      </Ellipse.Style>
+                    </Ellipse>
+                  </Grid>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock Grid.Row="1" x:Name="EmptyProfilesHint" Text="Профили не найдены. Очисти поиск или импортируй подключение." Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" Margin="22" Visibility="Collapsed" IsHitTestVisible="False" />
+          </Grid>
+          <StackPanel x:Name="SubscriptionsPanel" Visibility="Collapsed">
+            <Grid Margin="0,0,0,14">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <TextBlock Text="Сохранённые группы подписок" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+              <Button x:Name="ReloadSubscriptionsButton" Grid.Column="1" Content="Обновить список" Click="ReloadSubscriptions_Click" />
+              <Button x:Name="ImportSubscriptionButton" Grid.Column="2" Content="Импортировать подписку" Click="Subscription_Click" />
+            </Grid>
+            <TextBlock Text="Данные об использовании и сроке действия сообщает провайдер. Они могут отсутствовать." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10" />
+            <ListBox x:Name="SubscriptionGroupsList" SelectionChanged="SubscriptionGroups_SelectionChanged" MaxHeight="250" MinHeight="76" HorizontalContentAlignment="Stretch" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel>
+                        <ui:EmojiText Value="{Binding Group}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding ProfileCount, StringFormat={}{0} проф.}" Foreground="{StaticResource Muted}" Margin="0,3,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="{Binding UpdatedAt}" Foreground="{StaticResource Muted}" TextWrapping="Wrap" MaxWidth="220" VerticalAlignment="Center" Margin="12,0,0,0" />
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock x:Name="SubscriptionEmptyHint" Text="Сохранённых подписок пока нет. Импортируй подписку, чтобы добавить группу." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="10,10,10,18" Visibility="Collapsed" />
+            <Border x:Name="SubscriptionDetails" Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,8,0,16" Visibility="Collapsed">
+              <StackPanel>
+                <TextBlock x:Name="SubscriptionGroupTitle" FontSize="20" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock x:Name="SubscriptionProfileCount" Foreground="{StaticResource Muted}" Margin="0,4,0,14" />
+                <Grid Margin="0,0,0,14">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="Использование" FontWeight="SemiBold" />
+                  <TextBlock x:Name="SubscriptionUsage" Grid.Column="1" Text="Не сообщается" TextWrapping="Wrap" Margin="8,0,18,0" />
+                  <TextBlock Text="Срок" Grid.Column="2" FontWeight="SemiBold" />
+                  <TextBlock x:Name="SubscriptionExpiry" Grid.Column="3" Text="Не сообщается" TextWrapping="Wrap" Margin="8,0,0,0" />
+                </Grid>
+                <TextBlock x:Name="SubscriptionUpdatedAt" Foreground="{StaticResource Muted}" Margin="0,0,0,14" />
+                <WrapPanel>
+                  <Button x:Name="CancelSubscriptionDownloadButton" Content="Отменить загрузку" Click="CancelSubscriptionDownload_Click" Visibility="Collapsed" />
+                  <Button x:Name="RefreshSubscriptionButton" Content="Проверить обновления" Background="{StaticResource AccentFill}" Foreground="White" Click="RefreshSubscription_Click" />
+                  <TextBlock x:Name="SubscriptionRefreshUnavailable" Text="Обновление сейчас недоступно" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="8,0,0,0" Visibility="Collapsed" />
+                </WrapPanel>
+                <Border Background="{StaticResource InfoSurface}" CornerRadius="6" Padding="12" Margin="0,14,0,0">
+                  <StackPanel>
+                    <TextBlock Text="Расписание проверки обновлений" FontWeight="SemiBold" />
+                    <TextBlock Text="Работает, пока окно OneTunnel открыто. По расписанию создаётся только предпросмотр; профили не применяются автоматически." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,4,0,8" />
+                    <WrapPanel>
+                      <CheckBox x:Name="ScheduleEnabledBox" Content="Включить расписание" VerticalAlignment="Center" Margin="4,4,12,4" />
+                      <TextBlock Text="Интервал, минут" VerticalAlignment="Center" Margin="4,0,6,0" />
+                      <TextBox x:Name="ScheduleIntervalBox" Width="100" />
+                    </WrapPanel>
+                    <WrapPanel Margin="0,8,0,0">
+                      <Button x:Name="SaveSubscriptionScheduleButton" Content="Сохранить расписание" IsEnabled="False" Click="SaveSubscriptionSchedule_Click" />
+                      <TextBlock x:Name="ScheduleStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4" />
+                    </WrapPanel>
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Border>
+            <Border x:Name="SubscriptionPreviewPanel" Background="{StaticResource InfoSurface}" CornerRadius="6" Padding="16" Margin="0,0,0,16" Visibility="Collapsed">
+              <StackPanel>
+                <TextBlock Text="Предпросмотр изменений" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock x:Name="SubscriptionPreviewInfo" TextWrapping="Wrap" Margin="0,6,0,10" />
+                <TextBlock x:Name="SubscriptionPreviewMetadata" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,10" />
+                <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl x:Name="SubscriptionChangesList">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <Grid Margin="0,3">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                          </Grid.ColumnDefinitions>
+                          <TextBlock Text="{Binding Kind}" FontWeight="SemiBold" Margin="0,0,12,0" />
+                          <ui:EmojiText Grid.Column="1" Value="{Binding Name}" TextWrapping="Wrap" />
+                          <TextBlock Grid.Column="2" Text="{Binding Protocol}" Foreground="{StaticResource Muted}" Margin="12,0,0,0" />
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+                <WrapPanel Margin="0,14,0,0">
+                  <Button x:Name="ApplySubscriptionButton" Content="Применить изменения" Background="{StaticResource AccentFill}" Foreground="White" Click="ApplySubscription_Click" />
+                  <Button x:Name="CancelSubscriptionPreviewButton" Content="Отменить" Click="CancelSubscriptionPreview_Click" />
+                  <TextBlock x:Name="SubscriptionApplyUnavailable" Text="Предпросмотр нельзя применить сейчас" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="8,0,0,0" Visibility="Collapsed" />
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+          <StackPanel x:Name="EditorPanel" Visibility="Collapsed">
+            <TextBlock x:Name="EditorTitle" Text="Новое подключение" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,18" />
+            <Grid Margin="0,0,0,6">
+              <TextBlock Text="Название" VerticalAlignment="Center" />
+              <Button x:Name="EmojiPickerButton" Content="Эмодзи и флаги" HorizontalAlignment="Right" Padding="10,5" Margin="0" Click="EmojiPicker_Click" />
+            </Grid>
+            <TextBox x:Name="NameBox" MaxLength="4096" Margin="0,0,0,6" FontFamily="Segoe UI, Segoe UI Emoji, Segoe UI Symbol" />
+            <ui:EmojiText x:Name="NamePreview" Value="{Binding Text, ElementName=NameBox}" FontSize="16" MinHeight="20" Margin="0,0,0,12" />
+            <TextBlock Text="Группа (для подписки — название группы)" Margin="0,0,0,6" />
+            <ComboBox x:Name="GroupBox" IsEditable="True" Margin="0,0,0,14" />
+            <TextBlock x:Name="DetectedProtocol" Text="Протокол определится по конфигурации" Foreground="{StaticResource Muted}" Margin="0,0,0,14" />
+            <ComboBox x:Name="ProtocolBox" Visibility="Collapsed" />
+            <TextBlock Text="Конфигурация, ссылка подключения или HTTPS-подписка" Margin="0,0,0,6" />
+            <TextBox x:Name="SourceBox" TextChanged="Source_Changed" AcceptsReturn="True" Height="185" VerticalContentAlignment="Top" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" FontFamily="Consolas" FontSize="12" SpellCheck.IsEnabled="False" MaxLength="4194304" />
+            <TextBlock Text="Здесь видны приватные ключи. Не отправляй скриншоты этого поля." FontSize="12" Foreground="{StaticResource Muted}" Margin="0,7,0,14" />
+            <WrapPanel Margin="0,0,0,14">
+              <Button Content="Из файла" Click="Import_Click" />
+              <Button Content="Вставить из буфера" Click="Paste_Click" />
+            </WrapPanel>
+            <Expander x:Name="ReliabilityExpander" Header="Восстановление соединения" Margin="0,4,0,18">
+              <StackPanel Margin="0,12,0,0">
+                <CheckBox x:Name="AutoReconnectCheck" Content="Переподключаться при обрыве" Margin="0,0,0,12" />
+                <CheckBox x:Name="FallbackCheck" Content="Использовать совместимые резервные серверы этой группы" IsEnabled="{Binding IsChecked, ElementName=AutoReconnectCheck}" Margin="0,0,0,10" />
+                <CheckBox x:Name="QualityCheck" Content="Автоматически выбирать сервер по качеству" IsEnabled="{Binding IsChecked, ElementName=FallbackCheck}" Margin="0,0,0,10" />
+                <TextBlock Text="Выбор по качеству: три успешных HTTPS-замера, выигрыш от 25% и 50 мс, удержание сервера от 2 минут. Начинается с выбранного сервера. Настройки DNS и маршрутов сохраняются. При переключении локальный адрес системного прокси остаётся прежним. Если правила запрещают проверочный адрес или направляют его в обход сервера, замер не используется для выбора." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
+                <TextBlock Text="До 9 попыток, до 8 резервных серверов в порядке списка. В режиме всего устройства kill switch сохраняется между попытками. Если восстановить связь не удалось, блокировка остаётся до явного отключения. После аварии службы требуется ручное восстановление." TextWrapping="Wrap" Foreground="{StaticResource Muted}" />
+              </StackPanel>
+            </Expander>
+            <Expander x:Name="TransportExpander" Header="Фрагментация, шумы и MUX" Margin="0,4,0,18">
+              <StackPanel Margin="0,14,0,0">
+                <TextBlock Text="Настройки этого профиля сохраняются при обновлении подписки. По умолчанию выключены; применяются при следующем подключении." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,16" />
+                <CheckBox x:Name="FragmentCheck" Content="Фрагментация TLS" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Text="VLESS с TLS/REALITY поверх TCP. Делит приветствие TLS на части; может замедлить подключение." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8" />
+                <WrapPanel IsEnabled="{Binding IsChecked, ElementName=FragmentCheck}" Margin="0,0,0,18">
+                  <StackPanel Margin="0,0,20,0">
+                    <Label Content="Размер частей, байт" Target="{Binding ElementName=FragmentLengthBox}" />
+                    <TextBox x:Name="FragmentLengthBox" Text="100-200" Width="140" MaxLength="12" />
+                  </StackPanel>
+                  <StackPanel>
+                    <Label Content="Интервал, мс" Target="{Binding ElementName=FragmentIntervalBox}" />
+                    <TextBox x:Name="FragmentIntervalBox" Text="10-20" Width="140" MaxLength="12" />
+                  </StackPanel>
+                </WrapPanel>
+                <CheckBox x:Name="NoiseCheck" Content="Шумы UDP" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Text="Случайный пакет перед UDP-соединением: Hysteria2 или VLESS KCP/Hysteria. Сервер должен принимать такой трафик." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8" />
+                <WrapPanel IsEnabled="{Binding IsChecked, ElementName=NoiseCheck}" Margin="0,0,0,18">
+                  <StackPanel Margin="0,0,20,0">
+                    <Label Content="Размер пакета, байт" Target="{Binding ElementName=NoiseLengthBox}" />
+                    <TextBox x:Name="NoiseLengthBox" Text="50-150" Width="140" MaxLength="12" />
+                  </StackPanel>
+                  <StackPanel>
+                    <Label Content="Задержка, мс" Target="{Binding ElementName=NoiseDelayBox}" />
+                    <TextBox x:Name="NoiseDelayBox" Text="10-20" Width="140" MaxLength="12" />
+                  </StackPanel>
+                </WrapPanel>
+                <CheckBox x:Name="MuxCheck" Content="MUX · несколько потоков в одном соединении" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Text="Xray MUX/XUDP — VLESS TCP/WS/HTTPUpgrade без Vision. h2mux/smux/yamux — Shadowsocks и Trojan. Режим должен поддерживаться сервером. У XHTTP, gRPC и Hysteria объединение потоков встроено. Для h2mux/smux/yamux укажи число соединений или оставь 0, чтобы ограничивать потоки в сессии." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8" />
+                <StackPanel IsEnabled="{Binding IsChecked, ElementName=MuxCheck}" HorizontalAlignment="Left">
+                  <Label Content="Одновременных потоков (1–128)" Target="{Binding ElementName=MuxConcurrencyBox}" />
+                  <TextBox x:Name="MuxConcurrencyBox" Text="8" Width="140" MaxLength="3" HorizontalAlignment="Left" />
+                  <WrapPanel Margin="0,8,0,0">
+                    <StackPanel Margin="0,0,16,8">
+                      <Label Content="Режим MUX" />
+                      <ComboBox x:Name="MuxProtocolBox" Width="180" SelectedIndex="0" SelectionChanged="MuxProtocol_Changed">
+                        <ComboBoxItem Content="Xray MUX / XUDP" Tag="" />
+                        <ComboBoxItem Content="h2mux" Tag="h2mux" />
+                        <ComboBoxItem Content="smux" Tag="smux" />
+                        <ComboBoxItem Content="yamux" Tag="yamux" />
+                      </ComboBox>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,16,8">
+                      <Label Content="Соединений (0 — авто)" />
+                      <TextBox x:Name="MuxMaxConnectionsBox" Width="160" Text="0" MaxLength="2" TextChanged="MuxConnections_Changed" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,0,8">
+                      <Label Content="Минимум потоков" />
+                      <TextBox x:Name="MuxMinStreamsBox" Width="140" Text="0" MaxLength="3" />
+                    </StackPanel>
+                  </WrapPanel>
+                  <CheckBox x:Name="MuxPaddingBox" Content="Padding для h2mux/smux/yamux" Margin="4,0,4,8" />
+                  <WrapPanel>
+                    <StackPanel Margin="0,0,16,0">
+                      <Label Content="Потоков XUDP (0 — авто)" />
+                      <TextBox x:Name="XUDPConcurrencyBox" Width="180" Text="0" MaxLength="3" />
+                    </StackPanel>
+                    <StackPanel>
+                      <Label Content="UDP 443 в XUDP" />
+                      <ComboBox x:Name="MuxUDP443Box" Width="180" SelectedIndex="0">
+                        <ComboBoxItem Content="По умолчанию (skip)" Tag="" />
+                        <ComboBoxItem Content="Пропускать вне XUDP" Tag="skip" />
+                        <ComboBoxItem Content="Разрешить в XUDP" Tag="allow" />
+                        <ComboBoxItem Content="Отклонять" Tag="reject" />
+                      </ComboBox>
+                    </StackPanel>
+                  </WrapPanel>
+                </StackPanel>
+              </StackPanel>
+            </Expander>
+            <TextBlock Text="Подписка: импорт отдельных серверов без маршрутизации и балансировщиков Xray. Повторный импорт пропускает дубликаты; автопроверки обновлений нет." Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,12" />
+          </StackPanel>
+          <StackPanel x:Name="EnginesPanel" Visibility="Collapsed">
+            <TextBlock Text="Движки и восстановление" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,18" />
+            <TextBlock x:Name="EngineDetails" TextWrapping="Wrap" LineHeight="26" Margin="0,0,0,18" />
+            <Border x:Name="BackupPanel" Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,18">
+              <StackPanel>
+                <TextBlock Text="Зашифрованная резервная копия" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="Копия содержит библиотеку, настройки и источники подписок в зашифрованном файле. Пароль не сохраняется. Восстановление полностью заменит локальную библиотеку только после подтверждения." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,6,0,10" />
+                <TextBlock Text="Пароль для экспорта" Margin="0,0,0,4" />
+                <PasswordBox x:Name="BackupPasswordBox" MaxLength="1024" />
+                <Button x:Name="ExportBackupButton" Content="Экспортировать резервную копию…" Background="{StaticResource AccentFill}" Foreground="White" HorizontalAlignment="Left" Click="ExportBackup_Click" />
+                <Separator Margin="0,12,0,12" />
+                <TextBlock Text="Пароль для восстановления" Margin="0,0,0,4" />
+                <PasswordBox x:Name="RestorePasswordBox" MaxLength="1024" />
+                <WrapPanel Margin="0,8,0,0">
+                  <Button x:Name="PreviewBackupButton" Content="Проверить резервную копию…" Click="PreviewBackup_Click" />
+                  <Button x:Name="CancelBackupPreviewButton" Content="Отменить проверку" IsEnabled="False" Click="CancelBackupPreview_Click" />
+                  <CheckBox x:Name="AddRestoreSchedulesBox" Content="Включить расписания из копии (при открытом окне OneTunnel)" IsChecked="False" Margin="4,8,4,4" />
+                  <Button x:Name="ApplyBackupRestoreButton" Content="Заменить локальную библиотеку…" IsEnabled="False" Background="{StaticResource AccentFill}" Foreground="White" Click="ApplyBackupRestore_Click" />
+                </WrapPanel>
+                <TextBlock x:Name="BackupStatus" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,0" />
+              </StackPanel>
+            </Border>
+            <TextBlock Text="Движки встроены в Go-ядро. Необходимые компоненты и лицензии входят в комплект приложения." Foreground="{StaticResource Muted}" Margin="0,0,0,18" />
+            <Button x:Name="InstallServiceButton" Content="Установить / обновить службу" HorizontalAlignment="Left" Click="InstallService_Click" Margin="0,0,0,12" />
+            <Button x:Name="StartServiceButton" Content="Запустить службу" HorizontalAlignment="Left" Click="StartService_Click" Margin="0,0,0,12" />
+            <TextBlock Text="Служба управляет подключением. Закрытие окна сохраняет VPN; для возврата обычной сети нажми «Отключить». Установка требует подтверждения Windows один раз." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,12" />
+            <Button x:Name="LegacyRecoveryButton" Content="Восстановить подключение прежней версии от администратора" HorizontalAlignment="Left" Click="Elevate_Click" Margin="0,0,0,16" />
+            <TextBlock Text="После аварийного завершения восстановление удалит только туннель OneTunnel и его временные настройки. Системный прокси Windows приложение не меняет." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <WrapPanel Margin="0,0,0,24">
+              <Button x:Name="RecoveryButton" Content="Очистить оставшееся подключение" Click="Recovery_Click" />
+              <Button Content="Назад к подключению" Click="Cancel_Click" />
+            </WrapPanel>
+          </StackPanel>
+          <StackPanel x:Name="ActivityPanel" Visibility="Collapsed">
+            <TextBlock Text="События" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,14" />
+            <TextBlock Text="Последние события приложения" Foreground="{StaticResource Muted}" Margin="0,0,0,12" />
+            <TextBox x:Name="EventLog" IsReadOnly="True" MinHeight="220" FontSize="12" Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}" Padding="12" VerticalScrollBarVisibility="Auto" TextWrapping="Wrap" />
+            <Border Background="{StaticResource InfoSurface}" CornerRadius="6" Padding="16" Margin="0,18,0,0">
+              <StackPanel>
+                <TextBlock Text="Диагностический отчёт" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="Содержит безопасное резюме комплекта и профилей. Не включает секреты и не проверяет подключение, утечки или kill switch." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,6,0,12" />
+                <WrapPanel>
+                  <Button x:Name="GenerateDiagnosticsButton" Content="Сформировать отчёт" Background="{StaticResource AccentFill}" Foreground="White" Click="GenerateDiagnostics_Click" />
+                  <Button x:Name="CopyDiagnosticsButton" Content="Копировать" IsEnabled="False" Click="CopyDiagnostics_Click" />
+                  <Button x:Name="SaveDiagnosticsButton" Content="Сохранить…" IsEnabled="False" Click="SaveDiagnostics_Click" />
+                </WrapPanel>
+                <TextBox x:Name="DiagnosticsReport" IsReadOnly="True" AcceptsReturn="True" Height="240" FontFamily="Consolas" FontSize="12" Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}" Padding="12" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" TextWrapping="NoWrap" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+          <StackPanel x:Name="UserSettingsPanel" Visibility="Collapsed" MaxWidth="620" HorizontalAlignment="Left">
+            <TextBlock Text="Подключение и Windows" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,8" x:Name="SettingsSectionTitle" Visibility="Collapsed" />
+            <TextBlock Text="Автоподключение выключено по умолчанию. Неизвестные сети считаются общедоступными. Сохранение настроек не включает системный прокси и автозапуск — они подтверждаются отдельно." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,14" Visibility="Collapsed" />
+            <Border Background="Transparent" BorderBrush="{StaticResource Line}" BorderThickness="0" CornerRadius="8" Padding="0,12,0,0" Margin="0,0,0,14" x:Name="AutoConnectSettingsSection">
+              <StackPanel>
+                <TextBlock Text="Автоподключение" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="{StaticResource TextSecondary}" />
+                <CheckBox x:Name="UserAutoConnectBox" Content="Подключаться автоматически" IsChecked="False" Checked="UserSettingsDraft_Changed" Unchecked="UserSettingsDraft_Changed" Margin="0" MinHeight="44" />
+                <Grid Margin="0,0,0,6">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <TextBlock Text="Профиль" VerticalAlignment="Center" Margin="4,0,12,0" />
+                  <ComboBox x:Name="UserAutoConnectProfileBox" Grid.Column="1" DisplayMemberPath="Label" SelectionChanged="UserAutoConnectProfile_Changed" MinWidth="0" Width="260" HorizontalAlignment="Right" />
+                </Grid>
+                <CheckBox x:Name="UserFullDeviceBox" Content="Использовать системный туннель" IsChecked="False" Checked="UserSettingsDraft_Changed" Unchecked="UserSettingsDraft_Changed" Margin="0" MinHeight="44" />
+                <CheckBox x:Name="UserAllowTrustedBox" Content="Разрешать подключение в доверенных сетях" IsChecked="False" Checked="UserSettingsDraft_Changed" Unchecked="UserSettingsDraft_Changed" Margin="0" MinHeight="44" />
+                <CheckBox x:Name="UserAllowPublicBox" Content="Разрешать подключение в общедоступных и неизвестных сетях" IsChecked="False" Checked="UserSettingsDraft_Changed" Unchecked="UserSettingsDraft_Changed" Margin="0" MinHeight="44" />
+                <TextBlock x:Name="UserNetworkCategory" Text="Network category: unavailable" Foreground="{StaticResource Muted}" Margin="4,8,4,2" />
+                <TextBlock x:Name="UserAutoConnectInhibited" Text="После ручного отключения автоподключение приостановлено." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,2,4,4" Visibility="Collapsed" />
+              </StackPanel>
+            </Border>
+            <Border Background="Transparent" BorderBrush="{StaticResource Line}" BorderThickness="0" CornerRadius="8" Padding="0,12,0,0" Margin="0,0,0,14" x:Name="ProxySettingsSection">
+              <StackPanel>
+                <TextBlock Text="Системный прокси Windows" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="{StaticResource TextSecondary}" />
+                <CheckBox x:Name="UserSystemProxyBox" Content="Разрешить OneTunnel использовать системный прокси" IsChecked="False" Checked="UserSettingsDraft_Changed" Unchecked="UserSettingsDraft_Changed" Margin="0" MinHeight="44" />
+                <TextBlock Text="Используется подтверждённый локальный прокси OneTunnel. Прежние настройки Windows сохраняются для восстановления; внешние изменения не перезаписываются." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,0,4,8" />
+                <TextBlock x:Name="UserProxyStatus" Text="System proxy: off" Foreground="{StaticResource Muted}" Margin="4,0,4,4" />
+                <WrapPanel>
+                  <Button x:Name="EnableUserProxyButton" Content="Включить системный прокси…" IsEnabled="False" Click="EnableUserProxy_Click" />
+                  <Button x:Name="DisableUserProxyButton" Content="Выключить системный прокси…" IsEnabled="False" Click="DisableUserProxy_Click" />
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+            <StackPanel x:Name="GeneralSettingsSection" Visibility="Collapsed">
+              <Border Background="Transparent" BorderBrush="{StaticResource Line}" BorderThickness="0" CornerRadius="8" Padding="0,12,0,0" Margin="0,0,0,14" x:Name="StartupSettingsSection">
+                <StackPanel>
+                  <TextBlock Text="Запуск вместе с Windows" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="{StaticResource TextSecondary}" />
+                  <TextBlock Text="Запуск приложения при входе в Windows настраивается отдельно. Для автоматического подключения включи его выше." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,0,4,8" />
+                  <TextBlock Text="Путь приложения" FontWeight="SemiBold" Margin="4,0,4,4" />
+                  <TextBox x:Name="UserStartupPath" IsReadOnly="True" Text="Unavailable" TextWrapping="Wrap" Margin="4,0,4,8" />
+                  <TextBlock x:Name="UserStartupStatus" Text="Startup: not registered" Foreground="{StaticResource Muted}" Margin="4,0,4,4" />
+                  <WrapPanel>
+                    <Button x:Name="EnableUserStartupButton" Content="Включить автозапуск…" IsEnabled="False" Click="EnableUserStartup_Click" />
+                    <Button x:Name="DisableUserStartupButton" Content="Выключить автозапуск…" IsEnabled="False" Click="DisableUserStartup_Click" />
+                  </WrapPanel>
+                </StackPanel>
+              </Border>
+              <TextBlock Text="Область уведомлений" FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,12" />
+              <StackPanel>
+                <CheckBox x:Name="TrayNotificationsBox" Content="Уведомлять об изменении статуса" IsEnabled="False" MinHeight="44" Checked="TrayNotifications_Changed" Unchecked="TrayNotifications_Changed" />
+                <Button x:Name="HideToTrayButton" Content="Свернуть приложение в трей" IsEnabled="False" Click="HideToTray_Click" ToolTip="Вернуть окно: Ctrl+Shift+O" HorizontalAlignment="Left" />
+              </StackPanel>
+            </StackPanel>
+            <WrapPanel Margin="0,8,0,0">
+              <Button x:Name="SaveUserSettingsButton" Content="Сохранить настройки" Background="{StaticResource AccentFill}" Foreground="White" IsEnabled="False" Click="SaveUserSettings_Click" />
+              <Button x:Name="ReloadUserSettingsButton" Content="Обновить сведения" Click="ReloadUserSettings_Click" />
+            </WrapPanel>
+            <TextBlock x:Name="UserSettingsStatus" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,0,4,12" />
+            <Expander Header="Технические подробности" Margin="0,16,0,0" IsExpanded="False">
+              <TextBlock x:Name="UserSettingsDetails" Foreground="{StaticResource TextSecondary}" Margin="0,8,0,0" />
+            </Expander>
+          </StackPanel>
+          <StackPanel x:Name="GroupsPanel" Visibility="Collapsed">
+            <TextBlock Text="Группы подключений" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,8" />
+            <TextBlock Text="Управление группами профилей и сохранённых подписок." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <TextBlock Text="Удаление группы подписки также удаляет локальный источник для обновления. Удалённые профили не импортируются автоматически." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <WrapPanel Margin="0,0,0,8">
+              <Button x:Name="ReloadGroupsButton" Content="Обновить список" Click="ReloadGroups_Click" />
+              <TextBlock x:Name="GroupsStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4" />
+            </WrapPanel>
+            <ListBox x:Name="ConfigurationGroupsList" SelectionChanged="ConfigurationGroupsList_SelectionChanged" Background="Transparent" BorderThickness="0" MaxHeight="360" MinHeight="120" HorizontalContentAlignment="Stretch">
+              <ListBox.ItemTemplate>
+                <DataTemplate>
+                  <Border Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,0,0,8">
+                    <Grid>
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                      </Grid.ColumnDefinitions>
+                      <StackPanel>
+                        <ui:EmojiText Value="{Binding Name}" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding ProfileCount, StringFormat={}{0} проф.}" Foreground="{StaticResource Muted}" Margin="0,3,0,0" />
+                      </StackPanel>
+                      <TextBlock Grid.Column="1" Text="Подписка" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="12,0,0,0">
+                        <TextBlock.Style>
+                          <Style TargetType="TextBlock">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                              <DataTrigger Binding="{Binding IsSubscription}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                              </DataTrigger>
+                            </Style.Triggers>
+                          </Style>
+                        </TextBlock.Style>
+                      </TextBlock>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+            <TextBlock x:Name="GroupsEmptyHint" Text="Групп пока нет." Foreground="{StaticResource Muted}" HorizontalAlignment="Center" Margin="16" Visibility="Collapsed" />
+            <TextBlock Text="Название группы" FontWeight="SemiBold" Margin="0,14,0,6" />
+            <TextBox x:Name="RenameGroupBox" IsEnabled="False" />
+            <WrapPanel Margin="0,8,0,0">
+              <Button x:Name="RenameGroupButton" Content="Переименовать" IsEnabled="False" Background="{StaticResource AccentFill}" Foreground="White" Click="RenameGroup_Click" />
+              <Button x:Name="DeleteGroupButton" Content="Удалить группу" IsEnabled="False" Click="DeleteGroup_Click" />
+            </WrapPanel>
+          </StackPanel>
+          <StackPanel x:Name="ProfileToolsPanel" Visibility="Collapsed">
+            <Expander x:Name="NetworkPreferencesPanel" Header="DNS и правила маршрутизации" IsExpanded="False" Margin="0,0,0,16">
+              <StackPanel Margin="0,10,0,0">
+                <TextBlock Text="Network preferences use the shared TUN in full-device mode for proxy profiles and for AWG/WireGuard when a nonempty policy is saved. Native profiles keep imported DNS and routing until this opt-in; policy DNS replaces imported DNS and peer AllowedIPs stay unchanged. TCP/UDP only; ICMP is unavailable. Reset all preferences to restore the native path. Apply changes by manually installing an updated OneTunnel service bundle; the installed service is not changed automatically." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
+                <TextBlock Text="Пользовательские правила задают исключения из маршрутизации всего трафика через VPN. Правило direct отправляет совпавший трафик напрямую в сеть и может раскрыть его внешний адрес. Правила проверяются сверху вниз, первое совпадение важнее. Имена доменов не всегда видны при шифровании DNS/ECH, а процессы зависят от атрибуции Windows." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Margin="0,0,8,0">
+                    <TextBlock Text="DNS" Margin="0,0,0,4" />
+                    <ComboBox x:Name="NetworkDNSModeBox" SelectedIndex="0" SelectionChanged="NetworkDNSMode_Changed">
+                      <ComboBoxItem Content="По умолчанию" Tag="default" />
+                      <ComboBoxItem Content="DNS over HTTPS" Tag="https" />
+                      <ComboBoxItem Content="DNS over TLS" Tag="tls" />
+                      <ComboBoxItem Content="DNS over QUIC" Tag="quic" />
+                      <ComboBoxItem Content="DNS over HTTP/3" Tag="h3" />
+                    </ComboBox>
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                    <TextBlock Text="IP DNS-сервера" Margin="0,0,0,4" />
+                    <TextBox x:Name="NetworkServerIPBox" ToolTip="Литеральный IPv4 или IPv6-адрес; DNS-запросы идут через прокси. Начальное соединение с внешним DNS использует фиксированный зашифрованный HTTPS bootstrap инфраструктуры; этот пользовательский резолвер его не заменяет." />
+                  </StackPanel>
+                </Grid>
+                <Grid Margin="0,8,0,0">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="2*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Margin="0,0,8,0">
+                    <TextBlock Text="Имя TLS-сервера" Margin="0,0,0,4" />
+                    <TextBox x:Name="NetworkServerNameBox" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Margin="8,0,8,0">
+                    <TextBlock Text="Порт (пусто — по умолчанию)" TextWrapping="Wrap" Margin="0,0,0,4" />
+                    <TextBox x:Name="NetworkPortBox" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="2" Margin="8,0,0,0">
+                    <TextBlock Text="Путь DoH (HTTPS / HTTP3)" Margin="0,0,0,4" />
+                    <TextBox x:Name="NetworkPathBox" />
+                  </StackPanel>
+                </Grid>
+                <CheckBox x:Name="NetworkFakeIPBox" Content="FakeIP · сопоставлять DNS-имена с адресами внутри туннеля" Margin="4,10,4,4" ToolTip="Только общий TUN. Сопоставления живут в памяти до отключения; DNS-правила с отдельным резолвером имеют приоритет." />
+                <WrapPanel Margin="0,6,0,6">
+                  <StackPanel Margin="0,0,16,0">
+                    <TextBlock Text="Кэш DNS" Margin="0,0,0,4" />
+                    <ComboBox x:Name="NetworkCacheModeBox" Width="200" SelectedIndex="0" SelectionChanged="NetworkDNSMode_Changed">
+                      <ComboBoxItem Content="По умолчанию" Tag="default" />
+                      <ComboBoxItem Content="Отключён" Tag="disabled" />
+                      <ComboBoxItem Content="Ограничить размер" Tag="bounded" />
+                    </ComboBox>
+                  </StackPanel>
+                  <StackPanel>
+                    <TextBlock Text="Записей (128–65536)" Margin="0,0,0,4" />
+                    <TextBox x:Name="NetworkCacheCapacityBox" Width="170" MaxLength="5" />
+                  </StackPanel>
+                </WrapPanel>
+                <TextBlock Text="Правила: тип | действие | значение. Примеры: domain | proxy | login.example; domain-suffix | direct | example.org; cidr | reject | 192.0.2.0/24; process | proxy | C:\Apps\Browser\browser.exe. Типы: domain, domain-suffix, cidr, process. Действия: proxy, direct, reject. Максимум 64 правила; порядок строк сохраняется." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5" />
+                <TextBox x:Name="NetworkRulesBox" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="110" MaxHeight="220" FontFamily="Consolas" />
+                <TextBlock Text="Additional DNS resolvers: transport | IP | TLS name | port | path (one per line; blank port and path use defaults). These resolvers also use the proxy." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5" />
+                <TextBox x:Name="NetworkResolversBox" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="72" MaxHeight="160" FontFamily="Consolas" />
+                <TextBlock Text="DNS rules: domain or domain-suffix | domain | resolver number (starting at 1). Line order is preserved; the default DNS rule remains last." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5" />
+                <TextBox x:Name="NetworkDNSRulesBox" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="72" MaxHeight="160" FontFamily="Consolas" />
+                <CheckBox x:Name="NetworkAllowLANBox" Content="Allow direct access to private IPv4 and IPv6 ULA networks" IsChecked="False" Margin="4,10,4,4" ToolTip="Adds a tunnel bypass only for private IPv4 and IPv6 ULA ranges. Off by default." />
+                <WrapPanel Margin="0,8,0,0">
+                  <Button x:Name="SaveNetworkPreferencesButton" Content="Сохранить DNS и правила" Background="{StaticResource AccentFill}" Foreground="White" IsEnabled="False" Click="SaveNetworkPreferences_Click" />
+                  <Button x:Name="ReloadNetworkPreferencesButton" Content="Обновить сведения" IsEnabled="False" Click="ReloadNetworkPreferences_Click" />
+                  <TextBlock x:Name="NetworkPreferencesStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4" />
+                </WrapPanel>
+              </StackPanel>
+            </Expander>
+            <Expander x:Name="ProfileOrganizationPanel" Header="Копировать или переместить профиль" IsExpanded="False" Margin="0,0,0,16">
+              <StackPanel Margin="0,10,0,0">
+                <TextBlock Text="Копия не подключается автоматически. Управляемые подпиской профили можно копировать, но перемещать можно только между ручными группами. Перемещение сохраняет место профиля в порядке хранения и резервного подключения." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Margin="0,0,8,0">
+                    <TextBlock Text="Название копии" Margin="0,0,0,4" />
+                    <TextBox x:Name="ProfileOrganizationNameBox" />
+                  </StackPanel>
+                  <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                    <TextBlock Text="Целевая группа" Margin="0,0,0,4" />
+                    <ComboBox x:Name="ProfileOrganizationGroupBox" IsEditable="True" IsTextSearchEnabled="True" />
+                  </StackPanel>
+                </Grid>
+                <WrapPanel Margin="0,8,0,0">
+                  <Button x:Name="DuplicateProfileButton" Content="Создать копию" IsEnabled="False" Background="{StaticResource AccentFill}" Foreground="White" Click="DuplicateProfile_Click" />
+                  <Button x:Name="MoveProfileButton" Content="Переместить" IsEnabled="False" Click="MoveProfile_Click" />
+                  <Button x:Name="ReloadProfileOrganizationButton" Content="Обновить сведения" IsEnabled="False" Click="ReloadProfileOrganization_Click" />
+                  <TextBlock x:Name="ProfileOrganizationStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4" />
+                </WrapPanel>
+              </StackPanel>
+            </Expander>
+            <Expander x:Name="GroupResultsPanel" Header="Результаты проверки группы" Visibility="Collapsed" Margin="0,0,0,16">
+              <StackPanel Margin="0,12,0,0">
+                <TextBlock Text="Время включает запуск движка, HTTPS-проверку и очистку. Это не ping и не скорость загрузки. WG/AWG и профили с пользовательскими DNS или правилами маршрутизации показывают только результат проверки конфигурации и не участвуют в выборе лучшего результата." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
+                <WrapPanel Margin="0,0,0,8">
+                  <ComboBox x:Name="GroupResultSortBox" Width="178" SelectedIndex="0" SelectionChanged="GroupResultOptions_Changed" ToolTip="Порядок результатов">
+                    <ComboBoxItem Content="Порядок профилей" Tag="stored" />
+                    <ComboBoxItem Content="По времени проверки" Tag="duration" />
+                  </ComboBox>
+                  <ComboBox x:Name="GroupResultFilterBox" Width="160" SelectedIndex="0" SelectionChanged="GroupResultOptions_Changed" ToolTip="Фильтр результатов">
+                    <ComboBoxItem Content="Все результаты" Tag="all" />
+                    <ComboBoxItem Content="Доступные" Tag="reachable" />
+                    <ComboBoxItem Content="С ошибкой" Tag="failed" />
+                    <ComboBoxItem Content="Только конфигурация" Tag="config-only" />
+                  </ComboBox>
+                  <Button x:Name="SelectFastestResultButton" Content="Выбрать лучший результат" IsEnabled="False" Click="SelectFastestResult_Click" ToolTip="Выбирает лучший результат из всей проверки, независимо от текущего фильтра." />
+                  <Button x:Name="ClearGroupResultsButton" Content="Очистить результаты" IsEnabled="False" Click="ClearGroupResults_Click" />
+                </WrapPanel>
+                <TextBlock x:Name="GroupResultsInfo" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
+                <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto">
+                  <ItemsControl x:Name="GroupResults">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate>
+                        <StackPanel Margin="0,0,0,12">
+                          <ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                          <TextBlock Text="{Binding TimingLabel}" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="12" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </StackPanel>
+            </Expander>
+          </StackPanel>
+          <StackPanel x:Name="LegacyCommands" Visibility="Collapsed">
+            <Button x:Name="AddProfileButton" HorizontalContentAlignment="Left" Click="Add_Click" Style="{StaticResource RailButton}">
+              <StackPanel Orientation="Horizontal">
+                <Path Data="M9,1V17 M1,9H17" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round" Width="17" Height="17" Stretch="Uniform" Margin="0,0,10,0" />
+                <TextBlock Text="Добавить профиль" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <Button x:Name="SubscriptionButton" HorizontalContentAlignment="Left" Click="Subscriptions_Click" Style="{StaticResource RailButton}">
+              <StackPanel Orientation="Horizontal">
+                <Path Data="M2,4H16V16H2Z M5,1V6 M13,1V6 M2,8H16" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round" Width="17" Height="17" Stretch="Uniform" Margin="0,0,10,0" />
+                <TextBlock Text="Подписки" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <Button x:Name="GroupsNavigationButton" HorizontalContentAlignment="Left" Click="Groups_Click" Style="{StaticResource RailButton}">
+              <StackPanel Orientation="Horizontal">
+                <Path Data="M1,4H7L9,6H17V16H1Z" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round" Width="17" Height="17" Stretch="Uniform" Margin="0,0,10,0" />
+                <TextBlock Text="Группы" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <Button x:Name="EventsNavigationButton" HorizontalContentAlignment="Left" Click="Events_Click" Style="{StaticResource RailButton}">
+              <StackPanel Orientation="Horizontal">
+                <Path Data="M1,9H5L7,3L11,15L13,9H17" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" StrokeThickness="1.4" StrokeLineJoin="Round" Width="17" Height="17" Stretch="Uniform" Margin="0,0,10,0" />
+                <TextBlock Text="События" VerticalAlignment="Center" />
+              </StackPanel>
+            </Button>
+            <CheckBox x:Name="FavoritesOnlyBox" Content="Только избранное" VerticalAlignment="Center" Margin="4,4,14,4" Checked="LibraryFilter_Changed" Unchecked="LibraryFilter_Changed" />
+            <ComboBox x:Name="LibrarySortBox" Width="178" SelectedIndex="0" SelectionChanged="LibrarySort_Changed" ToolTip="Порядок профилей">
+              <ComboBoxItem Content="Порядок хранения" Tag="stored" />
+              <ComboBoxItem Content="По названию" Tag="name" />
+              <ComboBoxItem Content="По протоколу" Tag="protocol" />
+            </ComboBox>
+            <Button x:Name="FavoriteButton" Content="Добавить в избранное" IsEnabled="False" Click="Favorite_Click" Margin="0,8,0,0" />
+            <TextBlock x:Name="LibraryStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4" />
+            <Button x:Name="ConnectButton" Content="Подключить" Background="{StaticResource Selected}" Foreground="{StaticResource Ink}" IsEnabled="False" Click="Connect_Click" BorderBrush="{StaticResource Accent}" Margin="0,0,0,12" Padding="12,12" HorizontalAlignment="Stretch" />
+            <Button x:Name="CancelGroupButton" Visibility="Collapsed" Content="Отменить проверку" IsEnabled="False" Click="CancelGroup_Click" />
+            <Button x:Name="CheckGroupButton" Content="Проверить группу" IsEnabled="False" Click="CheckGroup_Click" />
+            <Button x:Name="ProbeButton" Content="Проверить доступ" IsEnabled="False" Click="Probe_Click" />
+            <Button x:Name="EditButton" Content="Изменить" IsEnabled="False" Click="Edit_Click" />
+            <Button x:Name="DeleteButton" Content="Удалить" IsEnabled="False" Click="Delete_Click" />
+            <Button x:Name="ExpandAllGroupsButton" Content="Развернуть группы" Padding="8,4" Margin="2" Click="ExpandAllGroups_Click" />
+            <Button x:Name="CollapseAllGroupsButton" Content="Свернуть группы" Padding="8,4" Margin="2" Click="CollapseAllGroups_Click" />
+            <TextBlock x:Name="ProfileDescription" Text="Импортируй конфигурацию или подписку. Профили хранятся на этом компьютере." Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
+            <TextBlock x:Name="ProfileCount" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="10,0,0,0" />
+            <TextBlock x:Name="PageDescription" Text="Профили, сохранённые на этом компьютере" Foreground="{StaticResource Muted}" Margin="0,4,0,0" Visibility="Collapsed" />
+            <TextBlock x:Name="ConnectionInfo" Text="AmneziaWG · WireGuard · VLESS · SOCKS5 · Hysteria2 · Shadowsocks" FontWeight="SemiBold" />
+            <TextBlock x:Name="ConnectionHint" Text="Серверы не входят в приложение. Используй собственную конфигурацию или данные своего провайдера." Foreground="{StaticResource Muted}" Margin="0,6,0,0" />
+            <TextBlock x:Name="ModeHelp" Foreground="{StaticResource Muted}" Margin="0,7,0,0" />
+          </StackPanel>
+          <StackPanel x:Name="AboutPanel" Visibility="Collapsed" MaxWidth="620" HorizontalAlignment="Left">
+            <TextBlock Text="OneTunnel для Windows" FontSize="20" FontWeight="SemiBold" />
+            <TextBlock x:Name="AboutVersion" Margin="0,12,0,0" />
+            <TextBlock Text="Windows x64 · Xray · sing-box · AmneziaWG" Foreground="{StaticResource TextSecondary}" Margin="0,8,0,24" />
+            <TextBlock Text="Версии приложения и ядра выпускаются независимо. Обновление интерфейса не обновляет установленную службу автоматически." TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}" />
+          </StackPanel>
+        </Grid>
+      </ScrollViewer>
+      <WrapPanel x:Name="EditorActions" Grid.Row="2" Visibility="Collapsed" Margin="0,12,0,0">
+        <Button x:Name="SaveProfileButton" Content="Сохранить / импортировать" Background="{StaticResource AccentFill}" Foreground="White" Click="Save_Click" />
+        <Button Content="Отмена" Click="CancelEditor_Click" />
+      </WrapPanel>
     </Grid>
-   </ScrollViewer>
-   <WrapPanel x:Name="EditorActions" Grid.Row="2" Visibility="Collapsed" Margin="0,12,0,0"><Button x:Name="SaveProfileButton" Content="Сохранить / импортировать" Background="{StaticResource Accent}" Foreground="White" Click="Save_Click"/><Button Content="Отмена" Click="CancelEditor_Click"/></WrapPanel>
-   <Border Grid.Row="3" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Padding="0,10,0,0" Margin="0,12,0,0"><TextBlock x:Name="Feedback" Text="Готов к настройке" Foreground="{StaticResource Muted}" FontSize="12" MaxHeight="66"/></Border>
+    <Border Grid.Row="1" Grid.ColumnSpan="5" BorderBrush="{StaticResource Line}" BorderThickness="0,1,0,0" Background="{StaticResource Rail}" Padding="16,6">
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+        <TextBlock x:Name="FooterStatus" Text="Отключено" Foreground="{StaticResource TextSecondary}" FontSize="12" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+        <TextBlock x:Name="FooterTime" Grid.Column="1" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+      </Grid>
+    </Border>
+    <Border Background="{StaticResource InspectorBackground}" BorderBrush="{StaticResource Line}" BorderThickness="0" CornerRadius="0" Padding="16" Margin="0" Grid.Column="4" x:Name="InspectorPanel">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="Auto" />
+          <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid Margin="0,2,0,16">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="32" />
+            <ColumnDefinition Width="32" />
+          </Grid.ColumnDefinitions>
+          <StackPanel x:Name="InspectorIdentity">
+            <ui:EmojiText x:Name="ProfileTitle" Value="Добавь первое подключение" FontSize="20" FontWeight="SemiBold" Margin="0,0,12,4" EmojiSize="28" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ShowServerFallback="True" />
+            <TextBlock x:Name="InspectorCountry" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="40,4,0,0" />
+          </StackPanel>
+          <Button x:Name="InspectorFavorite" Grid.Column="1" Style="{StaticResource StarButton}" Click="InspectorFavorite_Click" ToolTip="Избранное" AutomationProperties.Name="Избранное">
+            <Path x:Name="InspectorStar" Data="{StaticResource StarGeometry}" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" />
+          </Button>
+          <Button Grid.Column="2" x:Name="InspectorMenuButton" Style="{StaticResource StarButton}" Click="InspectorMenu_Click" ToolTip="Действия с профилем" AutomationProperties.Name="Действия с профилем">
+            <Path Data="M7,2L7,3 M7,7L7,8 M7,12L7,13" Stroke="{StaticResource TextSecondary}" StrokeThickness="2.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="12" Height="18" />
+          </Button>
+        </Grid>
+        <Border Grid.Row="1" Background="{StaticResource ConnectionBackground}" CornerRadius="6" Padding="10,9" Margin="0,0,0,16">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="16" />
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Ellipse x:Name="InspectorStatusDot" Width="8" Height="8" Fill="{StaticResource TextMuted}" />
+            <StackPanel x:Name="StatusSlot" Grid.Column="1">
+              <TextBlock x:Name="StatusLabel" Text="Отключено" FontSize="14" />
+            </StackPanel>
+            <TextBlock x:Name="InspectorLatency" Grid.Column="2" Foreground="{StaticResource AccentText}" VerticalAlignment="Center" />
+          </Grid>
+        </Border>
+        <TabControl x:Name="InspectorTabs" Grid.Row="2" VerticalAlignment="Top">
+          <TabItem Header="Параметры">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+              <StackPanel x:Name="InspectorParameters" Margin="0,12,0,0">
+                <ItemsControl x:Name="InspectorDetailRows">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <Grid MinHeight="32">
+                        <Grid.ColumnDefinitions>
+                          <ColumnDefinition Width="Auto" />
+                          <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="{Binding Label}" Foreground="{StaticResource TextSecondary}" Margin="0,0,16,0" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding Value}" HorizontalAlignment="Right" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" ToolTip="{Binding Value}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="Адрес и параметры безопасности доступны в редакторе профиля." Foreground="{StaticResource TextMuted}" FontSize="12" Margin="0,12,0,0" />
+                <StackPanel x:Name="ModePanel" Visibility="Collapsed" Margin="0,12,0,0">
+                  <TextBlock Text="Куда направлять трафик" FontWeight="SemiBold" Margin="0,0,0,6" />
+                  <ComboBox x:Name="ModeBox" SelectedIndex="0" MaxWidth="280" HorizontalAlignment="Stretch" MinWidth="0" SelectionChanged="Mode_Changed">
+                    <ComboBoxItem Content="Локальный прокси · только выбранные приложения" />
+                    <ComboBoxItem Content="Всё устройство · системный туннель" />
+                  </ComboBox>
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+          <TabItem Header="Статистика">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+              <StackPanel x:Name="InspectorStatistics" Margin="0,12,0,0">
+                <StackPanel x:Name="StatisticsPanel" Visibility="Collapsed" Margin="0,10,0,0">
+                  <TextBlock Text="Текущее подключение" FontWeight="SemiBold" />
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Отправлено: " />
+                    <TextBlock x:Name="StatisticsUploaded" />
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Получено: " />
+                    <TextBlock x:Name="StatisticsDownloaded" />
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Upload: " />
+                    <TextBlock x:Name="StatisticsUploadRate" />
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Download: " />
+                    <TextBlock x:Name="StatisticsDownloadRate" />
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="Время: " />
+                    <TextBlock x:Name="StatisticsElapsed" />
+                  </StackPanel>
+                  <TextBlock x:Name="StatisticsScopeHint" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                </StackPanel>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+        </TabControl>
+        <StackPanel Grid.Row="3" Margin="0,16,0,0">
+          <Grid Height="60" Background="{StaticResource Surface}" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Margin="12,8">
+              <StackPanel Orientation="Horizontal">
+                <Path Data="M7,15V1 M2,6L7,1L12,6" Stroke="{StaticResource AccentText}" StrokeThickness="1.5" Width="12" Height="14" Margin="0,0,6,0" />
+                <TextBlock Text="Отправлено" FontSize="12" Foreground="{StaticResource TextSecondary}" />
+              </StackPanel>
+              <TextBlock x:Name="InspectorSent" Text="—" Foreground="{StaticResource AccentText}" FontSize="16" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Margin="12,8">
+              <StackPanel Orientation="Horizontal">
+                <Path Data="M7,1V15 M2,10L7,15L12,10" Stroke="{StaticResource Warning}" StrokeThickness="1.5" Width="12" Height="14" Margin="0,0,6,0" />
+                <TextBlock Text="Получено" FontSize="12" Foreground="{StaticResource TextSecondary}" />
+              </StackPanel>
+              <TextBlock x:Name="InspectorReceived" Text="—" Foreground="{StaticResource Warning}" FontSize="16" />
+            </StackPanel>
+          </Grid>
+          <Button x:Name="PrimaryConnectButton" Height="44" Background="{StaticResource Selected}" BorderBrush="{StaticResource Accent}" Foreground="{StaticResource Ink}" Margin="0" HorizontalContentAlignment="Center" Click="PrimaryConnect_Click">
+            <StackPanel Orientation="Horizontal">
+              <Rectangle x:Name="PrimaryActionIcon" Width="10" Height="10" Fill="{StaticResource Ink}" Margin="0,0,10,0" VerticalAlignment="Center" Visibility="Collapsed" />
+              <TextBlock x:Name="PrimaryActionCaption" Text="Подключить" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+    <Border Grid.Column="1" Background="{StaticResource Line}" />
+    <Border x:Name="FeedbackNotice" Grid.Column="2" Grid.ColumnSpan="3" Visibility="Collapsed" VerticalAlignment="Bottom" Margin="16,0,16,12" Padding="12" Background="{StaticResource Surface}" BorderBrush="{StaticResource Line}" BorderThickness="1" CornerRadius="6">
+      <StackPanel x:Name="FeedbackSlot">
+        <TextBlock x:Name="Feedback" Text="Готов к настройке" Foreground="{StaticResource Muted}" FontSize="12" MaxHeight="66" Margin="0" />
+      </StackPanel>
+    </Border>
+    <Border x:Name="InspectorSeparator" Grid.Column="3" Background="{StaticResource Line}" />
   </Grid>
- </Grid>
 </Window>
