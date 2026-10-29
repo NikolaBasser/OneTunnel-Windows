@@ -30,6 +30,11 @@ jobs:
           if ($pin.SourceRevision -cnotmatch '^[0-9a-f]{40}$' -or $pin.Repository -cne 'OneTunnel-Core' -or
               $pin.SchemaVersion -ne 1 -or $pin.ApiVersion -ne 1 -or $pin.Version -notmatch '^\d+\.\d+\.\d+$' -or
               $pin.OS -cne 'windows' -or $pin.Architecture -cne 'amd64') { throw 'Invalid core source pin.' }
+          $productVersion = [string]([xml](Get-Content Directory.Build.props -Raw)).Project.PropertyGroup.Version
+          $manifestVersion = [string]([xml](Get-Content app.manifest -Raw)).assembly.assemblyIdentity.version
+          if ($pin.Version -cne $productVersion -or $manifestVersion -cne ($productVersion + '.0')) {
+            throw 'Application, manifest and pinned core product versions must match.'
+          }
           'Synthetic source checks passed. The application build requires the explicit manual pinned-core integration job.' | Add-Content $env:GITHUB_STEP_SUMMARY
 
   windows-build:

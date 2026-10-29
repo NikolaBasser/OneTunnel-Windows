@@ -1,8 +1,8 @@
 {
   "SchemaVersion": 1,
   "Repository": "OneTunnel-Core",
-  "SourceRevision": "58635bacf75784f299a94dbc1f356faa961e1609",
-  "Version": "0.5.0",
+  "SourceRevision": "ccdee05f8137e59f6f53a85fee3cf03d3fc0a179",
+  "Version": "0.2.0",
   "ApiVersion": 1,
   "OS": "windows",
   "Architecture": "amd64"

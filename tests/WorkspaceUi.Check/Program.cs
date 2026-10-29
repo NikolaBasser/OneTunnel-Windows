@@ -7,6 +7,8 @@ using System.Text.Json.Nodes;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Interop;
+using System.Windows.Input;
+using System.Windows.Automation.Peers;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
@@ -55,17 +57,185 @@ internal static class Program
         window.Width = 1379; window.Width = 1380;
         T Find<T>(string name) where T : FrameworkElement => (T)(window.FindName(name) ?? throw new Exception("Missing control: " + name));
         void Pump() { var frame = new DispatcherFrame(); var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) }; timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame); }
-        void Wait(Func<bool> condition) { var until = DateTime.UtcNow.AddSeconds(25); while (!condition() && DateTime.UtcNow < until) Pump(); if (!condition()) throw new Exception("UI condition timed out; feedback=" + Find<TextBlock>("Feedback").Text + "; org=" + Find<TextBlock>("ProfileOrganizationStatus").Text); }
-        void Click(string name) => Find<Button>(name).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        void Wait(Func<bool> condition, [System.Runtime.CompilerServices.CallerLineNumber] int line = 0) { var until = DateTime.UtcNow.AddSeconds(25); while (!condition() && DateTime.UtcNow < until) Pump(); if (!condition()) throw new Exception("UI condition timed out at line " + line + "; feedback=" + Find<TextBlock>("Feedback").Text + "; org=" + Find<TextBlock>("ProfileOrganizationStatus").Text + "; policy=" + Find<TextBlock>("PolicyStatus").Text + "; mode=" + Find<ComboBox>("RoutingModeBox").SelectedIndex + "; draft=" + typeof(MainWindow).GetMethod("NetworkPolicyDraftChanged",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null)); }
+        string NetworkDiff() {
+            var v=typeof(MainWindow).GetField("networkPreferencesView",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window) as NetworkPreferencesView;
+            if(v==null)return "view-null";
+            var pairs=new[]{("mode",(string)typeof(MainWindow).GetField("routingDraftMode",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!,v.RoutingMode),("custom",(string)typeof(MainWindow).GetMethod("CustomRoutingText",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null)!,v.CustomRulesText),("preset",(string)typeof(MainWindow).GetMethod("PresetRoutingText",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null)!,v.PresetRulesText),("config",(string)typeof(MainWindow).GetField("presetConfigDraft",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!,v.PresetConfigText),("dns",Find<ComboBox>("NetworkDNSModeBox").SelectedIndex.ToString(),v.Mode),("ip",Find<TextBox>("NetworkServerIPBox").Text,v.ServerIP),("name",Find<TextBox>("NetworkServerNameBox").Text,v.ServerName),("port",Find<TextBox>("NetworkPortBox").Text,v.Port),("path",Find<TextBox>("NetworkPathBox").Text,v.Path),("resolvers",Find<TextBox>("NetworkResolversBox").Text,v.ResolversText),("dnsrules",Find<TextBox>("NetworkDNSRulesBox").Text,v.DNSRulesText),("lan",Find<CheckBox>("NetworkAllowLANBox").IsChecked?.ToString()??"null",v.AllowLAN.ToString()),("fake",Find<CheckBox>("NetworkFakeIPBox").IsChecked?.ToString()??"null",v.FakeIP.ToString()),("cache",Find<ComboBox>("NetworkCacheModeBox").SelectedIndex.ToString(),v.CacheMode),("capacity",Find<TextBox>("NetworkCacheCapacityBox").Text,v.CacheCapacity)};
+            return string.Join("; ",pairs.Select(p=>$"{p.Item1}:eq={p.Item2==p.Item3},len={p.Item2.Length}/{p.Item3.Length}"))+"; status="+Find<TextBlock>("PolicyStatus").Text;
+        }
+        void WaitDownload(Func<bool> condition) { var until=DateTime.UtcNow.AddSeconds(130);while(!condition()&&DateTime.UtcNow<until)Pump();if(!condition())throw new Exception("Preset download timed out: "+Find<TextBlock>("LoyalStatus").Text+"; "+NetworkDiff());}
+        void Click(string name) { if(name=="SaveNetworkPreferencesButton")Wait(()=>Find<Button>(name).IsEnabled&&((OneTunnel.Client.ServiceConnection)typeof(MainWindow).GetField("connection",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!).Actions.CanSave); Find<Button>(name).RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); }
         void Panel(string value) => typeof(MainWindow).GetMethod("ShowPanel", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [value]);
         bool LibraryIdle() => !(bool)typeof(MainWindow).GetField("libraryPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)! && !(bool)typeof(MainWindow).GetField("favoritePending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
         Wait(() => Find<Button>("AddProfileButton").IsEnabled && Find<Button>("EditButton").IsEnabled && LibraryIdle());
+        if(Environment.GetEnvironmentVariable("ONETUNNEL_PROXY_MODE_UI_ONLY")=="1") {
+            var servers=Find<ListBox>("ProfilesList");
+            foreach(var server in servers.Items.Cast<Profile>().ToArray()) {
+                servers.SelectedItem=server;Wait(()=>LibraryIdle()&&Find<Button>("EditButton").IsEnabled);Pump();
+                Assert(Find<StackPanel>("ModePanel").Visibility==Visibility.Collapsed,"Proxy inspector hides traffic destination: "+server.Protocol);
+            }
+            CaptureLogical(window,"proxy-inspector-normal.png",1280,760);CaptureLogical(window,"proxy-inspector-minimum.png",1060,641);
+            var key=Convert.ToBase64String(Enumerable.Range(1,32).Select(i=>(byte)i).ToArray());
+            var native=ProfileBackend.SaveEditorAsync("WireGuard fixture",$"[Interface]\nPrivateKey = {key}\nAddress = 10.66.0.2/32\n[Peer]\nPublicKey = {key}\nEndpoint = 192.0.2.5:51820\nAllowedIPs = 0.0.0.0/0","Native",null,transport,new()).GetAwaiter().GetResult();
+            typeof(MainWindow).GetMethod("PresentApplied",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[native]);
+            Wait(()=>LibraryIdle()&&servers.Items.Count==4&&Find<StackPanel>("ModePanel").Visibility==Visibility.Visible);
+            Assert(servers.SelectedItem is Profile{Protocol:Protocol.WireGuard},"WG retains its traffic destination control");
+            Wait(()=>((ComboBoxItem)Find<ComboBox>("ModeBox").Items[0]).Content?.ToString()=="Маршрутизация из AllowedIPs");
+            Assert(((ComboBoxItem)Find<ComboBox>("ModeBox").Items[1]).Content?.ToString()=="Маршрутизация по настройкам","Native routing choices name the original and temporary-copy modes");
+            CaptureLogical(window,"native-routing-copy-normal.png",1280,760);CaptureLogical(window,"native-routing-copy-minimum.png",1060,641);
+            typeof(MainWindow).GetField("allowClose",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(window,true);window.Close();app.Shutdown();return 0;
+        }
+        if(Environment.GetEnvironmentVariable("ONETUNNEL_BALANCE_UI_ONLY")=="1") {
+            Panel("settings");typeof(MainWindow).GetField("settingsSection",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(window,"connection");typeof(MainWindow).GetMethod("PresentControlSettings",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null);
+            var load=PrivateTask("LoadUserSettingsAsync",true);Wait(()=>load.IsCompleted);load.GetAwaiter().GetResult();
+            Find<Expander>("BalanceExpander").IsExpanded=true;Pump();
+            Find<CheckBox>("BalanceEnabledBox").IsChecked=true;Find<ComboBox>("BalanceModeBox").SelectedIndex=1;
+            Assert(Find<ComboBox>("BalanceSelectionBox").SelectedIndex==0&&Find<ListBox>("BalanceProfilesList").Visibility==Visibility.Collapsed,"Automatic selection is the default and needs no server checklist");
+            Wait(()=>Find<Button>("SaveUserSettingsButton").IsEnabled);Click("SaveUserSettingsButton");Wait(()=>!(bool)typeof(MainWindow).GetField("userSettingsSavePending",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!);
+            Assert(ProfileBackend.UserSettingsAsync(CancellationToken.None).GetAwaiter().GetResult().Preferences.Balance is {Enabled:true,Manual:false},"Automatic composition persists without selected server IDs");
+            Find<ComboBox>("BalanceSelectionBox").SelectedIndex=1;Pump();
+            var rows=Find<ListBox>("BalanceProfilesList").Items.Cast<object>().ToArray();Assert(rows.Length==3,"Pool server picker includes subscription and manual groups");
+            foreach(var row in rows.Take(2)){Find<ListBox>("BalanceProfilesList").ScrollIntoView(row);Pump();var check=Descendants(Find<ListBox>("BalanceProfilesList")).OfType<CheckBox>().First(c=>ReferenceEquals(c.DataContext,row));typeof(System.Windows.Controls.Primitives.ToggleButton).GetMethod("OnClick",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(check,null);Pump();}
+            typeof(MainWindow).GetMethod("BalanceDraft_Changed",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[window,new RoutedEventArgs()]);
+            Wait(()=>Find<Button>("SaveUserSettingsButton").IsEnabled);Click("SaveUserSettingsButton");Wait(()=>!(bool)typeof(MainWindow).GetField("userSettingsSavePending",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!);
+            var saved=ProfileBackend.UserSettingsAsync(CancellationToken.None).GetAwaiter().GetResult().Preferences.Balance;
+            Assert(saved is {Enabled:true,Manual:true,Mode:"balanced",Best:2,Interval:30,MaxRTT:1500}&&saved.ProfileIDs.Split(',').Length==2,"Manual pool mode, members and quality limits persist through encrypted Go settings");
+            Find<TextBox>("BalanceBestBox").Text="9";Pump();Assert(!Find<Button>("SaveUserSettingsButton").IsEnabled,"Invalid pool bounds cannot be saved");
+            Click("ReloadUserSettingsButton");Wait(()=>Find<TextBox>("BalanceBestBox").Text=="2");
+            Find<Expander>("BalanceExpander").IsExpanded=true;var scroll=Find<ScrollViewer>("WorkspaceScroll");var top=Find<Expander>("BalanceExpander").TranslatePoint(new Point(),scroll).Y;scroll.ScrollToVerticalOffset(scroll.VerticalOffset+top);Pump();
+            CaptureLogical(window,"balance-manual-normal.png",960,640);
+            Find<ComboBox>("BalanceSelectionBox").SelectedIndex=0;Pump();
+            CaptureLogical(window,"balance-settings-normal.png",960,640);CaptureLogical(window,"balance-settings-minimum.png",800,560);
+            Find<CheckBox>("BalanceEnabledBox").IsChecked=false;Wait(()=>Find<Button>("SaveUserSettingsButton").IsEnabled);Click("SaveUserSettingsButton");Wait(()=>!(bool)typeof(MainWindow).GetField("userSettingsSavePending",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!);
+            Assert(ProfileBackend.UserSettingsAsync(CancellationToken.None).GetAwaiter().GetResult().Preferences.Balance?.Enabled==false,"Pool can be disabled without deleting saved members");
+            typeof(MainWindow).GetField("allowClose",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(window,true);window.Close();app.Shutdown();return 0;
+        }
+        if(Environment.GetEnvironmentVariable("ONETUNNEL_PROVIDER_UI_ONLY")=="1") {
+            typeof(MainWindow).GetMethod("BeginNewProfile",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[true]);
+            Find<TextBox>("SourceBox").Text="""[{"remarks":"Imported policy","outbounds":[{"tag":"proxy","protocol":"vless","settings":{"vnext":[{"address":"192.0.2.88","port":443,"users":[{"id":"11111111-1111-4111-8111-111111111111","encryption":"none"}]}]},"streamSettings":{"network":"tcp","security":"tls","tlsSettings":{"serverName":"example.com"}}},{"tag":"direct","protocol":"freedom"}],"routing":{"rules":[{"type":"field","domain":["domain:imported.example"],"outboundTag":"direct"},{"type":"field","protocol":["bittorrent"],"outboundTag":"direct"}]}}]""";
+            Find<TextBox>("NameBox").Text="Imported provider";Pump();Wait(()=>Find<Button>("SaveProfileButton").IsEnabled);Click("SaveProfileButton");Wait(()=>LibraryIdle()&&Find<ListBox>("ProfilesList").Items.Count==4);
+            Assert(ProfileBackend.ImportedRoutingSourcesAsync().GetAwaiter().GetResult().Count==1,"Importing a subscription through the UI also imports routing");
+            Panel("network");Wait(()=>NetworkIdle()&&Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
+            Find<ComboBox>("RoutingModeBox").SelectedIndex=1;Find<ComboBox>("RoutingSourceBox").SelectedIndex=1;Pump();
+            Wait(()=>Find<ComboBox>("ProviderRoutingGroupBox").Items.Count==1);Find<ComboBox>("ProviderRoutingGroupBox").SelectedIndex=0;
+            Wait(()=>!(bool)typeof(MainWindow).GetField("policyToolsPending",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!&&Find<TextBlock>("ProviderRoutingReview").Text.Contains("В черновике"));
+            Assert(window.FindName("ProviderRoutingURLBox")==null&&window.FindName("LoadProviderRoutingButton")==null&&window.FindName("ApplyProviderRoutingButton")==null&&window.FindName("ProviderRoutingChoiceBox")==null,"Routing only selects already imported policies without a second URL/import flow");
+            Assert(Find<TextBlock>("ProviderRoutingReview").Text.Contains("исключены"),"Excluded transport and balancing controls are explained after subscription selection");
+            Click("SaveNetworkPreferencesButton");Wait(()=>NetworkIdle()&&LibraryIdle()&&Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
+            Click("ReloadNetworkPreferencesButton");Wait(()=>NetworkIdle()&&Find<ComboBox>("ProviderRoutingGroupBox").SelectedItem is ImportedRoutingSource);
+            Assert(Find<ComboBox>("RoutingSourceBox").SelectedIndex==1&&Find<ComboBox>("ProviderRoutingGroupBox").SelectedItem is ImportedRoutingSource&&Find<TextBlock>("ProviderRoutingReview").Text.Contains("исключены"),"Imported subscription, configuration and limitations survive encrypted save/reload");
+            Find<Expander>("DNSSettingsExpander").IsExpanded=false;
+            var sc=Find<ScrollViewer>("WorkspaceScroll");var top=Find<Expander>("LoyalRulesPanel").TranslatePoint(new Point(),sc).Y;sc.ScrollToVerticalOffset(sc.VerticalOffset+top);Pump();
+            CaptureLogical(window,"imported-routing-normal.png",960,640);CaptureLogical(window,"imported-routing-minimum.png",800,560);
+            Find<ComboBox>("RoutingSourceBox").SelectedIndex=0;Pump();Assert(Find<StackPanel>("LoyalsoldierSourcePanel").IsVisible,"Loyalsoldier remains available");
+            typeof(MainWindow).GetField("allowClose",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(window,true);window.Close();app.Shutdown();return 0;
+        }
+        if(Environment.GetEnvironmentVariable("ONETUNNEL_DNS_LAYOUT_ONLY")=="1") {
+            Panel("network"); Pump();
+            var dns=Find<Expander>("DNSSettingsExpander");
+            dns.IsExpanded=false; Pump();
+            Assert(!Find<ComboBox>("NetworkDNSModeBox").IsVisible && !Find<TextBox>("NetworkResolversBox").IsVisible,"Collapsing DNS hides all DNS controls");
+            Assert(Find<CheckBox>("RoutingNoneToggle").IsVisible && Find<Button>("SaveNetworkPreferencesButton").IsVisible,"Routing and shared save remain visible when DNS collapses");
+            CaptureLogical(window,"dns-collapsed-routing-normal.png",960,640);CaptureLogical(window,"dns-collapsed-routing-minimum.png",800,560);
+            dns.IsExpanded=true;Pump();Assert(Find<ComboBox>("NetworkDNSModeBox").IsVisible,"DNS reopens independently");
+            typeof(MainWindow).GetField("allowClose",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(window,true);window.Close();app.Shutdown();return 0;
+        }
+        if(Environment.GetEnvironmentVariable("ONETUNNEL_GLOBAL_TRANSPORT_ONLY")=="1") {
+            Panel("editor");Assert(!Find<Expander>("TransportExpander").IsVisible,"Profile/group creation has no transport options");
+            Panel("settings");typeof(MainWindow).GetField("settingsSection",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(window,"general");typeof(MainWindow).GetMethod("PresentControlSettings",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null);
+            var load=PrivateTask("LoadUserSettingsAsync",true);Wait(()=>load.IsCompleted);load.GetAwaiter().GetResult();
+            Find<Expander>("TransportExpander").IsExpanded=true;Pump();Assert(Find<CheckBox>("FragmentCheck").IsVisible,"Common transport controls are in General settings");
+            Find<CheckBox>("FragmentCheck").IsChecked=true;Find<CheckBox>("NoiseCheck").IsChecked=true;Find<CheckBox>("MuxCheck").IsChecked=true;
+            Find<ComboBox>("MuxProtocolBox").SelectedIndex=3;Find<TextBox>("MuxMaxConnectionsBox").Text="2";Find<TextBox>("MuxMinStreamsBox").Text="1";Find<CheckBox>("MuxPaddingBox").IsChecked=true;Find<TextBox>("XUDPConcurrencyBox").Text="4";
+            Wait(()=>Find<Button>("SaveUserSettingsButton").IsEnabled);Click("SaveUserSettingsButton");
+            Wait(()=>!(bool)typeof(MainWindow).GetField("userSettingsSavePending",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!);
+            var savedPrefs=ProfileBackend.UserSettingsAsync(CancellationToken.None).GetAwaiter().GetResult().Preferences.Transport;
+            Assert(savedPrefs is {Fragment:true,Noise:true,Mux:true,MuxProtocol:"yamux",MuxMaxConnections:"2",MuxMinStreams:"1",MuxPadding:true,XUDPConcurrency:"4"},"Global options persist through the encrypted Go settings store");
+            var storePath=System.IO.Path.Combine(data,"profiles.bin");var valid=File.ReadAllBytes(storePath);Find<TextBox>("FragmentLengthBox").Text="0";Wait(()=>Find<Button>("SaveUserSettingsButton").IsEnabled);Click("SaveUserSettingsButton");Wait(()=>!(bool)typeof(MainWindow).GetField("userSettingsSavePending",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)!);
+            Assert(valid.SequenceEqual(File.ReadAllBytes(storePath)),"Invalid common transport values cannot change saved settings");
+            load=PrivateTask("LoadUserSettingsAsync",true);Wait(()=>load.IsCompleted);load.GetAwaiter().GetResult();
+            var globalDraft=(TransportInput)typeof(MainWindow).GetMethod("ReadGlobalTransport",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null)!;
+            typeof(MainWindow).GetMethod("BeginNewProfile",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[true]);Find<TextBox>("SourceBox").Text="socks5://192.0.2.81:1080\nsocks5://192.0.2.82:1080";Find<TextBox>("NameBox").Text="Global import";Pump();Wait(()=>Find<Button>("SaveProfileButton").IsEnabled);Click("SaveProfileButton");Wait(()=>LibraryIdle()&&Find<ListBox>("ProfilesList").Items.Count==5);
+            Assert(ProfileBackend.UserSettingsAsync(CancellationToken.None).GetAwaiter().GetResult().Preferences.Transport==globalDraft,"Importing a multi-server group cannot erase global MUX/fragment/noise settings");
+            Assert(!Find<Expander>("TransportExpander").IsVisible,"Transport settings remain outside the import editor");
+            Panel("settings");typeof(MainWindow).GetField("settingsSection",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(window,"general");typeof(MainWindow).GetMethod("PresentControlSettings",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null);load=PrivateTask("LoadUserSettingsAsync",true);Wait(()=>load.IsCompleted);Find<Expander>("TransportExpander").IsExpanded=true;
+            CaptureLogical(window,"global-transport-normal.png",960,640);CaptureLogical(window,"global-transport-minimum.png",800,560);
+            var scroll=Find<ScrollViewer>("WorkspaceScroll");scroll.ScrollToBottom();Pump();Assert(Find<Button>("SaveUserSettingsButton").IsVisible,"Global settings save action remains reachable by scrolling");
+            typeof(MainWindow).GetField("allowClose",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(window,true);window.Close();app.Shutdown();Console.WriteLine("PASS: global transport UI save, validation, group import and layout checks");return 0;
+        }
+        if(Environment.GetEnvironmentVariable("ONETUNNEL_MENU_ONLY")=="1") {
+            var menu=new ContextMenu{PlacementTarget=Find<Button>("InspectorMenuButton")};
+            foreach(var title in new[]{"Редактировать профиль","Проверить доступ","Удалить профиль…","Копировать или переместить","DNS и маршрутизация"})menu.Items.Add(new MenuItem{Header=title,IsEnabled=title!="Проверить доступ"});
+            menu.IsOpen=true;Pump();menu.UpdateLayout();
+            foreach(MenuItem item in menu.Items){item.ApplyTemplate();Assert(((System.Windows.Shapes.Path)item.Template.FindName("CheckMark",item)).Visibility==Visibility.Collapsed,"Plain menu command has no empty icon/check square");}
+            void SaveMenu(string name){var bmp=new RenderTargetBitmap((int)Math.Ceiling(menu.ActualWidth),(int)Math.Ceiling(menu.ActualHeight),96,96,PixelFormats.Pbgra32);bmp.Render(menu);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bmp));using var file=File.Create(System.IO.Path.Combine(Output,name));png.Save(file);}
+            SaveMenu("inspector-menu.png");menu.IsOpen=false;
+            var checkedItem=new MenuItem{Header="Группировать список",IsCheckable=true,IsChecked=true};var submenu=new MenuItem{Header="Порядок списка"};submenu.Items.Add(new MenuItem{Header="По имени"});menu.Items.Clear();menu.Items.Add(checkedItem);menu.Items.Add(submenu);menu.IsOpen=true;Pump();checkedItem.ApplyTemplate();submenu.ApplyTemplate();
+            Assert(((System.Windows.Shapes.Path)checkedItem.Template.FindName("CheckMark",checkedItem)).Visibility==Visibility.Visible,"Checkable options retain their real checkmark");
+            submenu.IsSubmenuOpen=true;Pump();Assert(((System.Windows.Controls.Primitives.Popup)submenu.Template.FindName("PART_Popup",submenu)).IsOpen,"Submenus remain available with the text-only menu template");submenu.IsSubmenuOpen=false;menu.IsOpen=false;
+            CaptureLogical(window,"settings-gear.png",1280,760);
+            typeof(MainWindow).GetField("allowClose",BindingFlags.Instance|BindingFlags.NonPublic)!.SetValue(window,true);window.Close();app.Shutdown();Console.WriteLine("PASS: menu chrome and settings gear checks");return 0;
+        }
         var list = Find<ListBox>("ProfilesList");
         Assert(list.Items.Count == 3, "Synthetic profiles loaded");
         var snapshot = Storage.Load();
         var profileFile = Path.Combine(data, "profiles.bin");
+        Assert(System.Windows.Data.CollectionViewSource.GetDefaultView(list.ItemsSource).GroupDescriptions.Count==1,"Server library groups imported profiles by default");
+        Assert(Raw<string>("group",new{Group="",Name="",Source="https://provider.example/sub/private-token?key=secret",Subscription=true})=="Подписка · provider.example","Subscription group name comes from URL host without exposing credentials or tokens");
+        var batchImport=ProfileBackend.SaveEditorAsync("Batch test","socks5://192.0.2.81:1080\nsocks5://192.0.2.82:1080","",null,transport,new()).GetAwaiter().GetResult();
+        typeof(MainWindow).GetMethod("SetGrouping",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[false]);
+        typeof(MainWindow).GetMethod("PresentApplied",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[batchImport]);
+        Wait(()=>LibraryIdle()&&Find<Button>("EditButton").IsEnabled);Pump();
+        Assert(batchImport.Batch&&batchImport.Added==2&&batchImport.Document.Profiles.Count(p=>p.Group=="Batch test")==2&&System.Windows.Data.CollectionViewSource.GetDefaultView(list.ItemsSource).GroupDescriptions.Count==1,"Multiple pasted servers immediately appear as one named group");
+        var batchExpander=Descendants(window).OfType<Expander>().First(e=>e.DataContext is System.Windows.Data.CollectionViewGroup g&&g.Name.ToString()=="Batch test");
+        T GroupHeader<T>(Expander exp,string name) where T:FrameworkElement=>Descendants((DependencyObject)exp.Header).OfType<T>().First(c=>c.Name==name);
+        Wait(()=>GroupHeader<Button>(batchExpander,"GroupDeleteAction").IsEnabled);
+        Assert(!GroupHeader<Button>(batchExpander,"GroupRefreshAction").IsEnabled&&GroupHeader<Button>(batchExpander,"GroupDeleteAction").IsEnabled,"Group exposes explicit action chips and disables refresh for a pasted list without URL");
+        var collapseGroup=GroupHeader<Button>(batchExpander,"GroupCollapseAction");collapseGroup.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();
+        Assert(!batchExpander.IsExpanded&&Storage.CollapsedGroups.Contains("Batch test"),"Collapse chip persists the imported group");
+        Assert(GroupHeader<Button>(batchExpander,"GroupDeleteAction").IsVisible,"Collapsed group retains its action chips");
+        collapseGroup.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Pump();
+        var subscriptionHeader=Descendants(window).OfType<Expander>().First(e=>e.DataContext is System.Windows.Data.CollectionViewGroup g&&g.Name.ToString()=="Personal subscription");
+        Wait(()=>GroupHeader<Button>(subscriptionHeader,"GroupRefreshAction").IsEnabled);
+        Assert(GroupHeader<Button>(subscriptionHeader,"GroupRefreshAction").IsEnabled,"Subscription header offers an explicit refresh chip");
+        var groupTitle=GroupHeader<FrameworkElement>(batchExpander,"GroupTitle");var groupBadge=(FrameworkElement)GroupHeader<TextBlock>(batchExpander,"GroupCount").Parent;
+        Assert(groupBadge.TranslatePoint(new Point(),window).X-groupTitle.TranslatePoint(new Point(groupTitle.ActualWidth,0),window).X<=10,"Profile count sits directly beside its group title instead of the latency column");
+        CaptureLogical(window,"server-groups.png",1280,760);
+        // Resizing for capture may recycle the virtualized group container.
+        Pump(); window.UpdateLayout(); Pump();
+        batchExpander=Descendants(window).OfType<Expander>().First(e=>e.DataContext is System.Windows.Data.CollectionViewGroup g&&g.Name.ToString()=="Batch test");
+        Assert(batchExpander.IsLoaded && GroupHeader<Button>(batchExpander,"GroupDeleteAction").Tag is string deletionGroupName && deletionGroupName=="Batch test", "Group deletion uses the loaded container after capture");
+        Wait(()=>GroupHeader<Button>(batchExpander,"GroupDeleteAction").IsEnabled);
+        var beforeDeletePrompt=File.ReadAllBytes(profileFile);
+        GroupHeader<Button>(batchExpander,"GroupDeleteAction").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Wait(()=>GroupHeader<Border>(batchExpander,"GroupDeleteConfirmation").Visibility==Visibility.Visible);
+        Assert(GroupHeader<TextBlock>(batchExpander,"GroupDeleteDescription").Text.Contains("2")&&beforeDeletePrompt.SequenceEqual(File.ReadAllBytes(profileFile)),"Inline deletion uses current group count and cannot delete on its first click");
+        CaptureLogical(window,"group-delete-confirmation.png",1280,760);
+        var cancelDelete=new KeyEventArgs(Keyboard.PrimaryDevice,PresentationSource.FromVisual(window),0,Key.Escape){RoutedEvent=Keyboard.PreviewKeyDownEvent};GroupHeader<Border>(batchExpander,"GroupDeleteConfirmation").RaiseEvent(cancelDelete);
+        Assert(cancelDelete.Handled&&GroupHeader<Border>(batchExpander,"GroupDeleteConfirmation").Visibility==Visibility.Collapsed&&beforeDeletePrompt.SequenceEqual(File.ReadAllBytes(profileFile)),"Escape cancels group deletion without changing storage");
+        GroupHeader<Button>(batchExpander,"GroupDeleteAction").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));Wait(()=>GroupHeader<Border>(batchExpander,"GroupDeleteConfirmation").Visibility==Visibility.Visible);
+        GroupHeader<Button>(batchExpander,"GroupDeleteConfirm").RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Wait(()=>LibraryIdle()&&list.Items.Count==3&&Find<Button>("EditButton").IsEnabled);
+        Assert(!Storage.Load().Any(p=>p.Group=="Batch test"),"Confirmed header action deletes only its group through the existing Go mutation guard");
         var before = SHA256.HashData(File.ReadAllBytes(profileFile));
         var search = Find<TextBox>("SearchBox");
+        string AccessibleName(UIElement element) => UIElementAutomationPeer.CreatePeerForElement(element)?.GetName() ?? "";
+        Assert(AccessibleName(search) == "Поиск серверов" && AccessibleName(list) == "Серверы", "Search and server list have explicit screen-reader names");
+        Assert(AccessibleName(Find<Button>("PrimaryConnectButton")) == Find<TextBlock>("PrimaryActionCaption").Text, "Primary action accessible name follows its current caption");
+        Assert(ApplicationCommands.Find.CanExecute(null, window), "Find command is available in the server library");
+        search.Text = "keyboard-query";
+        ApplicationCommands.Find.Execute(null, window);
+        Assert(search.SelectionLength == search.Text.Length, "Find command selects the existing search for replacement");
+        var escapeSearch = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, Key.Escape) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
+        search.RaiseEvent(escapeSearch);
+        Assert(escapeSearch.Handled && search.Text.Length == 0 && list.Items.Count == 3, "Escape clears only the search and restores the server list");
+        var emptyEscape = new KeyEventArgs(Keyboard.PrimaryDevice, PresentationSource.FromVisual(window), 0, Key.Escape) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
+        search.RaiseEvent(emptyEscape);
+        Assert(!emptyEscape.Handled, "Empty search does not swallow Escape");
+        Panel("settings"); Pump();
+        Assert(!ApplicationCommands.Find.CanExecute(null, window), "Find command does not steal keyboard input from settings");
+        Panel("connection"); Pump();
         search.Text = "AMSTERDAM"; Pump(); Assert(list.Items.Count == 1, "Case-insensitive name search");
         search.Text = "hysteria2"; Pump(); Assert(list.Items.Count == 1, "Protocol search");
         search.Text = "work profiles"; Pump(); Assert(list.Items.Count == 1, "Group search");
@@ -123,18 +293,7 @@ internal static class Program
         Find<CheckBox>("FallbackCheck").IsChecked = false; Pump();
         Assert(!Find<CheckBox>("QualityCheck").IsEnabled, "Quality selection requires fallback opt-in");
         Find<CheckBox>("FallbackCheck").IsChecked = true; Pump();
-        Find<Expander>("TransportExpander").IsExpanded = true;
-        Pump();
-        Assert(Find<CheckBox>("FragmentCheck").IsVisible, "Transport settings retained");
-        Find<CheckBox>("MuxCheck").IsChecked = true;
-        Find<ComboBox>("MuxProtocolBox").SelectedIndex = 1;
-        Find<TextBox>("MuxMaxConnectionsBox").Text = "1"; Find<CheckBox>("MuxPaddingBox").IsChecked = true; Pump();
-        var singMuxInput = (TransportInput)typeof(MainWindow).GetMethod("ReadTransport", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null)!;
-        Assert(singMuxInput.MuxProtocol == "h2mux" && singMuxInput.MuxMaxConnections == "1" && singMuxInput.MuxPadding && singMuxInput.XUDPConcurrency == "" && Find<TextBox>("MuxMaxConnectionsBox").IsEnabled && !Find<TextBox>("XUDPConcurrencyBox").IsEnabled, "Sing mux controls retain limits/padding and exclude Xray-only fields");
-        Find<ComboBox>("MuxProtocolBox").SelectedIndex = 0; Find<TextBox>("XUDPConcurrencyBox").Text = "4"; Find<ComboBox>("MuxUDP443Box").SelectedIndex = 3;
-        var xudpInput = (TransportInput)typeof(MainWindow).GetMethod("ReadTransport", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null)!;
-        Assert(xudpInput.XUDPConcurrency == "4" && xudpInput.UDP443Policy == "reject" && xudpInput.MuxMaxConnections == "" && !Find<TextBox>("MuxMaxConnectionsBox").IsEnabled, "XUDP controls retain the UDP443 policy without hidden sing mux options");
-        typeof(MainWindow).GetMethod("LoadTransport", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [ProfileBackend.DefaultTransport()]);
+        Assert(!Find<Expander>("TransportExpander").IsVisible,"Transport options are not part of creating a profile or group");
         Capture(window, "workspace-editor.png");
         Panel("connection"); Wait(() => list.IsVisible);
         Panel("engines"); Pump(); Assert(Find<StackPanel>("EnginesPanel").IsVisible && Find<Button>("RecoveryButton").IsVisible, "Recovery remains reachable");
@@ -234,6 +393,7 @@ internal static class Program
         string groupName = ((System.Windows.Data.CollectionViewGroup)groupExpander.DataContext).Name.ToString()!;
         groupExpander.IsExpanded = false; Pump();
         Assert(Storage.CollapsedGroups.Contains(groupName), "Group collapse persists through Go");
+        Raw<JsonElement>("store.load");Pump();
         var collapsedHash = SHA256.HashData(File.ReadAllBytes(profileFile));
         search.Text = "no-synthetic-match"; Pump(); search.Clear(); Pump();
         Assert(collapsedHash.SequenceEqual(SHA256.HashData(File.ReadAllBytes(profileFile))), "Rebuilding filtered groups preserves stored expansion state");
@@ -332,7 +492,8 @@ internal static class Program
         var newerSelectionID = storedIDs[1];
         var currentDocument = ProfileBackend.LoadDocumentAsync().GetAwaiter().GetResult();
         var hostGate = (SemaphoreSlim)typeof(ProfileBackend).Assembly.GetType("OneTunnel.Core.ProfileHost")!.GetField("Gate", BindingFlags.Static | BindingFlags.NonPublic)!.GetValue(null)!;
-        Assert(hostGate.Wait(2000), "Test can delay a local library projection without networking");
+        void HoldHostGate(string message) { bool acquired=false; Wait(() => acquired || (acquired=hostGate.Wait(0))); Assert(acquired,message); }
+        HoldHostGate("Test can delay a local library projection without networking");
         try {
             typeof(MainWindow).GetMethod("PresentDocument", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [currentDocument, requestedID, true]);
             list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == newerSelectionID);
@@ -465,7 +626,7 @@ internal static class Program
         var connectionSnapshot = connectionObject.GetType().GetField("snapshot", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var retainedSnapshot = (DesktopReply)connectionSnapshot.GetValue(connectionObject)!;
         var fastestFlag = typeof(MainWindow).GetField("fastestSelectionPending", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        Assert(hostGate.Wait(2000), "Test can delay best-result visibility projection without networking");
+        HoldHostGate("Test can delay best-result visibility projection without networking");
         Task policySelection;
         try {
             fastestFlag.SetValue(window, true);
@@ -527,7 +688,7 @@ internal static class Program
         }
         finally { File.WriteAllBytes(profileFile, organizationValidBytes); }
         Click("ReloadProfileOrganizationButton"); Wait(() => OrganizationIdle() && Find<Button>("DuplicateProfileButton").IsEnabled);
-        Assert(hostGate.Wait(2000), "Test can delay profile metadata without networking");
+        HoldHostGate("Test can delay profile metadata without networking");
         try {
             list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == imported.Selected!.Id);
             list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == targetResult.Id);
@@ -561,7 +722,7 @@ internal static class Program
         search.Clear(); favoritesBox.IsChecked = false; Wait(LibraryIdle);
         list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == targetResult.Id);
         Panel("network");
-        Find<Expander>("NetworkPreferencesPanel").IsExpanded = true;
+        Find<Expander>("DNSSettingsExpander").IsExpanded = true;
         Wait(() => NetworkIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
         var networkDraft = Find<TextBox>("NameBox").Text;
         var networkOriginal = Raw<JsonElement>("store.load").GetProperty("Profiles").EnumerateArray().First(p => p.GetProperty("Id").GetString() == targetResult.Id.ToString());
@@ -569,6 +730,7 @@ internal static class Program
         Find<TextBox>("NetworkServerIPBox").Text = "9.9.9.9";
         Find<TextBox>("NetworkServerNameBox").Text = "dns.quad9.net";
         Find<TextBox>("NetworkPortBox").Clear(); Find<TextBox>("NetworkPathBox").Clear();
+        Find<ComboBox>("RoutingModeBox").SelectedIndex = 2;
         Find<TextBox>("NetworkRulesBox").Text = "domain-suffix | proxy | example.com\ncidr | direct | 192.168.1.0/24\nprocess | reject | C:\\Synthetic\\blocked.exe";
         Assert(Find<CheckBox>("NetworkAllowLANBox").IsChecked == false, "LAN bypass is off by default");
         Find<TextBox>("NetworkResolversBox").Text = "https | 1.1.1.1 | cloudflare-dns.com | | \ntls | 2001:4860:4860::8888 | dns.google | | ";
@@ -584,9 +746,181 @@ internal static class Program
         Click("ReloadNetworkPreferencesButton"); Wait(() => NetworkIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
         Assert(Find<TextBox>("NetworkRulesBox").Text == canonicalRules && Find<TextBox>("NetworkServerIPBox").Text == "9.9.9.9", "Saved network preferences round-trip through real metadata IPC");
         Assert(Find<TextBox>("NetworkResolversBox").Text.Contains("2001:4860:4860::8888") && Find<TextBox>("NetworkDNSRulesBox").Text.Contains("2") && Find<CheckBox>("NetworkAllowLANBox").IsChecked == true, "Domain resolver and LAN preferences round-trip through metadata IPC");
+        bool PolicyIdle() => !(bool)typeof(MainWindow).GetField("policyToolsPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
+        void CheckPolicy(bool explain) { var task = PrivateTask("RunPolicyToolsAsync", explain); Wait(() => task.IsCompleted && PolicyIdle()); task.GetAwaiter().GetResult(); }
+        void PolicyQuery(string address, string port, string ip = "", string process = "") {
+            Find<TextBox>("PolicyAddressBox").Text = address; Find<TextBox>("PolicyPortBox").Text = port; Find<TextBox>("PolicyIPBox").Text = ip; Find<TextBox>("PolicyProcessBox").Text = process; Find<ComboBox>("PolicyTransportBox").SelectedIndex = 1;
+        }
+        void AlignPolicy() { var scroll = Find<ScrollViewer>("WorkspaceScroll"); var top = Find<Expander>("PolicyToolsPanel").TranslatePoint(new Point(), scroll).Y; scroll.ScrollToVerticalOffset(scroll.VerticalOffset + top); Pump(); }
+        var policyBytes = File.ReadAllBytes(profileFile);
+        Find<Expander>("PolicyToolsPanel").IsExpanded = true;
+        CheckPolicy(false);
+        Assert(Find<TextBlock>("PolicyAnalysisResult").Text.Contains("не найдены"), "Saved policy duplicate check uses the real Go analyzer");
+        PolicyQuery("api.example.com", "443"); CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyDecision").Text == "Через прокси" && Find<TextBlock>("PolicyExplanation").Text.Contains("№1"), "Saved domain rule predicts proxy with one-based rule number");
+        PolicyQuery("outside.invalid", "443", "192.168.1.3"); CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyDecision").Text == "Напрямую" && Find<TextBlock>("PolicyExplanation").Text.Contains("№2"), "Manual domain plus IP metadata predicts the CIDR rule without DNS lookup");
+        PolicyQuery("outside.invalid", "443", "203.0.113.9", @"C:\Synthetic\blocked.exe"); CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyDecision").Text == "Блокировка" && Find<TextBlock>("PolicyExplanation").Text.Contains("№3"), "Process metadata is passed to Go rather than matched by the UI");
+        PolicyQuery("outside.invalid", "443", "203.0.113.9", @"C:\Synthetic\other.exe"); CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyExplanation").Text == "Действие по умолчанию", "Default policy does not invent rule number zero");
+        PolicyQuery("outside.invalid", "53"); CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyDecision").Text == "Через настроенный DNS-резолвер" && !Find<TextBlock>("PolicyExplanation").Text.Contains("№0"), "DNS interception is a prediction, without a fabricated resolver address");
+        PolicyQuery("api.example.com", ""); CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyDecision").Text == "Недостаточно данных для прогноза", "Missing port remains unknown instead of silently using 443");
+        PolicyQuery("203.0.113.9", "443"); CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyDecision").Text == "Недостаточно данных для прогноза" && Find<TextBlock>("PolicyExplanation").Text.Contains("№1"), "Unknown earlier domain rule is not skipped to a later rule");
+        var policyWidth = window.Width; var policyHeight = window.Height;
+        CaptureLogical(window, "policy-unknown-normal.png", 1280, 760, 1, AlignPolicy);
+        CaptureLogical(window, "policy-unknown-minimum.png", 800, 560, 1, () => { Find<StackPanel>("PolicyRouteResult").BringIntoView(); Pump(); });
+        var policyScroll = Find<ScrollViewer>("WorkspaceScroll");
+        var resultBottom = Find<StackPanel>("PolicyRouteResult").TranslatePoint(new Point(0, Find<StackPanel>("PolicyRouteResult").ActualHeight), policyScroll).Y;
+        Assert(resultBottom <= policyScroll.ActualHeight + 1 && Find<Button>("ExplainPolicyButton").TranslatePoint(new Point(), policyScroll).Y >= 0 && Find<TextBlock>("PageTitle").ActualWidth > 300, "Minimum window keeps the action/result reachable by scrolling and does not reserve hidden toolbar columns");
+        Assert(Find<StackPanel>("NetworkPreferencesPanel").ActualWidth <= 620 && Find<Border>("FeedbackNotice").Visibility == Visibility.Collapsed, "Policy form obeys the 620-DIP cap and stale feedback does not cover controls");
+        window.Width = policyWidth; window.Height = policyHeight; Pump();
+        PolicyQuery("api.example.com", "65536"); CheckPolicy(true);
+        Assert(Find<StackPanel>("PolicyRouteResult").Visibility == Visibility.Collapsed && Find<TextBlock>("PolicyPortError").Text.Contains("65535") && Find<TextBlock>("PolicyPortError").Visibility == Visibility.Visible, "Invalid port clears old prediction and has an inline field error");
+        Assert(policyBytes.SequenceEqual(File.ReadAllBytes(profileFile)), "Analysis and all route predictions leave encrypted profile storage unchanged");
+        var duplicatePolicy = """{"Targets":[{"Name":"work","Protocol":3,"Source":"socks5://user:POLICY-TOOLS-SECRET@127.0.0.1:18080"}],"RuleSets":[{"Name":"sites","Members":[{"Kind":"domain-suffix","Value":"example.com"}]}],"Rules":[{"Kind":"rule-set","Value":"sites","Action":"proxy","Outbound":"work","Network":"tcp","Port":"443"},{"Kind":"rule-set","Value":"sites","Action":"reject","Network":"tcp","Port":"443"}]}""";
+        Find<TextBox>("NetworkRulesBox").Text = duplicatePolicy;
+        Assert(!Find<Button>("CheckPolicyDuplicatesButton").IsEnabled && !Find<Button>("ExplainPolicyButton").IsEnabled && Find<TextBlock>("PolicyStatus").Text.Contains("Сохраните"), "Unsaved policy drafts disable checks without silently saving");
+        Click("SaveNetworkPreferencesButton"); Wait(() => NetworkIdle() && LibraryIdle() && Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+        policyBytes = File.ReadAllBytes(profileFile);
+        CheckPolicy(false);
+        Assert(Find<TextBlock>("PolicyAnalysisResult").Text.Contains("№2") && !Find<TextBlock>("PolicyAnalysisResult").Text.Contains("POLICY-TOOLS-SECRET"), "Identical conditions with different actions warn with correct index and no credentials");
+        CaptureLogical(window, "policy-duplicates.png", 1280, 760, 1, AlignPolicy);
+        PolicyQuery("api.example.com", "443"); CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyDecision").Text == "Через прокси" && Find<TextBlock>("PolicyOutbound").Text == "Сервер: work" && !Find<TextBlock>("PolicyTechnicalDetails").Text.Contains("POLICY-TOOLS-SECRET"), "Named target prediction exposes its name but not target credentials");
+        CaptureLogical(window, "policy-proxy-target.png", 1280, 760, 1, AlignPolicy);
+        window.Width = policyWidth; window.Height = policyHeight; Pump();
+        Assert(policyBytes.SequenceEqual(File.ReadAllBytes(profileFile)), "Advanced policy checks are also read-only");
+        var external = ProfileBackend.NetworkPreferencesAsync(targetResult.Id).GetAwaiter().GetResult();
+        var externalInput = new NetworkInput(external.Mode, external.ServerIP, external.ServerName, external.Port, external.Path, canonicalRules, external.ResolversText, external.DNSRulesText, external.AllowLAN, external.FakeIP, external.CacheMode, external.CacheCapacity);
+        ProfileBackend.SaveNetworkPreferencesAsync(targetResult.Id, external.Token, externalInput).GetAwaiter().GetResult();
+        CheckPolicy(false);
+        Assert(Find<TextBlock>("PolicyAnalysisResult").Visibility == Visibility.Collapsed && !Find<Button>("CheckPolicyDuplicatesButton").IsEnabled && Find<TextBlock>("PolicyStatus").Text.Contains("Обновите"), "Changed saved token suppresses the result and requires explicit reload");
+        Click("ReloadNetworkPreferencesButton"); Wait(() => NetworkIdle() && Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+        var policyTask = PrivateTask("RunPolicyToolsAsync", false);
+        list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id != targetResult.Id);
+        Wait(() => policyTask.IsCompleted && PolicyIdle() && NetworkIdle() && LibraryIdle()); policyTask.GetAwaiter().GetResult();
+        Assert(Find<TextBlock>("PolicyAnalysisResult").Visibility == Visibility.Collapsed, "Profile switch discards an in-flight policy result");
+        list.SelectedIndex = -1; Pump();
+        Assert(!Find<Button>("CheckPolicyDuplicatesButton").IsEnabled && !Find<Button>("ExplainPolicyButton").IsEnabled, "No profile disables both policy operations");
+        list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == targetResult.Id); Wait(() => NetworkIdle() && LibraryIdle() && Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+        var apiFailureStore = Raw<JsonElement>("store.load");
+        Raw<object?>("delete", new { ID = targetResult.Id.ToString() });
+        try { CheckPolicy(false); Assert(Find<TextBlock>("PolicyAnalysisResult").Visibility == Visibility.Collapsed && Find<TextBlock>("PolicyStatus").Text.Contains("Не удалось"), "API failure is not shown as a successful zero-warning analysis"); }
+        finally { Raw<object?>("store.save", new { Document = JsonNode.Parse(apiFailureStore.GetRawText()) }); }
+        Click("ReloadNetworkPreferencesButton"); Wait(() => NetworkIdle() && Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+        Find<Expander>("PolicyToolsPanel").IsExpanded = false;
+        Assert(Find<TextBox>("NetworkRulesBox").Text == canonicalRules && Find<TextBox>("NameBox").Text == networkDraft, "Policy tools preserve restored settings and unrelated editor drafts");
+        Find<ComboBox>("RuleKindBox").SelectedIndex=3;Find<ComboBox>("RuleActionBox").SelectedIndex=2;
+        string chosenExecutable=Path.Combine(Environment.SystemDirectory,"cmd.exe");
+        typeof(MainWindow).GetMethod("ApplyRuleExecutable",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[chosenExecutable,false]);
+        Assert(Find<TextBox>("RuleValueBox").Text==chosenExecutable&&Find<Button>("RuleExecutableButton").Visibility==Visibility.Visible,"Executable picker selection binds to the process rule value without executing the program");
+        var beforeProcessRule=File.ReadAllBytes(profileFile);var processRuleTask=PrivateTask("AppendCustomRuleAsync");Wait(()=>processRuleTask.IsCompleted&&PolicyIdle());processRuleTask.GetAwaiter().GetResult();
+        Assert(Find<TextBox>("NetworkRulesBox").Text.Contains("cmd.exe")&&beforeProcessRule.SequenceEqual(File.ReadAllBytes(profileFile)),"Process builder appends a validated rule to the draft without auto-saving");
+        Click("SaveNetworkPreferencesButton");Wait(()=>NetworkIdle()&&LibraryIdle()&&Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+        PolicyQuery("outside.invalid","443","203.0.113.9",chosenExecutable);CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyDecision").Text=="Блокировка","A chosen executable reaches the real Go process matcher");
+        CaptureLogical(window,"routing-process-builder.png",960,640,prepare:()=>{var scroll=Find<ScrollViewer>("WorkspaceScroll");scroll.ScrollToVerticalOffset(scroll.VerticalOffset+Find<StackPanel>("CustomRoutingPanel").TranslatePoint(new Point(),scroll).Y);Pump();});
+        window.Width=policyWidth;window.Height=policyHeight;Pump();
+        Find<TextBox>("NetworkRulesBox").Text=canonicalRules;Click("SaveNetworkPreferencesButton");Wait(()=>NetworkIdle()&&LibraryIdle()&&Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+        var loyalBefore = File.ReadAllBytes(profileFile);
+        var loyalFile = Path.Combine(Output, "geosite-fixture.dat");
+        File.WriteAllBytes(loyalFile,Convert.FromBase64String("CjIKB3lvdXR1YmUSEQgCEg1sb3lhbC5leGFtcGxlEhQIAxIQZXhhY3QubG95YWwudGVzdA=="));
+        Find<CheckBox>("RoutingPresetToggle").IsChecked=true;
+        Assert(Find<ComboBox>("RoutingModeBox").SelectedIndex==1 && Find<CheckBox>("RoutingCustomToggle").IsChecked==false && Find<CheckBox>("RoutingNoneToggle").IsChecked==false,"Preset toggle turns off the other two routing modes");
+        Find<CheckBox>("RoutingPresetToggle").IsChecked=false;
+        Assert(Find<CheckBox>("RoutingPresetToggle").IsChecked==true,"Routing toggles keep exactly one selected mode");
+        Assert(Find<TextBox>("NetworkRulesBox").Text == "" && Find<TextBox>("NetworkRulesBox").IsReadOnly && Find<Expander>("LoyalRulesPanel").Visibility == Visibility.Visible, "Preset mode has its own empty bank and disables manual policy editing");
+        Find<Expander>("LoyalRulesPanel").IsExpanded = true;
+        Find<TextBox>("LoyalCategoryBox").Clear();Click("ConfigurePresetButton");
+        Assert(Find<TextBlock>("PresetCategoryError").Visibility==Visibility.Visible && loyalBefore.SequenceEqual(File.ReadAllBytes(profileFile)),"Missing category is reported inline before any import or save");
+        Assert(Find<ComboBox>("LoyalFormatBox").Items.Count==2 && window.FindName("PresetClashListBox")==null,"Preset UI offers only geosite and geoip");
+        Find<ComboBox>("LoyalFormatBox").SelectedIndex = 0;
+        Find<TextBox>("LoyalCategoryBox").Text = "youtube";
+        Find<TextBox>("LoyalNameBox").Text = "loyal-ui";
+        Find<ComboBox>("LoyalActionBox").SelectedIndex = 2;
+        var loyalTask = PrivateTask("ImportLoyalRulesAsync", loyalFile, false);
+        Assert(!Find<Button>("SaveNetworkPreferencesButton").IsEnabled && !Find<ComboBox>("RoutingModeBox").IsEnabled, "Pending preset import prevents saving or switching a half-built policy");
+        Wait(() => loyalTask.IsCompleted && PolicyIdle()); loyalTask.GetAwaiter().GetResult();
+        var loyalDraft = Find<TextBox>("NetworkRulesBox").Text;
+        Assert(loyalDraft.Contains("Snapshot") && loyalDraft.Contains("loyal-ui") && loyalBefore.SequenceEqual(File.ReadAllBytes(profileFile)), "Loyalsoldier import creates a compressed draft without changing stored profiles");
+        Assert(!Find<Button>("CheckPolicyDuplicatesButton").IsEnabled && Find<TextBlock>("LoyalStatus").Text.Contains("2"), "Imported draft requires explicit save before analysis");
+        var repeatedTask = PrivateTask("ImportLoyalRulesAsync", loyalFile, false); Wait(() => repeatedTask.IsCompleted && PolicyIdle()); repeatedTask.GetAwaiter().GetResult();
+        Assert(Find<TextBox>("NetworkRulesBox").Text == loyalDraft && Find<TextBlock>("LoyalStatus").Text.Contains("уже есть"), "Import refuses silent replacement and preserves the draft");
+        Find<CheckBox>("LoyalReplaceBox").IsChecked = true;
+        Find<ComboBox>("LoyalActionBox").SelectedIndex = 1;
+        var replaceTask = PrivateTask("ImportLoyalRulesAsync", loyalFile, false); Wait(() => replaceTask.IsCompleted && PolicyIdle()); replaceTask.GetAwaiter().GetResult();
+        Assert(Find<TextBox>("NetworkRulesBox").Text == loyalDraft, "Explicit update preserves rule action and position");
+        Click("SaveNetworkPreferencesButton"); Wait(() => NetworkIdle() && LibraryIdle() && Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+        var loyalCopy = JsonSerializer.Deserialize<NetworkOptions>(NetworkProfile().GetProperty("Network").GetRawText())!;
+        Assert(loyalCopy.RuleSets!.First(s => s.Name == "loyal-ui").Data?.Snapshot?.Length > 0, "Presentation metadata retains imported compressed snapshots");
+        Assert(Find<TextBlock>("RoutingPresetSummary").Text.Contains("loyal-ui") && Find<TextBlock>("RoutingPresetSummary").Text.Contains("Блокировать") && Find<TextBox>("NetworkRulesBox").Visibility==Visibility.Collapsed, "Preset mode shows an ordered name/action summary instead of JSON");
+        PolicyQuery("a.loyal.example", "443", "203.0.113.9", @"C:\Synthetic\other.exe"); CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyDecision").Text.Contains("Блок"), "Imported geosite domain suffix reaches the saved Go route predictor");
+        CaptureLogical(window, "routing-presets.png", 960, 640, prepare: () => { var scroll=Find<ScrollViewer>("WorkspaceScroll"); scroll.ScrollToVerticalOffset(scroll.VerticalOffset+Find<CheckBox>("RoutingPresetToggle").TranslatePoint(new Point(),scroll).Y-48); Pump(); });
+        CaptureLogical(window, "loyal-import-normal.png", 960, 640, prepare: () => {
+            var scroll = Find<ScrollViewer>("WorkspaceScroll");
+            scroll.ScrollToVerticalOffset(scroll.VerticalOffset + Find<Expander>("LoyalRulesPanel").TranslatePoint(new Point(), scroll).Y); Pump();
+        });
+        CaptureLogical(window, "loyal-import-minimum.png", 800, 560, prepare: () => {
+            var scroll = Find<ScrollViewer>("WorkspaceScroll"); var status = Find<TextBlock>("LoyalStatus");
+            scroll.ScrollToVerticalOffset(scroll.VerticalOffset + status.TranslatePoint(new Point(0, status.ActualHeight), scroll).Y - scroll.ActualHeight + 12); Pump();
+            Assert(status.TranslatePoint(new Point(0, status.ActualHeight), scroll).Y <= scroll.ActualHeight + 1 && Find<Button>("RefreshPresetsButton").TranslatePoint(new Point(), scroll).Y >= 0, "Loyalsoldier refresh action and complete result are reachable at the minimum window size");
+        });
+        window.Width = policyWidth; window.Height = policyHeight; Pump();
+        Find<Expander>("LoyalRulesPanel").IsExpanded = false;
+        if (Environment.GetEnvironmentVariable("ONETUNNEL_LOYAL_UI_LIVE") == "1")
+        {
+            Find<TextBox>("LoyalCategoryBox").Text = "category-ads-all";
+            Find<TextBox>("LoyalNameBox").Text = "loyal-large";
+            var largeBefore = File.ReadAllBytes(profileFile);
+            var largeTask = PrivateTask("ImportLoyalRulesAsync", "", true);
+            Wait(() => largeTask.IsCompleted && PolicyIdle()); largeTask.GetAwaiter().GetResult();
+            Assert(Find<TextBox>("NetworkRulesBox").Text.Length > 1_000_000 && largeBefore.SequenceEqual(File.ReadAllBytes(profileFile)), "Real large Loyalsoldier download reaches the WPF draft without saving automatically");
+            Click("SaveNetworkPreferencesButton"); Wait(() => NetworkIdle() && LibraryIdle() && Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+            Assert(NetworkProfile().GetProperty("Network").GetProperty("RuleSets").EnumerateArray().Any(s => s.GetProperty("Name").GetString() == "loyal-large"), "Large imported snapshot survives the complete WPF save/reload path");
+            var beforeRefresh=File.ReadAllBytes(profileFile);
+            for(int repeat=0;repeat<2;repeat++){
+                Click("RefreshPresetsButton");WaitDownload(()=>PolicyIdle());
+                var rows=Find<ListBox>("PresetCatalogList").Items.OfType<PresetRow>().ToArray();
+                Assert(rows.Length==3&&rows.Select(row=>row.Action).SequenceEqual(new[]{"reject","direct","direct"})&&rows.All(row=>!row.Pending),"The single paired source refreshes both geosite and geoip with fixed ads/RU priority");
+                Assert(rows[1].Category=="category-ru"&&rows[2].Format=="geoip"&&rows[2].Category=="ru","Paired RU routing includes domain and IP data");
+            }
+            Assert(beforeRefresh.SequenceEqual(File.ReadAllBytes(profileFile)),"Paired refresh preserves encrypted storage until explicit save");
+            Assert(!Find<ComboBox>("PresetGeoKindBox").IsVisible&&!Find<TextBox>("LoyalCategoryBox").IsVisible&&!Find<ComboBox>("LoyalActionBox").IsVisible,"Paired source hides category, format and action editors");
+            Click("SaveNetworkPreferencesButton");Wait(()=>NetworkIdle()&&LibraryIdle()&&Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+        }
+        var savedPresetDraft = Find<TextBox>("NetworkRulesBox").Text;
+        Find<CheckBox>("RoutingNoneToggle").IsChecked=true;
+        Assert(Find<TextBox>("NetworkRulesBox").Visibility == Visibility.Collapsed && Find<Expander>("LoyalRulesPanel").Visibility == Visibility.Collapsed && !Find<Button>("LoyalDownloadButton").IsEnabled, "None mode hides both mutually exclusive route editors and disables preset import");
+        Wait(() => Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
+        Click("SaveNetworkPreferencesButton"); Wait(() => NetworkIdle() && LibraryIdle());
+        Console.WriteLine("TRACE none-save "+NetworkDiff());
+        WaitDownload(() => Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+        var noRouting = NetworkProfile().GetProperty("Network");
+        Assert(noRouting.GetProperty("Rules").ValueKind == JsonValueKind.Null && noRouting.GetProperty("DNS").GetProperty("ServerIP").GetString() == "9.9.9.9", "None mode sends no routing rules and preserves the DNS policy");
+        Assert((!noRouting.TryGetProperty("AllowLAN",out var noneLAN)||!noneLAN.GetBoolean())&&Find<CheckBox>("NetworkAllowLANBox").Visibility==Visibility.Collapsed,"All-through-VPN mode disables direct LAN access while keeping its preference for the other modes");
+        PolicyQuery("a.loyal.example", "443", "203.0.113.9", @"C:\Synthetic\other.exe"); CheckPolicy(true);
+        Assert(Find<TextBlock>("PolicyDecision").Text == "Через прокси", "Disabled preset rules do not affect the saved runtime route predictor");
+        CaptureLogical(window, "routing-none.png", 960, 640, prepare: () => { var scroll=Find<ScrollViewer>("WorkspaceScroll");scroll.ScrollToVerticalOffset(scroll.VerticalOffset+Find<CheckBox>("RoutingPresetToggle").TranslatePoint(new Point(),scroll).Y-48);Pump(); });
+        Find<ComboBox>("RoutingModeBox").SelectedIndex = 2;
+        Assert(Find<TextBox>("NetworkRulesBox").Text == canonicalRules && !Find<TextBox>("NetworkRulesBox").IsReadOnly && Find<Expander>("LoyalRulesPanel").Visibility == Visibility.Collapsed, "Custom rules survive preset and none saves and remain separately editable");
+        Find<ComboBox>("RoutingModeBox").SelectedIndex = 1;
+        Assert(Find<TextBox>("NetworkRulesBox").Text == savedPresetDraft, "Preset snapshots survive save/reload while the none mode is selected");
+        Find<ComboBox>("RoutingModeBox").SelectedIndex = 2;
+        CaptureLogical(window, "routing-custom-minimum.png", 800, 560, prepare: () => { var scroll=Find<ScrollViewer>("WorkspaceScroll");scroll.ScrollToVerticalOffset(scroll.VerticalOffset+Find<CheckBox>("RoutingPresetToggle").TranslatePoint(new Point(),scroll).Y-48);Pump(); });
+        window.Width = policyWidth; window.Height = policyHeight; Pump();
+        Click("SaveNetworkPreferencesButton"); Wait(() => NetworkIdle() && LibraryIdle() && Find<Button>("CheckPolicyDuplicatesButton").IsEnabled);
+        void TraceNetwork(string stage) => Console.WriteLine($"TRACE {stage}: busy={typeof(MainWindow).GetField("busy",BindingFlags.Instance|BindingFlags.NonPublic)!.GetValue(window)} idle={NetworkIdle()} policyIdle={PolicyIdle()} save={Find<Button>("SaveNetworkPreferencesButton").IsEnabled} dns={Find<ComboBox>("NetworkDNSModeBox").SelectedIndex} fake={Find<CheckBox>("NetworkFakeIPBox").IsChecked} cache={Find<ComboBox>("NetworkCacheModeBox").SelectedIndex}/{Find<TextBox>("NetworkCacheCapacityBox").Text}");
+        TraceNetwork("after custom save");
         Find<ComboBox>("NetworkDNSModeBox").SelectedIndex = 3; Find<TextBox>("NetworkPortBox").Clear(); Find<TextBox>("NetworkPathBox").Clear();
         Find<CheckBox>("NetworkFakeIPBox").IsChecked = true; Find<ComboBox>("NetworkCacheModeBox").SelectedIndex = 2; Find<TextBox>("NetworkCacheCapacityBox").Text = "512";
-        Click("SaveNetworkPreferencesButton"); Wait(() => NetworkIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
+        TraceNetwork("before advanced DNS save");
+        Click("SaveNetworkPreferencesButton"); TraceNetwork("advanced save dispatched"); Wait(() => NetworkIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
+        TraceNetwork("advanced save complete");
         var advancedDNS = NetworkProfile().GetProperty("Network");
         Assert(advancedDNS.GetProperty("DNS").GetProperty("Transport").GetString() == "quic" && advancedDNS.GetProperty("DNS").GetProperty("Port").GetInt32() == 853 && advancedDNS.GetProperty("FakeIP").GetBoolean() && advancedDNS.GetProperty("DNSCache").GetProperty("Capacity").GetInt32() == 512, "DoQ, FakeIP and bounded DNS cache persist through the real Go host");
         Find<ComboBox>("NetworkDNSModeBox").SelectedIndex = 4; Find<TextBox>("NetworkPortBox").Clear(); Find<TextBox>("NetworkPathBox").Text = "/custom-dns";
@@ -634,6 +968,8 @@ internal static class Program
         typeof(MainWindow).GetMethod("PresentDocument", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [nativeAdded.Document, nativeAdded.Selected!.Id, true]);
         Wait(() => NetworkIdle() && LibraryIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
         var nativeOriginal = Raw<JsonElement>("store.load").GetProperty("Profiles").EnumerateArray().First(p => p.GetProperty("Id").GetString() == nativeAdded.Selected!.Id.ToString());
+        PolicyQuery("example.org", "443");
+        Assert(!Find<Button>("ExplainPolicyButton").IsEnabled && !Find<TextBox>("PolicyAddressBox").IsEnabled && Find<Button>("CheckPolicyDuplicatesButton").IsEnabled && Find<TextBlock>("PolicyNativeHint").Visibility == Visibility.Visible, "Native AllowedIPs disable the prediction form but retain saved-policy analysis");
         var nativeOriginalSource = nativeOriginal.GetProperty("Source").GetString();
         Assert(nativeOriginalSource == nativeFixture && nativeOriginalSource.Split("[Peer]").Length == 3, "Editor import preserves both native peers and their route ownership");
         var nativeStatus = Find<TextBlock>("NetworkPreferencesStatus").Text;
@@ -643,22 +979,28 @@ internal static class Program
         Find<TextBox>("NetworkServerIPBox").Text = "9.9.9.9";
         Find<TextBox>("NetworkServerNameBox").Text = "dns.quad9.net";
         Find<TextBox>("NetworkPortBox").Clear(); Find<TextBox>("NetworkPathBox").Clear();
+        Find<ComboBox>("RoutingModeBox").SelectedIndex=2;
         Find<TextBox>("NetworkRulesBox").Text = "domain-suffix | reject | blocked.example";
+        string[] ServiceProcessIdentity() => System.Diagnostics.Process.GetProcessesByName("OneTunnel.Service").Select(process => { using (process) return $"{process.Id}/{process.StartTime.ToUniversalTime().Ticks}"; }).Order().ToArray();
+        var serviceBeforeNativeSave = ServiceProcessIdentity();
+        var nativeController = (IConnectionController)connectionObject;
+        var connectionBeforeNativeSave = (nativeController.Active, nativeController.TrafficLocked, nativeController.LocalPort, nativeController.WholeDevice);
         Click("SaveNetworkPreferencesButton"); Wait(() => NetworkIdle() && LibraryIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
         var nativeSaved = Raw<JsonElement>("store.load").GetProperty("Profiles").EnumerateArray().First(p => p.GetProperty("Id").GetString() == nativeAdded.Selected!.Id.ToString());
         Assert(nativeSaved.GetProperty("Protocol").GetInt32() == 1 && nativeSaved.GetProperty("Source").GetString() == nativeOriginalSource && nativeSaved.GetProperty("Network").GetProperty("DNS").GetProperty("Transport").GetString() == "tls", "Native policy save preserves the imported WireGuard source and selected policy through real Go IPC");
-        Assert(Find<TextBlock>("Feedback").Text.Contains("Подключение не запускалось"), "Saving native preferences does not connect or start the service");
+        Assert(connectionBeforeNativeSave == (nativeController.Active, nativeController.TrafficLocked, nativeController.LocalPort, nativeController.WholeDevice) && serviceBeforeNativeSave.SequenceEqual(ServiceProcessIdentity()), "Saving native preferences preserves observed connection state and service process identity");
         var finalNetworkDocument = ProfileBackend.LoadDocumentAsync().GetAwaiter().GetResult();
         typeof(MainWindow).GetMethod("PresentDocument", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [finalNetworkDocument, targetResult.Id, true]);
         Wait(() => NetworkIdle() && LibraryIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
-        Assert(hostGate.Wait(2000), "Test can delay network metadata without networking");
+        HoldHostGate("Test can delay network metadata without networking");
         try { list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == imported.Selected!.Id); list.SelectedItem = list.Items.OfType<Profile>().First(p => p.Id == targetResult.Id); }
         finally { hostGate.Release(); }
         Wait(() => NetworkIdle() && Find<Button>("SaveNetworkPreferencesButton").IsEnabled);
         var renderedNetwork = (NetworkPreferencesView)typeof(MainWindow).GetField("networkPreferencesView", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
         Assert(renderedNetwork.ID == targetResult.Id.ToString() && Find<TextBox>("NameBox").Text == networkDraft, "Delayed network metadata preserves newer selection and editor draft");
         window.Width = window.MinWidth; window.Height = window.MinHeight; Pump();
-        Assert(Find<TextBox>("NetworkRulesBox").ActualWidth > 200 && Find<TextBox>("NetworkResolversBox").ActualWidth > 200 && Find<TextBox>("NetworkDNSRulesBox").ActualWidth > 200 && Find<TextBox>("NetworkServerIPBox").ActualWidth > 80, "Network editor retains usable controls at minimum window size");
+        Find<Expander>("AdvancedRoutingEditor").IsExpanded=true;window.UpdateLayout();Pump();
+        Assert(Find<TextBox>("NetworkRulesBox").ActualWidth > 200 && Find<TextBox>("NetworkResolversBox").ActualWidth > 200 && Find<TextBox>("NetworkDNSRulesBox").ActualWidth > 200 && Find<TextBox>("NetworkServerIPBox").ActualWidth > 80, "Expanded advanced network editor retains usable controls at minimum window size");
         Capture(window, "dns-routing-minimum.png"); window.Width = 1240; window.Height = 850; Pump();
         Task PrivateTask(string method, params object?[] args) => (Task)typeof(MainWindow).GetMethod(method, BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, args)!;
         bool BackupIdle() => !(bool)typeof(MainWindow).GetField("backupPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)! && !(bool)typeof(MainWindow).GetField("backupApplyPending", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(window)!;
@@ -715,7 +1057,7 @@ internal static class Program
         var trayPendingField = typeof(MainWindow).GetField("traySelectionPending", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var pendingTargetField = typeof(MainWindow).GetField("pendingLibrarySelection", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var trayRetainedSnapshot = (DesktopReply)connectionSnapshot.GetValue(connectionObject)!;
-        Assert(hostGate.Wait(2000), "Test can delay tray visibility projection without networking");
+        HoldHostGate("Test can delay tray visibility projection without networking");
         try {
             trayPendingField.SetValue(window, true); pendingTargetField.SetValue(window, nativeAdded.Selected!.Id);
             favoritesBox.IsChecked = false;
@@ -761,7 +1103,7 @@ internal static class Program
         Find<CheckBox>("UserAllowPublicBox").IsChecked = false; Find<CheckBox>("UserFullDeviceBox").IsChecked = false; Find<ComboBox>("UserAutoConnectProfileBox").SelectedItem = null;
         Wait(() => Find<Button>("SaveUserSettingsButton").IsEnabled); Click("SaveUserSettingsButton"); Wait(UserSettingsIdle);
         var resetUserDocument = Raw<JsonElement>("store.load");
-        Assert(!resetUserDocument.TryGetProperty("UserSettings", out var resetUserPreferences) || resetUserPreferences.ValueKind == JsonValueKind.Null, "Explicitly clearing preferences restores disabled defaults without registry effects");
+        Assert(resetUserDocument.TryGetProperty("UserSettings",out var resetUserPreferences)&&!resetUserPreferences.GetProperty("AutoConnect").GetBoolean()&&!resetUserPreferences.GetProperty("UseSystemProxy").GetBoolean()&&!resetUserPreferences.GetProperty("Transport").GetProperty("Mux").GetBoolean()&&!resetUserPreferences.GetProperty("Transport").GetProperty("Fragment").GetBoolean()&&!resetUserPreferences.GetProperty("Transport").GetProperty("Noise").GetBoolean(),"Clearing common preferences disables automation and transport flags without registry effects");
         Assert(Find<TextBox>("NameBox").Text == automationDraft && Raw<JsonElement>("store.load").GetProperty("FavoriteIDs").GetArrayLength() == 1, "Automation tools preserve editor drafts and unrelated favorites");
         typeof(MainWindow).GetMethod("SetGrouping", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, [false]);
         Panel("connection");
@@ -778,6 +1120,30 @@ internal static class Program
         Assert(statsRoundTrip?.Statistics == statsContract && statsRoundTrip.ProxyListenerStable, "Service statistics survive the retained C# observation contract without recomputation");
         connectionSnapshot.SetValue(connectionObject, statsSnapshot);
         typeof(MainWindow).GetMethod("PresentConnectionState", BindingFlags.Instance | BindingFlags.NonPublic)!.Invoke(window, null);
+        var uiBusyField=typeof(MainWindow).GetField("busy",BindingFlags.Instance|BindingFlags.NonPublic)!;
+        var browseSelection=list.Items.OfType<Profile>().First();
+        var browseOther=list.Items.OfType<Profile>().First(p=>p.Id!=browseSelection.Id);
+        var activeView=statsSnapshot with {Response=statsSnapshot.Response with {State=statsSnapshot.Response.State with {Active=true,ProfileId=browseSelection.Id}},Actions=new(CanSelect:true,CanDisconnect:true,CanToggle:true,ConnectCaption:"Отключить")};
+        typeof(MainWindow).GetMethod("SetGrouping",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[true]);Panel("connection");Pump();
+        HoldHostGate("Test can delay a pending connection command without changing the real service");
+        try {
+            uiBusyField.SetValue(window,true);
+            // Drain the preceding context replies before installing the fake session.
+            Pump();
+            connectionSnapshot.SetValue(connectionObject,activeView);
+            typeof(MainWindow).GetMethod("RefreshControls",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null);
+            Click("UserSettingsNavigationButton");Pump();Assert(Find<FrameworkElement>("UserSettingsPanel").Visibility==Visibility.Visible,"Settings navigation remains responsive while a connection command is pending");
+            typeof(MainWindow).GetMethod("Home_Click",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[window,new RoutedEventArgs()]);Pump();
+            list.SelectedItem=browseOther;Pump();
+            Assert(list.IsEnabled&&((Profile)list.SelectedItem).Id==browseOther.Id&&((OneTunnel.Client.ServiceConnection)connectionObject).ProfileId==browseSelection.Id,$"Browsing another server cannot replace the active session or lock the server list; enabled={list.IsEnabled}, selected={((Profile?)list.SelectedItem)?.Id}, expected={browseOther.Id}, session={((OneTunnel.Client.ServiceConnection)connectionObject).ProfileId}, active={browseSelection.Id}");
+            var busyGroup=Descendants(list).OfType<Expander>().First(e=>e.DataContext is System.Windows.Data.CollectionViewGroup);
+            var wasExpanded=busyGroup.IsExpanded;busyGroup.IsExpanded=!wasExpanded;Pump();
+            Assert(busyGroup.IsExpanded!=wasExpanded,"Collapsing a group never synchronously waits for a pending connection command");
+            busyGroup.IsExpanded=wasExpanded;Pump();
+            Assert(Find<Button>("SaveProfileButton").IsEnabled==false||!((OneTunnel.Client.ServiceConnection)connectionObject).Actions.CanSave,"Viewing during a connection does not grant profile mutation permission");
+        } finally {uiBusyField.SetValue(window,false);connectionSnapshot.SetValue(connectionObject,statsSnapshot);hostGate.Release();}
+        Wait(()=>LibraryIdle()&&NetworkIdle()&&OrganizationIdle());
+        typeof(MainWindow).GetMethod("RefreshControls",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,null);
         int traySelections = 0;
         using (var menuFixture = new TrayShell(() => { }, () => { }, () => { }, () => { }, () => { })) {
             menuFixture.PresentProfiles(trayView, (_, _) => traySelections++);
@@ -844,6 +1210,26 @@ internal static class Program
             var popup = (System.Windows.Controls.Primitives.Popup)popupBox.Template.FindName("PART_Popup", popupBox);
             Assert(popup.IsOpen && popup.Child is FrameworkElement { ActualHeight: > 10 }, "Dark ComboBox popup opens with a measured visual surface on the VM");
             popupBox.IsDropDownOpen = false;
+            var groupEmpty=JsonNode.Parse(referenceOriginal)!.AsObject();groupEmpty["Profiles"]=new JsonArray();groupEmpty["FavoriteIDs"]=new JsonArray();Raw<object?>("store.save",new{Document=groupEmpty});
+            var longGroup="Подписка команды — европейские серверы с очень длинным названием для проверки заголовка";
+            AppliedProfiles? many=null;
+            for(int g=0;g<2;g++)many=ProfileBackend.SaveEditorAsync(g==0?longGroup:"Локальный набор",string.Join("\n",Enumerable.Range(10,50).Select(i=>$"socks5://{(g==0?"192.0.2":"198.51.100")}.{i}:1080")),"",null,transport,new()).GetAwaiter().GetResult();
+            var manyRaw=JsonNode.Parse(Raw<JsonElement>("store.load").GetRawText())!.AsObject();manyRaw["SubscriptionSources"]![longGroup]="https://subscription.example/fixture-only";Raw<object?>("store.save",new{Document=manyRaw});
+            typeof(MainWindow).GetMethod("PresentDocument",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[many!.Document,many.Selected!.Id,true]);
+            typeof(MainWindow).GetMethod("SetGrouping",BindingFlags.Instance|BindingFlags.NonPublic)!.Invoke(window,[true]);Panel("connection");search.Clear();
+            Wait(()=>LibraryIdle()&&NetworkIdle()&&OrganizationIdle()&&list.Items.Count==100);for(int settle=0;settle<4;settle++)Pump();list.IsEnabled=true;
+            CaptureLogical(window,"group-actions-50.png",1280,760);
+            var libraryScroll=(ScrollViewer)list.Template.FindName("PART_ScrollViewer",list);
+            Console.WriteLine($"TRACE pixel list={list.Items.Count} unit={VirtualizingPanel.GetScrollUnit(list)} extent={libraryScroll.ExtentHeight} viewport={libraryScroll.ViewportHeight} scrollable={libraryScroll.ScrollableHeight}");
+            Assert(VirtualizingPanel.GetScrollUnit(list)==ScrollUnit.Pixel&&VirtualizingPanel.GetIsVirtualizingWhenGrouping(list)&&libraryScroll.ScrollableHeight>2000,"Large groups use virtualized pixel scrolling");
+            libraryScroll.ScrollToVerticalOffset(17);Pump();Assert(Math.Abs(libraryScroll.VerticalOffset-17)<1,"Pixel scrolling stops within a server row instead of skipping a whole group");
+            var wheelBefore=libraryScroll.VerticalOffset;libraryScroll.RaiseEvent(new MouseWheelEventArgs(Mouse.PrimaryDevice,Environment.TickCount,-120){RoutedEvent=Mouse.MouseWheelEvent});Pump();
+            Assert(libraryScroll.VerticalOffset>wheelBefore&&libraryScroll.VerticalOffset-wheelBefore<libraryScroll.ViewportHeight,"One wheel step scrolls a small pixel distance within a 50-server group");
+            libraryScroll.ScrollToHome();Pump();list.IsEnabled=false;Pump();
+            var librarySurface=(Border)list.Template.FindName("ServerLibrarySurface",list);
+            Assert(((SolidColorBrush)librarySurface.Background).Color==((SolidColorBrush)app.Resources["Canvas"]).Color,"Disabled server library keeps its dark surface instead of Windows white disabled chrome");
+            CaptureLogical(window,"group-actions-disabled.png",1280,760);
+            list.IsEnabled=true;CaptureLogical(window,"group-actions-minimum.png",1060,641);
             Console.WriteLine("SKIP: native mouse hover, global keys and real monitor DPI need an interactive user session; scale captures are offscreen rasterization checks.");
         }
         finally {
@@ -987,7 +1373,7 @@ internal static class Program
             foreach (var nested in Descendants(child)) yield return nested;
         }
     }
-    private static void CaptureLogical(Window window, string name, double width, double height, double scale = 1)
+    private static void CaptureLogical(Window window, string name, double width, double height, double scale = 1, Action? prepare = null)
     {
         var content = (FrameworkElement)window.Content;
         double nativeNonClientHeight = window.ActualHeight - content.ActualHeight;
@@ -1001,6 +1387,7 @@ internal static class Program
         timer.Tick += (_, _) => { timer.Stop(); frame.Continue = false; }; timer.Start(); Dispatcher.PushFrame(frame);
         window.UpdateLayout();
         Assert(Math.Abs(content.ActualWidth - width) < .1 && Math.Abs(content.ActualHeight - height) < .1, "Native test window has the requested client dimensions for " + name);
+        prepare?.Invoke();
         if (name == "A-control-connected.png") {
             var inspector = (FrameworkElement)window.FindName("InspectorPanel");
             var profileList = (ListBox)window.FindName("ProfilesList");

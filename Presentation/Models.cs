@@ -63,7 +63,21 @@ public sealed record NetworkRule(string Kind,string Value,string Action)
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Outbound {get;init;}
 }
 public sealed record PolicyTarget(string Name,int Protocol,string Source,[property: System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] string? Via=null);
-public sealed record RuleSet(string Name,List<NetworkRule> Members);
+public sealed record RuleSet(string Name,List<NetworkRule> Members)
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public RuleSetData? Data {get;init;}
+}
+public sealed record RuleSetData
+{
+    [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public string? Snapshot {get;init;}
+}
+public sealed record RuleImportInput(string Format,string Category,string Name,string Action,string Path,bool Download,bool Replace);
+public sealed record PresetRow(string Name,string Format,string Category,string Action,bool Pending,string DisplayName,string ActionLabel,string Status);
+public sealed record RuleImportResult(string RulesText,string SHA256,int Count,string PresetSummary="",string PresetConfigText="",List<PresetRow>? PresetRows=null);
+public sealed record ProviderRoutingInput(string URL,int Index,string SHA256="");
+public sealed record ProviderRoutingChoice(int Index,string Label);
+public sealed record ImportedRoutingSource(string Group,string SHA256,List<ProviderRoutingChoice> Profiles);
+public sealed record ProviderRoutingResult(List<ProviderRoutingChoice> Profiles,string SHA256,RuleImportResult? Draft,List<string>? Warnings);
 public sealed record DNSRule(string Kind,string Value,int ResolverIndex);
 public sealed record NetworkOptions(DNSOptions? DNS,List<NetworkRule> Rules)
 {
@@ -76,12 +90,24 @@ public sealed record NetworkOptions(DNSOptions? DNS,List<NetworkRule> Rules)
     [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public List<RuleSet>? RuleSets {get;init;}
 }
 public sealed record DNSCacheOptions(bool Disabled,int Capacity);
-public sealed record NetworkPreferencesView(string ID,string Token,string Message,string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN,bool Supported,bool CanSave,bool FakeIP=false,string CacheMode="",string CacheCapacity="");
-public sealed record NetworkInput(string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN,bool FakeIP=false,string CacheMode="",string CacheCapacity="");
+public sealed record NetworkPreferencesView(string ID,string Token,string Message,string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN,bool Supported,bool CanSave,bool FakeIP=false,string CacheMode="",string CacheCapacity="",string RoutingMode="",string CustomRulesText="",string PresetRulesText="",string PresetSummary="",string PresetConfigText="",List<PresetRow>? PresetRows=null);
+public sealed record NetworkInput(string Mode,string ServerIP,string ServerName,string Port,string Path,string RulesText,string ResolversText,string DNSRulesText,bool AllowLAN,bool FakeIP=false,string CacheMode="",string CacheCapacity="")
+{
+    public string RoutingMode {get;init;}="";
+    public string CustomRulesText {get;init;}="";
+    public string PresetRulesText {get;init;}="";
+    public string PresetConfigText {get;init;}="";
+}
+public sealed record PolicyWarning(int Rule,string Code);
+public sealed record PolicyAnalysis(int Rules,int Targets,int RuleSets,List<PolicyWarning> Warnings);
+public sealed record RouteQuery(string Domain,string IP,string Process,string Network,ushort Port);
+public sealed record RoutePrediction(string Decision,string Outbound,string Reason,int Rule,bool PredictionOnly);
 public sealed record BackupExportResult(int ProfileCount);
 public sealed record BackupRestorePreview(string Token,int CurrentProfiles,int ReplacementProfiles,int EnabledSchedules,bool CanApply,string ExpiresAt);
 public sealed record TrayProfileItem(string ID,string Name,string Group);
-public sealed record UserPreferences(bool UseSystemProxy=false,bool AutoConnect=false,string ProfileID="",bool FullDevice=false,bool AllowTrusted=false,bool AllowPublic=false);
+public sealed record BalanceInput(bool Enabled,string Mode,string ProfileIDs,int Best,int Interval,int MaxRTT,bool Manual=false);
+public sealed record UserPreferences(bool UseSystemProxy=false,bool AutoConnect=false,string ProfileID="",bool FullDevice=false,bool AllowTrusted=false,bool AllowPublic=false)
+{ [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public TransportInput? Transport {get;init;} [System.Text.Json.Serialization.JsonIgnore(Condition=System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] public BalanceInput? Balance {get;init;} }
 public sealed record UserSettingsView(UserPreferences Preferences,string Token,string NetworkCategory,string Message,bool CanSave,bool ProxyEnabled,bool AutoConnectInhibited,bool StartupRecorded,bool CanEnableProxy,bool CanDisableProxy,bool CanEnableStartup,bool CanDisableStartup,bool StartupEnabled=false);
 public sealed record UserSettingsTickResult(UserSettingsView View,DesktopReply? Connection);
 public sealed record TrayProfilesView(string Token,string SelectedID,string Message,List<TrayProfileItem> Profiles,bool CanSelect,bool Truncated);

@@ -3,6 +3,19 @@
 One Windows interface for VPN and proxy connections, powered by the embedded
 [OneTunnel Go core](https://github.com/NikolaBasser/OneTunnel-Core).
 
+## OneTunnel 0.2.0
+
+[Download Windows x64](https://github.com/NikolaBasser/OneTunnel-Windows/releases/tag/v0.2.0).
+The application, presentation library and bundled Go core share product version
+**0.2.0**. Update the service through **Service and backup → Install / update service**,
+then reconnect to use the new core behavior. Existing API and profile formats are
+unchanged. See [release acceptance](ACCEPTANCE-0.2.txt).
+
+The release includes automatic shared proxy/WG/AWG balancing, routing presets
+from Loyalsoldier or imported subscriptions, global transport settings and the
+updated grouped server library. WG/AWG offer **Routing from AllowedIPs** and
+**Routing according to settings**; the latter expands only a temporary native copy.
+
 ## Protocols
 
 AmneziaWG, WireGuard, VLESS, SOCKS5, Hysteria2, Shadowsocks, HTTP CONNECT and
@@ -10,9 +23,20 @@ HTTPS proxies, Trojan, TUIC, AnyTLS, and NaiveProxy.
 
 ## Features
 
+- Three mutually exclusive routing switches under **ROUTING**: **Presets**,
+  **Custom rules**, and **All through VPN/proxy**. Each opens its own controls.
+  Switching preserves both banks; changes apply after saving and reconnecting.
+  All-through mode also disables direct LAN exceptions, retaining that preference
+  for other modes. Local proxy still captures only applications configured to use it.
+  Presets provide a paired geosite + geoip scheme and one
+  **Refresh** button for both GitHub files. Custom rules expose every
+  existing matcher/qualifier, an executable picker, and the full advanced editor.
+
+- **Loyalsoldier routing:** one geosite + geoip source and one Refresh button. The fixed scheme blocks advertising first, sends Russian domains and Russian IP ranges directly, and routes other traffic through VPN/proxy. Updates replace the preset draft atomically; Save and reconnect apply it. Custom rules remain separate. No category selection is required. Source files are limited to 128 MiB each; interrupted downloads retry once and leave previous rules unchanged on failure.
+
 - Local proxy and whole-device connection modes.
 - Whole-device traffic protection with explicit disconnect and recovery controls.
-- Profile and subscription import, collapsible configuration groups, and country flags/emoji.
+- Profile and subscription import, collapsible configuration groups, and country flags/emoji. The server list starts grouped; batch import restores grouped display. Subscription names default to the URL host, without its path or tokens. Each group header has explicit collapse/expand, subscription refresh and delete chips. Deletion is confirmed inline, with the current profile count and Escape/cancel support. The grouped library scrolls in pixels and retains its dark background while disabled. Group counts sit immediately beside their names. Library browsing and navigation remain available during active/pending connections; view-only group expansion persists asynchronously without changing the running session. Connection/profile mutation guards remain enforced. Pasted lists without a URL cannot be refreshed as subscriptions.
 - Saved subscription groups with provider-reported usage/expiry and a manual refresh preview that requires explicit approval before applying changes.
 - Optional automatic reconnection, compatible backups and sustained HTTPS-quality selection.
 - Split routing, explicit LAN access, chained proxy targets and up to eight WG/AWG peers.
@@ -58,7 +82,7 @@ reconnection. Explicit disconnect/recovery controls release owned protection.
 
 ## Feature implementation status
 
-Reviewed on 2026-10-27 against the pinned core and recorded live checks. **Ready** means
+Updated on 2026-10-29 against the pinned core and recorded live checks. **Ready** means
 the stated scope is implemented and checked; **Partial** includes implemented
 features whose current-build system/network validation is incomplete. None of
 the original roadmap rows is wholly unimplemented. This source status does not
@@ -119,10 +143,9 @@ and [Windows #26](https://github.com/NikolaBasser/OneTunnel-Windows/issues/26) (
 packages are not available. Linux, Android, and iOS work belongs to the separate
 core/platform projects; this repository contains the Windows application.
 
-The application starts its independent release series at **0.1.0**. The pinned core
-uses its own version series; application 0.1.0 currently consumes core 0.5.0 through
-[core-reference.json](core-reference.json). A core version and an application version
-do not need to match.
+Starting with **0.2.0**, the project uses one product version for the application
+and core. [core-reference.json](core-reference.json) still pins the precise core
+commit and API/platform contract; matching version strings alone are insufficient.
 
 ## Download and build
 
@@ -174,8 +197,9 @@ rules choose proxy, direct or reject; unmatched traffic stays proxied. Direct ru
 are intentional exceptions to VPN routing, not an automatic LAN bypass. Custom
 DoH/DoT/DoQ/DoH3 use literal resolver IPs, verified TLS identity and proxy detours. Upstream
 server-name bootstrap uses the fixed encrypted infrastructure path, separately
-from the custom tunneled resolver. Native AWG/WG with empty preferences retain imported DNS/AllowedIPs;
-nonempty full-device policies use the shared TUN; local mode is rejected. A matching new
+from the custom tunneled resolver. Native AllowedIPs mode keeps the imported routes
+and ignores saved policy/pool settings; settings-routing uses a full-route runtime
+copy with the saved policy in the shared TUN. A matching new
 service build is required; an old strict service refuses unsupported fields.
 Whole-device startup refreshes the interface snapshot before becoming ready so
 executable-path rules apply to the first TUN connection.
@@ -229,9 +253,10 @@ the local server check; infrastructure endpoint bootstrap stays encrypted.
 Native WG/AWG group checks retain imported AllowedIPs and address families, reporting separate DNS exchange latency when eligible DNS responds. The duration may include the initial handshake. Missing eligible DNS remains configuration-only. DNS success does not certify public internet access or absence of leaks.
 
 AWG/WireGuard with nonempty full-device network preferences use the shared TUN
-and an in-process AWG userspace transport. This mode supports TCP/UDP, preserves
-peer AllowedIPs and replaces imported DNS with the configured encrypted policy
-resolver. Uncovered destinations fail closed; direct routing requires an explicit
+and an in-process AWG userspace transport. Settings-routing uses a temporary copy
+with 0.0.0.0/0 and/or ::/0 for the profile's address families, leaving the stored
+source untouched, and replaces imported DNS with the configured encrypted policy
+resolver. Direct routing requires an explicit
 rule. ICMP is unavailable in this mode. Empty preferences preserve legacy native
 routing, DNS and ICMP. Resolver addresses must fit peer coverage/address families.
 Native policy health checks an uncached encrypted DNS exchange rather than public
@@ -268,3 +293,52 @@ Shadowsocks/Trojan multiplex settings support h2mux/smux/yamux, padding and
 connection/stream policies; VLESS Xray settings include XUDP and UDP443 policy.
 Unsupported combinations are validated by Go. Advanced fields require the
 matching pinned service; existing defaults are retained.
+
+Transport options are shared under Settings → General: TLS fragmentation, UDP
+noise, MUX, padding, stream/connection limits and XUDP/UDP443 policy. Saving them
+applies an in-memory override at the next connection to every compatible primary
+and fallback profile, without rewriting imported sources. VLESS uses Xray MUX;
+Shadowsocks/Trojan use the selected sing-box mode (automatic defaults to h2mux).
+Server support is required. Incompatible features are skipped with connection
+feedback; WG/AWG do not gain TLS fragmentation or MUX. Until the first explicit
+shared-settings save, legacy profile transport preferences remain effective.
+Editing profile metadata preserves those hidden legacy preferences.
+
+Provider routing is captured automatically alongside subscription import and
+refresh, including Xray JSON files/pasted subscriptions. Settings select an
+already imported subscription; there is no configuration selector or separate
+URL or routing-import flow. Selection prepares supported rules as an unsaved
+draft with explicit skipped-rule warnings. Save DNS and rules to activate on the
+next connection. Older subscriptions need one ordinary subscription refresh to
+capture their routing. Source refresh does not silently replace an active policy.
+Stored routing follows group rename/deletion and encrypted backup/restore; it
+excludes server credentials and is absent from ordinary library projections.
+Only domain/IP rules without additional conditions are included. Repeated lists
+with the same action are combined; ambiguous multi-action schemes fail explicitly.
+Existing saved provider port/transport rules are removed on load. Provider balancing,
+BitTorrent and DNS strategy are not imported; proxy/default traffic uses the
+selected OneTunnel server. Geosite/geoip categories resolve from Loyalsoldier.
+
+Settings → Connection now includes an opt-in shared server pool (2–8 servers
+from any subscription or manual group), best-server and balanced modes, best-set
+size, HTTPS probe interval and maximum delay. Save applies at the next connection;
+primary DNS/routing policy is shared, member-specific policies are excluded.
+Native members use full-route runtime copies in settings-routing mode. The
+original AllowedIPs mode bypasses this pool and saved routing policy. Proxy-only
+API pools retain narrow native scope and report unavailable probes explicitly.
+Flow pinning, quality recovery and
+reserves are owned by Go. The new pool requires the matching bundled service;
+copying the app alone cannot add this feature to an older running service.
+
+Pool composition defaults to automatic: all library subscriptions/manual groups
+are sampled for 20 seconds at connection start and up to eight measured servers
+are chosen by successful responses, median HTTPS delay and variation. Manual
+composition reveals the existing picker and preserves its saved choices. With
+fewer than eight eligible servers, the available subset is used; an entirely
+unmeasured/offline library fails explicitly. Restricted native peers without a
+common HTTPS probe in proxy-only API mode need manual selection. Existing TCP sessions never migrate.
+
+The proxy inspector omits the traffic-destination selector; native WG/AWG keep
+it. Geodata updates use the current service proxy when connected, with official
+GitHub release assets as a fallback on the same route. Provider import failures
+identify the exact category and preserve the previous draft.

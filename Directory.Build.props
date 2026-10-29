@@ -2,5 +2,6 @@
   <!-- Allow dependency restore on Linux; full builds and runtime tests use Windows. -->
   <PropertyGroup>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <Version>0.2.0</Version>
   </PropertyGroup>
 </Project>

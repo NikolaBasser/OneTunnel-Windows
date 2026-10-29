@@ -2,6 +2,15 @@ namespace OneTunnel.Core;
 
 public static class ProfileBackend
 {
+    public static Task<ProfileDocument> DocumentAsync()=>ProfileHost.CallAsync<ProfileDocument>("ui.store.load");
+    public static Task<RuleImportResult> RecommendedPresetsAsync()=>ProfileHost.CallAsync<RuleImportResult>("network.presets.recommended",seconds:130);
+    public static Task<ProviderRoutingResult> ProviderRoutingAsync(ProviderRoutingInput input)=>ProfileHost.CallAsync<ProviderRoutingResult>("network.presets.provider",new{ProviderRouting=input},seconds:130);
+    public static Task<List<ImportedRoutingSource>> ImportedRoutingSourcesAsync()=>ProfileHost.CallAsync<List<ImportedRoutingSource>>("network.presets.sources");
+    public static Task<ProviderRoutingResult> SelectImportedRoutingAsync(string group,ProviderRoutingInput input)=>ProfileHost.CallAsync<ProviderRoutingResult>("network.presets.select",new{Group=group,ProviderRouting=input},seconds:130);
+    public static Task<RuleImportResult> ConfigurePresetAsync(NetworkInput input,RuleImportInput source,bool remove=false)=>ProfileHost.CallAsync<RuleImportResult>(remove?"network.presets.remove":"network.presets.configure",new{NetworkInput=input,RuleImport=source});
+    public static Task<RuleImportResult> RefreshPresetsAsync(NetworkInput input)=>ProfileHost.CallAsync<RuleImportResult>("network.presets.refresh",new{NetworkInput=input},seconds:130);
+    public static Task<RuleImportResult> AppendRuleAsync(NetworkInput input,NetworkRule rule)=>ProfileHost.CallAsync<RuleImportResult>("network.rules.append",new{NetworkInput=input,PolicyRule=rule});
+    public static Task<RuleImportResult> ImportRulesAsync(NetworkInput input,RuleImportInput import)=>ProfileHost.CallAsync<RuleImportResult>("network.rules.import",new{NetworkInput=input,RuleImport=import},seconds:75);
     public static Task<string> DiagnosticsAsync()=>ProfileHost.CallAsync<string>("diagnostics.report");
     public static Task<ProfileDocument> FavoriteAsync(Guid id,bool favorite)=>ProfileHost.CallAsync<ProfileDocument>("ui.favorite.set",new{ID=id.ToString(),Favorite=favorite});
     public static Task<ProfileLibraryView> LibraryAsync(string sort,bool favoritesOnly)=>ProfileHost.CallAsync<ProfileLibraryView>("library.view",new{Sort=sort,FavoritesOnly=favoritesOnly});
@@ -9,13 +18,15 @@ public static class ProfileBackend
     public static Task<ProfileDocument> RenameGroupAsync(string group,string name,string token)=>ProfileHost.CallAsync<ProfileDocument>("ui.group.rename",new{Group=group,Name=name,Token=token});
     public static Task<ProfileDocument> DeleteGroupAsync(string group,string token)=>ProfileHost.CallAsync<ProfileDocument>("ui.group.delete",new{Group=group,Token=token});
     public static Task<ProfileDocument> SetAllGroupsExpandedAsync(bool expanded)=>ProfileHost.CallAsync<ProfileDocument>("ui.group.expansion.all",new{Expanded=expanded});
-    public static Task<AppliedProfiles> SaveEditorAsync(string name,string source,string group,Guid? id,TransportInput transport,ReliabilityOptions? reliability=null)=>ProfileHost.CallAsync<AppliedProfiles>("ui.editor.save",new{Name=name,Source=source,Group=group,ID=id?.ToString()??"",TransportInput=transport,Reliability=reliability});
+    public static Task<AppliedProfiles> SaveEditorAsync(string name,string source,string group,Guid? id,TransportInput? transport,ReliabilityOptions? reliability=null)=>ProfileHost.CallAsync<AppliedProfiles>("ui.editor.save",new{Name=name,Source=source,Group=group,ID=id?.ToString()??"",TransportInput=transport,Reliability=reliability});
     public static Task<GroupCheckResult> CheckGroupAsync(string group,CancellationToken cancellation=default)=>ProfileHost.CallAsync<GroupCheckResult>("group.check",new{Group=group},1000,cancellation:cancellation);
     public static Task<GroupResultsView> GroupResultsAsync(string sort,string filter)=>ProfileHost.CallAsync<GroupResultsView>("group.results.view",new{Sort=sort,Filter=filter});
     public static Task<Guid> FastestGroupResultAsync(string token)=>ProfileHost.CallAsync<Guid>("group.results.fastest",new{Token=token});
     public static Task ClearGroupResultsAsync(bool clearQuality=false)=>ProfileHost.CallAsync<object?>("group.results.clear",new{ClearQuality=clearQuality});
     public static Task<ProfileOrganizationView> ProfileOrganizationAsync(Guid id)=>ProfileHost.CallAsync<ProfileOrganizationView>("profile.organization",new{ID=id.ToString()});
     public static Task<NetworkPreferencesView> NetworkPreferencesAsync(Guid id)=>ProfileHost.CallAsync<NetworkPreferencesView>("network.preferences.view",new{ID=id.ToString()});
+    public static Task<PolicyAnalysis> AnalyzePolicyAsync(Guid id)=>ProfileHost.CallAsync<PolicyAnalysis>("network.analyze",new{ID=id.ToString()});
+    public static Task<RoutePrediction> ExplainRouteAsync(Guid id,RouteQuery query)=>ProfileHost.CallAsync<RoutePrediction>("network.explain",new{ID=id.ToString(),PolicyQuery=query});
     public static Task<ProfileDocument> SaveNetworkPreferencesAsync(Guid id,string token,NetworkInput input)=>ProfileHost.CallAsync<ProfileDocument>("ui.network.preferences.save",new{ID=id.ToString(),Token=token,NetworkInput=input});
     public static Task<AppliedProfiles> DuplicateProfileAsync(Guid id,string name,string group,string token)=>ProfileHost.CallAsync<AppliedProfiles>("ui.profile.duplicate",new{ID=id.ToString(),Name=name,Group=group,Token=token});
     public static Task<AppliedProfiles> MoveProfileAsync(Guid id,string group,string token)=>ProfileHost.CallAsync<AppliedProfiles>("ui.profile.move",new{ID=id.ToString(),Group=group,Token=token});
@@ -47,6 +58,7 @@ public static class ProfileBackend
     public static Task<ProfileView> ViewAsync(Protocol protocol)=>ProfileHost.CallAsync<ProfileView>("profile.view",new{Requested=(int)protocol});
     public static ProfileDocument Delete(Guid id)=>ProfileHost.Call<ProfileDocument>("ui.delete",new{ID=id.ToString()});
     public static ProfileDocument SetGroupExpanded(string group,bool expanded)=>ProfileHost.Call<ProfileDocument>("ui.group.expansion",new{Group=group,Expanded=expanded});
+    public static Task<ProfileDocument> SetGroupExpandedAsync(string group,bool expanded)=>ProfileHost.CallAsync<ProfileDocument>("ui.group.expansion",new{Group=group,Expanded=expanded});
 }
 public static class DesktopEnvironment
 {

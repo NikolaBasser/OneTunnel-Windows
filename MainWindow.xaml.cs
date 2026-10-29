@@ -189,20 +189,20 @@ public partial class MainWindow : Window
     private void UpdateControlNavigation() => PresentControlNavigation();
     private void SidebarGroup_Click(object sender, RoutedEventArgs e)
     {
-        if (busy || !connection.Actions.CanSelect || sender is not Button { Tag: string group }) return;
+        if (!connection.Actions.CanSelect || sender is not Button { Tag: string group }) return;
         sidebarGroup = group;
         SearchBox.Clear(); FavoritesOnlyBox.IsChecked = false;
         ShowPanel("connection"); RefreshProfileFilter(true);
     }
     private void SidebarFavorites_Click(object sender, RoutedEventArgs e)
     {
-        if (busy || !connection.Actions.CanSelect) return;
+        if (!connection.Actions.CanSelect) return;
         sidebarGroup = null; SearchBox.Clear(); FavoritesOnlyBox.IsChecked = true;
         ShowPanel("connection"); RefreshProfileFilter(true);
     }
     private void SettingsSection_Click(object sender, RoutedEventArgs e)
     {
-        if (busy || sender is not Button { Tag: string name }) return;
+        if (sender is not Button { Tag: string name }) return;
         if (visiblePanel != "settings") ShowPanel("settings");
         settingsSection = name switch { "UserSystemProxyBox" => "proxy", "UserStartupPath" => "startup", _ => "connection" };
         PresentSettingsSection(); WorkspaceScroll.ScrollToTop();
@@ -210,7 +210,6 @@ public partial class MainWindow : Window
     private void PresentSettingsSection() => PresentControlSettings();
     private void NetworkSettings_Click(object sender, RoutedEventArgs e)
     {
-        if (busy) return;
         ShowPanel("network");
     }
     private void ShowPanel(string panel)
@@ -251,9 +250,9 @@ public partial class MainWindow : Window
         EditButton.IsEnabled=actions.CanEdit; DeleteButton.IsEnabled=actions.CanDelete;
         AddProfileButton.IsEnabled=actions.CanAdd;
         ImportConnectionButton.IsEnabled=ImportSubscriptionButton.IsEnabled=actions.CanAdd;
-        SubscriptionButton.IsEnabled=ReloadSubscriptionsButton.IsEnabled=!busy;
-        UserSettingsNavigationButton.IsEnabled=!busy;
-        HomeNavigationButton.IsEnabled=GroupsNavigationButton.IsEnabled=EventsNavigationButton.IsEnabled=!busy;
+        SubscriptionButton.IsEnabled=true;ReloadSubscriptionsButton.IsEnabled=!busy;
+        UserSettingsNavigationButton.IsEnabled=true;
+        HomeNavigationButton.IsEnabled=GroupsNavigationButton.IsEnabled=EventsNavigationButton.IsEnabled=true;
         CancelSubscriptionDownloadButton.Visibility=subscriptionDownload != null ? Visibility.Visible : Visibility.Collapsed;
         CancelSubscriptionDownloadButton.IsEnabled=subscriptionDownload != null && !subscriptionDownload.IsCancellationRequested;
         SubscriptionGroupsList.IsEnabled=pendingSubscriptionPreview == null && !busy;
@@ -502,7 +501,7 @@ public partial class MainWindow : Window
         }        UpdateLibraryControls();
         ProfileTitle.Value = p?.Name ?? (profiles.Count == 0 ? "Добавь первое подключение" : "Выбери профиль из списка");
         ProfileDescription.Text = p == null ? "Импорт конфигурации или подписки" : $"{p.Protocol} · профиль сохранён локально";
-        ModePanel.Visibility = p != null ? Visibility.Visible : Visibility.Collapsed;
+        ModePanel.Visibility = p != null && (p.Protocol == Protocol.AmneziaWG || p.Protocol == Protocol.WireGuard) ? Visibility.Visible : Visibility.Collapsed;
         profileView = null;
         if (p == null) { ConnectionInfo.Text = "AmneziaWG · WireGuard · VLESS · SOCKS5 · Hysteria2 · Shadowsocks · HTTP(S) · Trojan · TUIC · AnyTLS · NaiveProxy"; ConnectionHint.Text = "Серверы не входят в приложение."; }
         else
@@ -541,7 +540,7 @@ public partial class MainWindow : Window
     }
     private void Subscriptions_Click(object sender, RoutedEventArgs e)
     {
-        if (!busy) ShowPanel("subscriptions");
+        ShowPanel("subscriptions");
     }
     private async Task LoadSubscriptionsAsync()
     {
@@ -592,6 +591,11 @@ public partial class MainWindow : Window
     private async void RefreshSubscription_Click(object sender, RoutedEventArgs e)
     {
         if (busy || subscriptionDownload != null || !connection.Actions.CanAdd || selectedSubscription is not { CanRefresh: true } item || pendingSubscriptionPreview != null) return;
+        await RefreshSubscriptionAsync(item);
+    }
+    private async Task RefreshSubscriptionAsync(SubscriptionSummary item)
+    {
+        if(busy || subscriptionDownload!=null || !connection.Actions.CanAdd || !item.CanRefresh || pendingSubscriptionPreview!=null)return;
         using var cancellation = new CancellationTokenSource();
         subscriptionDownload = cancellation;
         try { await Execute(async () =>
@@ -736,16 +740,15 @@ public partial class MainWindow : Window
         catch { if (!lifetime.IsCancellationRequested) Feedback.Text = "Не удалось проверить расписание обновления."; }
         finally { scheduleTickPending = false; if (!lifetime.IsCancellationRequested) RefreshControls(); }
     }
-    private bool HasEditorContent() => editing != null || NameBox.Text.Length > 0 || SourceBox.Text.Length > 0 || GroupBox.Text.Length > 0 || AutoReconnectCheck.IsChecked == true || FallbackCheck.IsChecked == true || QualityCheck.IsChecked == true || FragmentCheck.IsChecked == true || NoiseCheck.IsChecked == true || MuxCheck.IsChecked == true;
+    private bool HasEditorContent() => editing != null || NameBox.Text.Length > 0 || SourceBox.Text.Length > 0 || GroupBox.Text.Length > 0 || AutoReconnectCheck.IsChecked == true || FallbackCheck.IsChecked == true || QualityCheck.IsChecked == true;
     private void ClearEditorContent()
     {
         editing = null; NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; AutoReconnectCheck.IsChecked = false; FallbackCheck.IsChecked = false; QualityCheck.IsChecked = false;
-        FragmentCheck.IsChecked = false; NoiseCheck.IsChecked = false; MuxCheck.IsChecked = false;
     }
     private void BeginNewProfile(bool subscription)
     {
         AutoReconnectCheck.IsChecked=false;FallbackCheck.IsChecked=false;QualityCheck.IsChecked=false;
-        editing = null; LoadTransport(null); NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; ProtocolBox.SelectedIndex = 0;
+        editing = null; NameBox.Clear(); SourceBox.Clear(); GroupBox.Text = ""; ProtocolBox.SelectedIndex = 0;
         EditorTitle.Text = subscription ? "Импорт / обновление подписки" : "Новое подключение";
         SaveProfileButton.Content = subscription ? "Импортировать / обновить" : "Сохранить / импортировать";
         ShowPanel("editor"); NameBox.Focus();
@@ -765,44 +768,25 @@ public partial class MainWindow : Window
         menu.Items.Add(new Separator()); menu.Items.Add(countries);
         EmojiPickerButton.ContextMenu = menu; menu.PlacementTarget = EmojiPickerButton; menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom; menu.IsOpen = true;
     }
-    private void LoadTransport(TransportOptions? options)
-    {
-        var o = options ?? ProfileBackend.DefaultTransport();
-        FragmentCheck.IsChecked = o.Fragment; NoiseCheck.IsChecked = o.Noise; MuxCheck.IsChecked = o.Mux;
-        FragmentLengthBox.Text = o.FragmentLength; FragmentIntervalBox.Text = o.FragmentInterval;
-        NoiseLengthBox.Text = o.NoiseLength; NoiseDelayBox.Text = o.NoiseDelay;
-        MuxConcurrencyBox.Text = o.MuxConcurrency.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        MuxProtocolBox.SelectedIndex = o.MuxProtocol switch { "h2mux" => 1, "smux" => 2, "yamux" => 3, _ => 0 };
-        MuxMaxConnectionsBox.Text = o.MuxMaxConnections.ToString(); MuxMinStreamsBox.Text = o.MuxMinStreams.ToString();
-        MuxPaddingBox.IsChecked = o.MuxPadding; XUDPConcurrencyBox.Text = o.XUDPConcurrency.ToString();
-        MuxUDP443Box.SelectedIndex = o.UDP443Policy switch { "skip" => 1, "allow" => 2, "reject" => 3, _ => 0 };
-        UpdateMuxControls();
-        TransportExpander.IsExpanded = o.Fragment || o.Noise || o.Mux;
-    }
     private static string ChoiceTag(ComboBox box) => (box.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
-    private bool UsesSingMux() => ChoiceTag(MuxProtocolBox) is "h2mux" or "smux" or "yamux";
-    private bool UsesMuxConnectionLimit() => UsesSingMux() && int.TryParse(MuxMaxConnectionsBox.Text, out var count) && count > 0;
+
+    private bool UsesMuxConnectionLimit() => int.TryParse(MuxMaxConnectionsBox.Text, out var count) && count > 0;
     private void MuxProtocol_Changed(object sender, SelectionChangedEventArgs e) { if (MuxUDP443Box != null) UpdateMuxControls(); }
     private void MuxConnections_Changed(object sender, TextChangedEventArgs e) { if (MuxUDP443Box != null) UpdateMuxControls(); }
     private void UpdateMuxControls()
     {
-        bool sing = UsesSingMux();
-        MuxMaxConnectionsBox.IsEnabled = MuxPaddingBox.IsEnabled = sing;
-        MuxMinStreamsBox.IsEnabled = UsesMuxConnectionLimit();
-        MuxConcurrencyBox.IsEnabled = !UsesMuxConnectionLimit();
-        XUDPConcurrencyBox.IsEnabled = MuxUDP443Box.IsEnabled = !sing;
-    }
-    private TransportInput ReadTransport() => new(FragmentCheck.IsChecked == true, FragmentLengthBox.Text, FragmentIntervalBox.Text, NoiseCheck.IsChecked == true, NoiseLengthBox.Text, NoiseDelayBox.Text, MuxCheck.IsChecked == true, MuxConcurrencyBox.Text,
-        ChoiceTag(MuxProtocolBox), UsesSingMux() ? MuxMaxConnectionsBox.Text : "", UsesMuxConnectionLimit() ? MuxMinStreamsBox.Text : "", UsesSingMux() && MuxPaddingBox.IsChecked == true,
-        UsesSingMux() ? "" : XUDPConcurrencyBox.Text, UsesSingMux() ? "" : ChoiceTag(MuxUDP443Box));
 
+        MuxMaxConnectionsBox.IsEnabled = MuxPaddingBox.IsEnabled = true;
+        MuxMinStreamsBox.IsEnabled = UsesMuxConnectionLimit();
+        MuxConcurrencyBox.IsEnabled = true;
+        XUDPConcurrencyBox.IsEnabled = MuxUDP443Box.IsEnabled = true;
+    }
     private async void Edit_Click(object sender, RoutedEventArgs e)
     {
         if (!connection.Actions.CanEdit || selected is not { } p) return;
         if (HasEditorContent()) { ShowPanel("editor"); Feedback.Text = "Продолжи или отмени текущий профиль перед редактированием другого."; return; }
         await Execute(async () => {
             var edit = await ProfileBackend.LoadEditorAsync(p.Id);
-            LoadTransport(edit.Transport);
  AutoReconnectCheck.IsChecked=edit.Reliability?.AutoReconnect??false;FallbackCheck.IsChecked=edit.Reliability?.UseFallbacks??false;QualityCheck.IsChecked=edit.Reliability?.AutoSelect??false;
             GroupBox.Text = edit.Group; editing = edit.Id; NameBox.Text = edit.Name; SourceBox.Text = edit.Source; ProtocolBox.SelectedItem = edit.Protocol; EditorTitle.Text = "Изменить подключение"; ShowPanel("editor");
         });
@@ -990,7 +974,7 @@ public partial class MainWindow : Window
         if (!connection.Actions.CanSave) return;
         await Execute(async () =>
         {
-            var result=await ProfileBackend.SaveEditorAsync(NameBox.Text,SourceBox.Text,GroupBox.Text,editing,ReadTransport(),new(AutoReconnectCheck.IsChecked==true,FallbackCheck.IsChecked==true,AutoReconnectCheck.IsChecked==true && FallbackCheck.IsChecked==true && QualityCheck.IsChecked==true));
+            var result=await ProfileBackend.SaveEditorAsync(NameBox.Text,SourceBox.Text,GroupBox.Text,editing,null,new(AutoReconnectCheck.IsChecked==true,FallbackCheck.IsChecked==true,AutoReconnectCheck.IsChecked==true && FallbackCheck.IsChecked==true && QualityCheck.IsChecked==true));
             PresentApplied(result);
         });
     }
@@ -1114,7 +1098,7 @@ public partial class MainWindow : Window
         UpdateLibraryControls();
         if (refreshLibrary) {
             _ = RefreshLibraryProjectionAsync();
-            if (GroupsPanel.Visibility == Visibility.Visible) _ = RefreshGroupSummariesAsync();
+            if ((GroupsPanel.Visibility == Visibility.Visible||groupedProfiles)&&!groupsPending) _ = RefreshGroupSummariesAsync();
         }
         if (groupResultsView?.HasResults == true) _ = RefreshGroupResultsAsync();
         if (tray != null) _ = RefreshTrayProfilesAsync();
@@ -1122,6 +1106,7 @@ public partial class MainWindow : Window
     }
     private void PresentApplied(AppliedProfiles result)
     {
+        if(result.Batch)SetGrouping(true);
         sidebarGroup = null;
         SearchBox.Clear();PresentDocument(result.Document,result.Selected?.Id??selected?.Id);ClearEditorContent();ShowPanel("connection");
         Feedback.Text=result.Batch?$"Подписка обновлена / импортирована. Обновлено: {result.Updated}. Добавлено: {result.Added}. Устаревших удалено: {result.Removed}. Повторов: {result.Duplicates}. Неподдерживаемых: {result.Skipped}.":"Профиль сохранён. Ключи защищены учётной записью Windows.";
@@ -1411,7 +1396,7 @@ public partial class MainWindow : Window
         if (!IsInitialized || NetworkDNSModeBox == null) return;
         var view = networkPreferencesView;
         bool matching = view != null && Guid.TryParse(view.ID, out var id) && selected?.Id == id;
-        bool pending = networkPreferencesPending || networkPreferencesSavePending || busy;
+        bool pending = networkPreferencesPending || networkPreferencesSavePending || busy || policyToolsPending;
         bool supported = matching && view!.Supported;
         bool customDNS = supported && GetNetworkDNSMode() != "default";
         NetworkDNSModeBox.IsEnabled = supported && !pending;
@@ -1420,9 +1405,13 @@ public partial class MainWindow : Window
         NetworkFakeIPBox.IsEnabled = NetworkCacheModeBox.IsEnabled = supported && !pending;
         NetworkCacheCapacityBox.IsEnabled = supported && !pending && ChoiceTag(NetworkCacheModeBox) == "bounded";
         NetworkRulesBox.IsEnabled = supported && !pending;
+        RoutingModeBox.IsEnabled = supported && !pending && !policyToolsPending;
+        CustomRoutingPanel.IsEnabled=LoyalRulesPanel.IsEnabled=supported&&!pending;
+        UpdateRoutingVisibility();
         NetworkResolversBox.IsEnabled = NetworkDNSRulesBox.IsEnabled = NetworkAllowLANBox.IsEnabled = supported && !pending;
         SaveNetworkPreferencesButton.IsEnabled = matching && view!.CanSave && supported && connection.Actions.CanSave && !pending;
         ReloadNetworkPreferencesButton.IsEnabled = selected != null && !pending;
+        UpdatePolicyTools();
     }
     private string GetNetworkDNSMode()
     {
@@ -1440,6 +1429,7 @@ public partial class MainWindow : Window
             networkPreferencesFieldsToken = null;
             NetworkDNSModeBox.SelectedIndex = 0;
             NetworkServerIPBox.Clear(); NetworkServerNameBox.Clear(); NetworkPortBox.Clear(); NetworkPathBox.Clear(); NetworkRulesBox.Clear();
+            ResetRoutingDrafts();
             NetworkResolversBox.Clear(); NetworkDNSRulesBox.Clear(); NetworkAllowLANBox.IsChecked = false;
             NetworkFakeIPBox.IsChecked = false; NetworkCacheModeBox.SelectedIndex = 0; NetworkCacheCapacityBox.Clear();
         }
@@ -1489,7 +1479,7 @@ public partial class MainWindow : Window
             NetworkServerNameBox.Text = view.ServerName;
             NetworkPortBox.Text = view.Port;
             NetworkPathBox.Text = view.Path;
-            NetworkRulesBox.Text = view.RulesText;
+            PresentRoutingDrafts(view);
             NetworkResolversBox.Text = view.ResolversText;
             NetworkDNSRulesBox.Text = view.DNSRulesText;
             NetworkAllowLANBox.IsChecked = view.AllowLAN;
@@ -1500,6 +1490,7 @@ public partial class MainWindow : Window
         networkPreferencesFieldsId = Guid.TryParse(view.ID, out id) ? id : null;
         networkPreferencesFieldsToken = view.Token;
         networkPreferencesView = view;
+        PolicyPreferencesRefreshed();
         networkPreferencesRequestedId = Guid.TryParse(view.ID, out id) ? id : null;
         NetworkPreferencesStatus.Text = view.Supported ? view.Message : (string.IsNullOrWhiteSpace(view.Message) ? "Настройки DNS и маршрутизации недоступны для этого профиля или режима." : view.Message);
         UpdateNetworkPreferencesControls();
@@ -1513,13 +1504,14 @@ public partial class MainWindow : Window
     private async Task SaveNetworkPreferencesAsync()
     {
         if (networkPreferencesView is not { } view || !Guid.TryParse(view.ID, out var id) || selected?.Id != id ||
-            !view.Supported || !view.CanSave || !connection.Actions.CanSave || busy || networkPreferencesPending || networkPreferencesSavePending) return;
+            !view.Supported || !view.CanSave || !connection.Actions.CanSave || busy || networkPreferencesPending || networkPreferencesSavePending || policyToolsPending) return;
         string mode = GetNetworkDNSMode();
         var input = new NetworkInput(mode, mode == "default" ? "" : NetworkServerIPBox.Text,
             mode == "default" ? "" : NetworkServerNameBox.Text, mode == "default" ? "" : NetworkPortBox.Text,
             mode is "https" or "h3" ? NetworkPathBox.Text : "", NetworkRulesBox.Text, NetworkResolversBox.Text,
             NetworkDNSRulesBox.Text, NetworkAllowLANBox.IsChecked == true, NetworkFakeIPBox.IsChecked == true, ChoiceTag(NetworkCacheModeBox),
-            ChoiceTag(NetworkCacheModeBox) == "default" ? "" : NetworkCacheCapacityBox.Text);
+            ChoiceTag(NetworkCacheModeBox) == "default" ? "" : NetworkCacheCapacityBox.Text)
+        { RoutingMode=routingDraftMode,CustomRulesText=CustomRoutingText(),PresetRulesText=PresetRoutingText(),PresetConfigText=presetConfigDraft };
         string token = view.Token;
         networkPreferencesSavePending = true;
         busy = true;
@@ -1531,8 +1523,8 @@ public partial class MainWindow : Window
             if (lifetime.IsCancellationRequested) return;
             PresentDocument(document, selected?.Id ?? id, refreshLibrary: false);
             await RefreshLibraryProjectionAsync();
-            NetworkPreferencesStatus.Text = "Настройки сохранены. Чтобы применить их, вручную обнови установленную службу OneTunnel.";
-            Feedback.Text = "Настройки DNS и маршрутизации сохранены. Подключение не запускалось; службу нужно обновить вручную.";
+            NetworkPreferencesStatus.Text = "Настройки сохранены. Они будут использованы при следующем подключении.";
+            Feedback.Text = "DNS и правила сохранены. Текущее соединение не изменено.";
         }
         catch
         {
@@ -1577,7 +1569,8 @@ public partial class MainWindow : Window
         ConfigurationGroupsList.IsEnabled = !groupsPending && !groupMutationPending;
         ReloadGroupsButton.IsEnabled = !busy && !groupsPending && !groupMutationPending;
         RenameGroupBox.IsEnabled = RenameGroupButton.IsEnabled = DeleteGroupButton.IsEnabled = canMutate;
-        ExpandAllGroupsButton.IsEnabled = CollapseAllGroupsButton.IsEnabled = connection.Actions.CanAdd && !busy && !groupsPending && !groupMutationPending;
+        ExpandAllGroupsButton.IsEnabled = CollapseAllGroupsButton.IsEnabled = connection.Actions.CanSelect && !busy && !groupsPending && !groupMutationPending;
+        UpdateProfileGroupHeaders();
     }
     private async Task RefreshGroupSummariesAsync(string? preferredName = null)
     {
@@ -1627,7 +1620,6 @@ public partial class MainWindow : Window
     }
     private void Groups_Click(object sender, RoutedEventArgs e)
     {
-        if (busy) return;
         ShowPanel("groups");
         if (!groupsLoaded) _ = RefreshGroupSummariesAsync();
     }
@@ -1644,6 +1636,11 @@ public partial class MainWindow : Window
     private async void DeleteGroup_Click(object sender, RoutedEventArgs e)
     {
         if (!CanMutateGroups || selectedGroup is not { } group) return;
+        await ConfirmDeleteGroupAsync(group);
+    }
+    private async Task ConfirmDeleteGroupAsync(GroupSummary group)
+    {
+        if(!CanMutateGroups)return;
         string subscriptionNote = group.IsSubscription ? " Локальный источник обновления подписки тоже будет удалён." : "";
         string prompt = $"Удалить группу «{group.Name}» и {group.ProfileCount} проф.?{subscriptionNote}\n\nЭто действие нельзя отменить.";
         if (MessageBox.Show(this, prompt, "Удалить группу", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
@@ -1680,7 +1677,7 @@ public partial class MainWindow : Window
     private async void CollapseAllGroups_Click(object sender, RoutedEventArgs e) => await SetAllGroupsExpandedAsync(false);
     private async Task SetAllGroupsExpandedAsync(bool expanded)
     {
-        if (!CanMutateGroups) return;
+        if (!connection.Actions.CanSelect||busy||groupsPending||groupMutationPending) return;
         bool wasRestoringGroupExpansion = restoringGroupExpansion;
         groupMutationPending = true; busy = true; applyingBulkGroupExpansion = true;
         restoringGroupExpansion = true;
@@ -1709,15 +1706,20 @@ public partial class MainWindow : Window
         restoringGroupExpansion = true;
         try { exp.IsExpanded = !Storage.CollapsedGroups.Contains(group.Name.ToString()!); }
         finally { restoringGroupExpansion = wasRestoring; }
+        UpdateProfileGroupHeader(exp);
+        if(!groupsLoaded&&!groupsPending)_=RefreshGroupSummariesAsync();
     }
-    private void Group_Changed(object sender, RoutedEventArgs e)
+    private int groupExpansionVersion;
+    private async void Group_Changed(object sender, RoutedEventArgs e)
     {
+        if(sender is Expander header)UpdateProfileGroupHeader(header);
         if (restoringGroupExpansion || applyingBulkGroupExpansion || sender is not Expander exp || !exp.IsLoaded || !storageReady || exp.DataContext is not System.Windows.Data.CollectionViewGroup group) return;
         string name = group.Name.ToString()!;
         if (Storage.CollapsedGroups.Contains(name) == !exp.IsExpanded) return;
+        int expansionRequest=++groupExpansionVersion;
         var before = Storage.CollapsedGroups.ToHashSet();
         if (exp.IsExpanded) Storage.CollapsedGroups.Remove(name); else Storage.CollapsedGroups.Add(name);
-        try { Storage.Accept(ProfileBackend.SetGroupExpanded(name,exp.IsExpanded)); InvalidateGroupSummaries(); InvalidateProfileOrganization("Сведения профиля обновляются…", clearFields: false); InvalidateNetworkPreferences("Настройки сети обновляются…", clearFields: false); if (selected is { } currentProfile) { _ = LoadProfileOrganizationAsync(currentProfile.Id); _ = LoadNetworkPreferencesAsync(currentProfile.Id); } } catch { Storage.CollapsedGroups.Clear(); Storage.CollapsedGroups.UnionWith(before); Feedback.Text = "Не удалось сохранить состояние группы."; }
+        try { var document=await ProfileBackend.SetGroupExpandedAsync(name,exp.IsExpanded); if(expansionRequest!=groupExpansionVersion||lifetime.IsCancellationRequested)return; Storage.Accept(document); InvalidateGroupSummaries(); _ = RefreshGroupSummariesAsync(); InvalidateProfileOrganization("Сведения профиля обновляются…", clearFields: false); InvalidateNetworkPreferences("Настройки сети обновляются…", clearFields: false); if (selected is { } currentProfile) { _ = LoadProfileOrganizationAsync(currentProfile.Id); _ = LoadNetworkPreferencesAsync(currentProfile.Id); } } catch { if(expansionRequest==groupExpansionVersion){Storage.CollapsedGroups.Clear(); Storage.CollapsedGroups.UnionWith(before); Feedback.Text = "Не удалось сохранить состояние группы.";} }
     }
     private async void Import_Click(object sender, RoutedEventArgs e)
     {
@@ -1775,7 +1777,7 @@ public partial class MainWindow : Window
         await Execute(async () => {
             Feedback.Text="Выполнение команды…";
             try { Feedback.Text=await connection.ToggleAsync(id,fullDevice); }
-            finally { if(connection.Prepared is { } prepared) PresentDocument(prepared.Document,prepared.Selected?.Id); }
+            finally { if(connection.Prepared is { } prepared) PresentDocument(await ProfileBackend.DocumentAsync(),selected?.Id??prepared.Selected?.Id); }
             PresentConnectionState(); Log("Команда подключения завершена Go-ядром.");
         });
     }
@@ -1783,10 +1785,10 @@ public partial class MainWindow : Window
     private async void Recovery_Click(object sender, RoutedEventArgs e) => await Execute(async () => { await connection.RecoverAsync(); Feedback.Text = "Подключение очищено, блокировка kill switch снята. Обычная сеть восстановлена."; Log("Восстановление завершено."); });
     private void Cancel_Click(object sender, RoutedEventArgs e) { ShowPanel("connection"); }
     private void CancelEditor_Click(object sender, RoutedEventArgs e) { ClearEditorContent(); ShowPanel("connection"); }
-    private void Engines_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("engines"); }
-    private void Home_Click(object sender, RoutedEventArgs e) { if (!busy) { sidebarGroup = null; FavoritesOnlyBox.IsChecked = false; ShowPanel("connection"); RefreshProfileFilter(true); } }
-    private void Events_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("activity"); }
-    private void UserSettings_Click(object sender, RoutedEventArgs e) { if (!busy) ShowPanel("settings"); }
+    private void Engines_Click(object sender, RoutedEventArgs e) { ShowPanel("engines"); }
+    private void Home_Click(object sender, RoutedEventArgs e) { sidebarGroup = null; FavoritesOnlyBox.IsChecked = false; ShowPanel("connection"); RefreshProfileFilter(true); }
+    private void Events_Click(object sender, RoutedEventArgs e) { ShowPanel("activity"); }
+    private void UserSettings_Click(object sender, RoutedEventArgs e) { ShowPanel("settings"); }
 
     private async Task LoadUserSettingsAsync(bool resetDraft = false)
     {
@@ -1857,6 +1859,7 @@ public partial class MainWindow : Window
                 UserFullDeviceBox.IsChecked = view.Preferences.FullDevice;
                 UserAllowTrustedBox.IsChecked = view.Preferences.AllowTrusted;
                 UserAllowPublicBox.IsChecked = view.Preferences.AllowPublic;
+                LoadGlobalTransport(view.Preferences.Transport); LoadBalance(view.Preferences.Balance);
             }
             finally { updatingUserSettingsControls = false; }
         }
@@ -1881,13 +1884,14 @@ public partial class MainWindow : Window
         bool pending = userSettingsPending || userSettingsTickPending || userSettingsSavePending || userSettingsActionPending;
         bool draftEnabled = view != null && !userSettingsPending && !userSettingsSavePending && !userSettingsActionPending;
         UserSystemProxyBox.IsEnabled = draftEnabled;
+        TransportExpander.IsEnabled = draftEnabled; BalanceExpander.IsEnabled=draftEnabled;
         UserAutoConnectBox.IsEnabled = draftEnabled;
         UserAutoConnectProfileBox.IsEnabled = draftEnabled && UserAutoConnectBox.IsChecked == true;
         UserFullDeviceBox.IsEnabled = draftEnabled;
         UserAllowTrustedBox.IsEnabled = draftEnabled;
         UserAllowPublicBox.IsEnabled = draftEnabled;
         bool staleDraft = userSettingsDraftDirty && view != null && !string.Equals(userSettingsDraftToken, view.Token, StringComparison.Ordinal);
-        SaveUserSettingsButton.IsEnabled = !busy && !pending && view?.CanSave == true && userSettingsDraftDirty && !staleDraft;
+        SaveUserSettingsButton.IsEnabled = !busy && !pending && view?.CanSave == true && userSettingsDraftDirty && !staleDraft && BalanceDraftValid();
         ReloadUserSettingsButton.IsEnabled = !pending;
         EnableUserProxyButton.IsEnabled = !busy && !pending && !userSettingsDraftDirty && view?.CanEnableProxy == true;
         DisableUserProxyButton.IsEnabled = !busy && !pending && !userSettingsDraftDirty && view?.CanDisableProxy == true;
@@ -1911,7 +1915,7 @@ public partial class MainWindow : Window
             UserAutoConnectProfileBox.SelectedItem is Profile selectedProfile ? selectedProfile.Id.ToString() : "",
             UserFullDeviceBox.IsChecked == true,
             UserAllowTrustedBox.IsChecked == true,
-            UserAllowPublicBox.IsChecked == true);
+            UserAllowPublicBox.IsChecked == true) { Transport=ReadGlobalTransport(),Balance=ReadBalance() };
         int request = ++userSettingsRequestVersion;
         userSettingsSavePending = true; UpdateUserSettingsControls();
         bool persisted = false;
@@ -2008,4 +2012,3 @@ public partial class MainWindow : Window
         // The service owns the connection. Closing the UI never tears it down.
     }
 }
-

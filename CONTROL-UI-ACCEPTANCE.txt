@@ -1,3 +1,5 @@
+Historical 0.1.0 baseline. For the current release see ACCEPTANCE-0.2.txt.
+
 Control UI acceptance — 2026-10-28
 
 Graphite Control layout: adjacent groups/table/inspector (208/1/*/1/340 DIP),

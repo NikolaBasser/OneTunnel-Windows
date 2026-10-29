@@ -1,4 +1,4 @@
-param([string]$Name = 'OneTunnel-win-x64', [Parameter(Mandatory=$true)][string]$CoreBundlePath)
+param([string]$Name = 'OneTunnel-0.2.0-win-x64', [Parameter(Mandatory=$true)][string]$CoreBundlePath)
 $ErrorActionPreference = 'Stop'
 $project = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 Push-Location $project

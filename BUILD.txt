@@ -1,7 +1,7 @@
 OneTunnel — Windows x64
 
 APPLICATION VERSION
-0.1.0. The Go core is versioned separately and pinned by core-reference.json.
+0.2.0 for the application and core. core-reference.json also pins the exact core commit.
 
 BUILD REQUIREMENTS
 Windows 10/11 x64, .NET 10 SDK and PowerShell.
@@ -14,7 +14,7 @@ Follow its BUILD.txt to produce a clean Windows amd64 core bundle.
 This repository contains no Go sources, Go setup script or implicit core build command.
 
 BUILD THE WINDOWS APPLICATION
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build.ps1 -Name OneTunnel-0.1.0-win-x64 -CoreBundlePath C:\path\to\trusted-core-bundle
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/Build.ps1 -Name OneTunnel-0.2.0-win-x64 -CoreBundlePath C:\path\to\trusted-core-bundle
 For a development build:
 dotnet build OneTunnel.csproj -p:CoreBundlePath=C:\path\to\trusted-core-bundle
 Application builds never compile or download Go binaries implicitly.
@@ -49,7 +49,7 @@ Check for updates downloads a preview; Apply commits that exact reviewed result.
 Cancel or a cancelled download does not apply changes. Previews expire after ten minutes;
 an intervening profile or group change requires a fresh preview.
 Provider-reported traffic and expiry may be unknown and do not establish live usage accuracy.
-Scheduled refresh is not included. Existing import and connect-time preparation still work.
+Optional scheduled previews run only while the application is open; changes still require Apply.
 Manual subscription management runs in the user host and requires no service update.
 
 SYSTEM TRAY
@@ -62,8 +62,8 @@ Close/Exit retains the normal UI-exit behavior and does not disconnect the servi
 This UI-only feature requires no installed-service update.
 
 OUTPUT
-dist/OneTunnel-0.1.0-win-x64/
-dist/OneTunnel-0.1.0-win-x64.zip
+dist/OneTunnel-0.2.0-win-x64/
+dist/OneTunnel-0.2.0-win-x64.zip
 
 SERVICE INSTALLATION
 The package contains a native Go installer; scripts/Install-Service.ps1 is a compatibility launcher.
@@ -151,7 +151,8 @@ DNS-rule lines: domain or domain-suffix | domain | resolver number (starting1).
 Maximum64 DNS rules, evaluated in order. Resolver traffic stays proxied.
 LAN access defaults off and covers10/8,172.16/12,192.168/16 and fc00::/7 only.
 Explicit user reject/proxy rules take precedence over the appended LAN exception.
-Save affects future shared-TUN proxy connections; native AWG/WG are unsupported.
+Save affects future shared-TUN connections, including native AWG/WG settings-routing.
+WG/AWG use a temporary full-AllowedIPs copy; original AllowedIPs mode ignores saved policy.
 Local config tests do not establish live DNS/IPv6 leak or firewall behavior.
 
 CONNECTION STATISTICS

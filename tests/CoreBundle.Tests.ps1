@@ -31,11 +31,11 @@ function New-Fixture([string]$name) {
             [IO.File]::WriteAllBytes($path, $bytes)
         } else { 'synthetic notice or metadata' | Set-Content -LiteralPath $path -Encoding UTF8 }
     }
-    @{Runtime='go';Version='0.5.0';ApiVersion=1;SourceRevision=$revision;Dirty=$false;OS='windows';Architecture='amd64';
+    @{Runtime='go';Version='0.2.0';ApiVersion=1;SourceRevision=$revision;Dirty=$false;OS='windows';Architecture='amd64';
         AdapterRequired=$false;EmbeddedScope='embedded-native-and-proxy';EmbeddedAWG=$true;EmbeddedXray=$true;
         EmbeddedSingBox=$true;EmbeddedTun=$true;EmbeddedNaive=$true} |
         ConvertTo-Json | Set-Content -LiteralPath (Join-Path $bundle 'service/go-runtime.json') -Encoding UTF8
-    Save-Manifest $bundle @{SchemaVersion=1;Version='0.5.0';ApiVersion=1;OS='windows';Architecture='amd64';SourceRevision=$revision;Dirty=$false;Files=@()}
+    Save-Manifest $bundle @{SchemaVersion=1;Version='0.2.0';ApiVersion=1;OS='windows';Architecture='amd64';SourceRevision=$revision;Dirty=$false;Files=@()}
     Update-Manifest $bundle
     return $bundle
 }
@@ -60,7 +60,7 @@ try {
     if ($identity.SourceRevision -cne $revision) { throw 'Valid bundle identity was lost.' }
     $script:passed++
     $reference = Join-Path $testRoot 'core-reference.json'
-    $pin = @{SchemaVersion=1;Repository='OneTunnel-Core';SourceRevision=$revision;Version='0.5.0';ApiVersion=1;OS='windows';Architecture='amd64'}
+    $pin = @{SchemaVersion=1;Repository='OneTunnel-Core';SourceRevision=$revision;Version='0.2.0';ApiVersion=1;OS='windows';Architecture='amd64'}
     $pin | ConvertTo-Json | Set-Content -LiteralPath $reference -Encoding UTF8
     & $Validator -Bundle $valid -Reference $reference -Quiet
     $script:passed++

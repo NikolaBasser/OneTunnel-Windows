@@ -29,7 +29,7 @@
             <RowDefinition Height="*" />
           </Grid.RowDefinitions>
           <TextBlock x:Name="SidebarHeading" Text="Группы" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="4,0,0,12" />
-          <Button x:Name="HomeNavigationButton" Grid.Row="1" Style="{StaticResource RailButton}" Click="Home_Click">
+          <Button AutomationProperties.Name="Все серверы" x:Name="HomeNavigationButton" Grid.Row="1" Style="{StaticResource RailButton}" Click="Home_Click">
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="20" />
@@ -41,7 +41,7 @@
               <TextBlock x:Name="AllServerCount" Grid.Column="2" Foreground="{StaticResource TextSecondary}" />
             </Grid>
           </Button>
-          <Button x:Name="SidebarFavoritesButton" Grid.Row="2" Style="{StaticResource RailButton}" Click="SidebarFavorites_Click">
+          <Button AutomationProperties.Name="Избранное" x:Name="SidebarFavoritesButton" Grid.Row="2" Style="{StaticResource RailButton}" Click="SidebarFavorites_Click">
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="20" />
@@ -57,7 +57,7 @@
             <ItemsControl x:Name="SidebarGroups">
               <ItemsControl.ItemTemplate>
                 <DataTemplate>
-                  <Button Tag="{Binding Name}" Click="SidebarGroup_Click" HorizontalContentAlignment="Stretch">
+                  <Button AutomationProperties.Name="{Binding Name, StringFormat=Группа: {0}}" Tag="{Binding Name}" Click="SidebarGroup_Click" HorizontalContentAlignment="Stretch">
                     <Button.Style>
                       <Style TargetType="Button" BasedOn="{StaticResource RailButton}">
                         <Style.Triggers>
@@ -83,51 +83,51 @@
             </ItemsControl>
           </ScrollViewer>
         </Grid>
-        <Button x:Name="UserSettingsNavigationButton" Grid.Row="1" Style="{StaticResource RailButton}" Click="UserSettings_Click" Margin="0,12,0,0">
+        <Button AutomationProperties.Name="Настройки" x:Name="UserSettingsNavigationButton" Grid.Row="1" Style="{StaticResource RailButton}" Click="UserSettings_Click" Margin="0,12,0,0">
           <StackPanel Orientation="Horizontal">
-            <Path Data="M9,1V4 M9,14V17 M1,9H4 M14,9H17 M3,3L5,5 M13,13L15,15 M3,15L5,13 M13,5L15,3 M9,5A4,4 0 1 1 8.99,5" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
+            <Path Data="M10,2 L14,2 14.6,5 16,5.8 18.9,4.8 20.9,8.2 18.6,10.2 18.6,13.8 20.9,15.8 18.9,19.2 16,18.2 14.6,19 14,22 10,22 9.4,19 8,18.2 5.1,19.2 3.1,15.8 5.4,13.8 5.4,10.2 3.1,8.2 5.1,4.8 8,5.8 9.4,5 Z M12,8 A4,4 0 1 1 11.99,8 Z" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
             <TextBlock Text="Настройки" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
         <StackPanel x:Name="SettingsSections" Visibility="Collapsed">
           <Button Content="К серверам" Style="{StaticResource RailButton}" Click="Home_Click" Margin="0,0,0,16" />
-          <Button Tag="general" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+          <Button AutomationProperties.Name="Основные" Tag="general" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
             <StackPanel Orientation="Horizontal">
               <Path Data="M9,1V4 M9,14V17 M1,9H4 M14,9H17 M3,3L5,5 M13,13L15,15 M3,15L5,13 M13,5L15,3 M9,5A4,4 0 1 1 8.99,5" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
               <TextBlock Text="Основные" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Tag="connection" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+          <Button AutomationProperties.Name="Подключение" Tag="connection" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
             <StackPanel Orientation="Horizontal">
               <Path Data="M7,3L10,0H15V5L12,8 M11,15L8,18H3V13L6,10 M6,12L12,6" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
               <TextBlock Text="Подключение" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Tag="proxy" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+          <Button AutomationProperties.Name="Системный прокси" Tag="proxy" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
             <StackPanel Orientation="Horizontal">
               <Path Data="M1,5H17 M12,1L17,5L12,9 M17,13H1 M6,9L1,13L6,17" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
               <TextBlock Text="Системный прокси" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Tag="network" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+          <Button AutomationProperties.Name="DNS и маршруты" Tag="network" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
             <StackPanel Orientation="Horizontal">
               <Path Data="M9,3V10 M3,10H15 M3,10V16 M15,10V16 M6,0H12V5H6Z M0,14H6V18H0Z M12,14H18V18H12Z" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
               <TextBlock Text="DNS и маршруты" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Tag="activity" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+          <Button AutomationProperties.Name="Диагностика" Tag="activity" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
             <StackPanel Orientation="Horizontal">
               <Path Data="M1,9H5L7,3L11,15L13,9H17" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
               <TextBlock Text="Диагностика" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Tag="engines" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+          <Button AutomationProperties.Name="Служба и копии" Tag="engines" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
             <StackPanel Orientation="Horizontal">
               <Path Data="M2,2H16V7H2Z M2,11H16V16H2Z M5,5H7 M5,14H7" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
               <TextBlock Text="Служба и копии" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
-          <Button Tag="about" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
+          <Button AutomationProperties.Name="О приложении" Tag="about" Style="{StaticResource RailButton}" Click="ControlSettings_Click">
             <StackPanel Orientation="Horizontal">
               <Path Data="M9,0A9,9 0 1 0 9,18A9,9 0 1 0 9,0 M9,8V14 M9,4V5" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.3" Width="18" Height="18" Stretch="Uniform" Margin="0,0,10,0" />
               <TextBlock Text="О приложении" VerticalAlignment="Center" />
@@ -165,7 +165,7 @@
                 </Style>
               </TextBlock.Style>
             </TextBlock>
-            <TextBox x:Name="SearchBox" MinHeight="36" ToolTip="Поиск по названию, группе и протоколу" TextChanged="Search_Changed" Height="36" Padding="32,5,30,5" Background="Transparent" BorderThickness="0" />
+            <TextBox x:Name="SearchBox" AutomationProperties.Name="Поиск серверов" PreviewKeyDown="Search_KeyDown" MinHeight="36" ToolTip="Поиск по названию, группе и протоколу (Ctrl+F); Esc — очистить" TextChanged="Search_Changed" Height="36" Padding="32,5,30,5" Background="Transparent" BorderThickness="0" />
             <Button x:Name="ClearSearchButton" Width="26" Height="28" MinHeight="0" Margin="0,0,2,0" Padding="7" HorizontalAlignment="Right" VerticalAlignment="Center" Background="Transparent" BorderThickness="0" ToolTip="Очистить поиск" AutomationProperties.Name="Очистить поиск" Click="ClearSearch_Click">
               <Button.Style>
                 <Style TargetType="Button" BasedOn="{StaticResource StarButton}">
@@ -205,7 +205,7 @@
               <TextBlock Grid.Column="1" Text="Протокол" Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center" />
               <TextBlock Grid.Column="2" Text="Задержка" Foreground="{StaticResource TextSecondary}" FontSize="12" HorizontalAlignment="Right" VerticalAlignment="Center" />
             </Grid>
-            <ListBox x:Name="ProfilesList" SelectionChanged="Profiles_SelectionChanged" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" MinHeight="0" IsTabStop="True" Grid.Row="1" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True">
+            <ListBox Style="{StaticResource ServerLibrary}" AutomationProperties.Name="Серверы" x:Name="ProfilesList" SelectionChanged="Profiles_SelectionChanged" Background="Transparent" BorderThickness="0" ScrollViewer.HorizontalScrollBarVisibility="Disabled" HorizontalContentAlignment="Stretch" MinHeight="0" IsTabStop="True" Grid.Row="1" VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.IsVirtualizingWhenGrouping="True" VirtualizingPanel.ScrollUnit="Pixel" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True">
               <ListBox.ItemContainerStyle>
                 <Style TargetType="ListBoxItem" BasedOn="{StaticResource ProfileRowBase}">
                   <Setter Property="Height" Value="50" />
@@ -220,12 +220,30 @@
                       <Setter Property="Template">
                         <Setter.Value>
                           <ControlTemplate TargetType="GroupItem">
-                            <Expander IsExpanded="True" Loaded="Group_Loaded" Expanded="Group_Changed" Collapsed="Group_Changed" Margin="0,4,0,8">
+                            <Expander IsExpanded="True" Loaded="Group_Loaded" Expanded="Group_Changed" Collapsed="Group_Changed" Margin="0,4,0,12" HorizontalContentAlignment="Stretch">
+                              <Expander.Template><ControlTemplate TargetType="Expander"><StackPanel><ContentPresenter ContentSource="Header"/><ContentPresenter x:Name="GroupRows" ContentSource="Content" Visibility="Collapsed"/></StackPanel><ControlTemplate.Triggers><Trigger Property="IsExpanded" Value="True"><Setter TargetName="GroupRows" Property="Visibility" Value="Visible"/></Trigger></ControlTemplate.Triggers></ControlTemplate></Expander.Template>
                               <Expander.Header>
-                                <StackPanel Orientation="Horizontal">
-                                  <ui:EmojiText Value="{Binding Name}" FontWeight="SemiBold" MaxWidth="560" TextTrimming="CharacterEllipsis" />
-                                  <TextBlock Text="{Binding ItemCount, StringFormat=({0})}" Margin="8,0,0,0" Foreground="{StaticResource Muted}" />
-                                </StackPanel>
+                                <Border Background="{StaticResource ContentBackground}" Padding="8,6,8,8">
+                                  <StackPanel>
+                                    <Grid Height="28"><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                                      <Path Data="M1,4 L7,4 9,6 17,6 17,16 1,16 Z" Width="18" Height="18" Stretch="Uniform" Stroke="{StaticResource TextSecondary}" StrokeThickness="1.5" VerticalAlignment="Center"/>
+                                      <ui:EmojiText x:Name="GroupTitle" Grid.Column="1" Value="{Binding Name}" ToolTip="{Binding Name}" FontWeight="SemiBold" MaxWidth="330" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" Margin="2,0,8,0"/>
+                                      <Border Grid.Column="2" Background="{StaticResource Surface}" CornerRadius="6" Padding="8,3" VerticalAlignment="Center"><TextBlock x:Name="GroupCount" Text="{Binding ItemCount}" Foreground="{StaticResource TextSecondary}" FontSize="12"/></Border>
+                                    </Grid>
+                                    <WrapPanel Margin="0,6,0,0">
+                                      <Button x:Name="GroupCollapseAction" Style="{StaticResource GroupActionChip}" Width="116" Click="ProfileGroupCollapse_Click" AutomationProperties.Name="Свернуть или развернуть группу">
+                                        <StackPanel Orientation="Horizontal"><Path Width="14" Height="14" Stretch="Uniform" Stroke="{StaticResource AccentText}" StrokeThickness="1.5" Margin="0,0,7,0"><Path.Style><Style TargetType="Path"><Setter Property="Data" Value="M1,4 L7,10 13,4"/><Style.Triggers><DataTrigger Binding="{Binding IsExpanded, RelativeSource={RelativeSource AncestorType=Expander}}" Value="True"><Setter Property="Data" Value="M1,10 L7,4 13,10"/></DataTrigger></Style.Triggers></Style></Path.Style></Path><TextBlock><TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Text" Value="Развернуть"/><Style.Triggers><DataTrigger Binding="{Binding IsExpanded, RelativeSource={RelativeSource AncestorType=Expander}}" Value="True"><Setter Property="Text" Value="Свернуть"/></DataTrigger></Style.Triggers></Style></TextBlock.Style></TextBlock></StackPanel>
+                                      </Button>
+                                      <Button x:Name="GroupRefreshAction" Tag="{Binding Name}" Style="{StaticResource GroupActionChip}" Width="124" IsEnabled="False" Click="ProfileGroupRefresh_Click" AutomationProperties.Name="Обновить подписку группы"><StackPanel Orientation="Horizontal"><Path Data="M13,5 A6,6 0 1 0 13,11 M13,1 L13,5 9,5" Width="14" Height="14" Stretch="Uniform" Stroke="{StaticResource AccentText}" StrokeThickness="1.5" Margin="0,0,7,0"/><TextBlock Text="Обновить"/></StackPanel></Button>
+                                      <Button x:Name="GroupDeleteAction" Tag="{Binding Name}" Style="{StaticResource GroupDeleteChip}" Width="96" IsEnabled="False" Click="ProfileGroupDelete_Click" ToolTip="Удалить локальную группу и её профили" AutomationProperties.Name="Удалить группу"><StackPanel Orientation="Horizontal"><Path Data="M2,4 L14,4 M5,4 L5,1 11,1 11,4 M4,4 L5,15 11,15 12,4 M7,7 L7,12 M9,7 L9,12" Width="14" Height="14" Stretch="Uniform" Stroke="{StaticResource Error}" StrokeThickness="1.5" Margin="0,0,7,0"/><TextBlock Text="Удалить"/></StackPanel></Button>
+                                    </WrapPanel>
+                                    <Border x:Name="GroupDeleteConfirmation" Visibility="Collapsed" BorderBrush="{StaticResource Error}" BorderThickness="1" CornerRadius="6" Padding="12" Margin="0,8,0,0" PreviewKeyDown="ProfileGroupDelete_KeyDown">
+                                      <StackPanel><TextBlock x:Name="GroupDeleteTitle" TextWrapping="Wrap" FontWeight="SemiBold"/><TextBlock x:Name="GroupDeleteDescription" TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}" Margin="0,6,0,8"/><TextBlock x:Name="GroupDeleteError" Foreground="{StaticResource Error}" TextWrapping="Wrap"/>
+                                        <WrapPanel HorizontalAlignment="Right" Margin="0,4,0,0"><Button x:Name="GroupDeleteCancel" Style="{StaticResource GroupActionChip}" Content="Отмена" Click="ProfileGroupDeleteCancel_Click"/><Button x:Name="GroupDeleteConfirm" Style="{StaticResource GroupActionChip}" Content="Удалить группу" Background="#A93345" Foreground="White" Click="ProfileGroupDeleteConfirm_Click" Margin="0"/></WrapPanel>
+                                      </StackPanel>
+                                    </Border>
+                                  </StackPanel>
+                                </Border>
                               </Expander.Header>
                               <ItemsPresenter />
                             </Expander>
@@ -263,7 +281,7 @@
                         </MultiBinding>
                       </TextBlock.Foreground>
                     </TextBlock>
-                    <Button Grid.Column="3" Style="{StaticResource StarButton}" Tag="{Binding Id}" Click="RowFavorite_Click" ToolTip="Избранное" AutomationProperties.Name="Изменить избранное">
+                    <Button Grid.Column="3" Style="{StaticResource StarButton}" Tag="{Binding Id}" Click="RowFavorite_Click" ToolTip="Избранное" AutomationProperties.Name="{Binding Name, StringFormat=Изменить избранное: {0}}">
                       <Button.IsEnabled>
                         <Binding ElementName="FavoriteButton" Path="IsEnabled" />
                       </Button.IsEnabled>
@@ -440,76 +458,7 @@
                 <TextBlock Text="До 9 попыток, до 8 резервных серверов в порядке списка. В режиме всего устройства kill switch сохраняется между попытками. Если восстановить связь не удалось, блокировка остаётся до явного отключения. После аварии службы требуется ручное восстановление." TextWrapping="Wrap" Foreground="{StaticResource Muted}" />
               </StackPanel>
             </Expander>
-            <Expander x:Name="TransportExpander" Header="Фрагментация, шумы и MUX" Margin="0,4,0,18">
-              <StackPanel Margin="0,14,0,0">
-                <TextBlock Text="Настройки этого профиля сохраняются при обновлении подписки. По умолчанию выключены; применяются при следующем подключении." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,16" />
-                <CheckBox x:Name="FragmentCheck" Content="Фрагментация TLS" FontWeight="SemiBold" Margin="0,0,0,6" />
-                <TextBlock Text="VLESS с TLS/REALITY поверх TCP. Делит приветствие TLS на части; может замедлить подключение." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8" />
-                <WrapPanel IsEnabled="{Binding IsChecked, ElementName=FragmentCheck}" Margin="0,0,0,18">
-                  <StackPanel Margin="0,0,20,0">
-                    <Label Content="Размер частей, байт" Target="{Binding ElementName=FragmentLengthBox}" />
-                    <TextBox x:Name="FragmentLengthBox" Text="100-200" Width="140" MaxLength="12" />
-                  </StackPanel>
-                  <StackPanel>
-                    <Label Content="Интервал, мс" Target="{Binding ElementName=FragmentIntervalBox}" />
-                    <TextBox x:Name="FragmentIntervalBox" Text="10-20" Width="140" MaxLength="12" />
-                  </StackPanel>
-                </WrapPanel>
-                <CheckBox x:Name="NoiseCheck" Content="Шумы UDP" FontWeight="SemiBold" Margin="0,0,0,6" />
-                <TextBlock Text="Случайный пакет перед UDP-соединением: Hysteria2 или VLESS KCP/Hysteria. Сервер должен принимать такой трафик." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8" />
-                <WrapPanel IsEnabled="{Binding IsChecked, ElementName=NoiseCheck}" Margin="0,0,0,18">
-                  <StackPanel Margin="0,0,20,0">
-                    <Label Content="Размер пакета, байт" Target="{Binding ElementName=NoiseLengthBox}" />
-                    <TextBox x:Name="NoiseLengthBox" Text="50-150" Width="140" MaxLength="12" />
-                  </StackPanel>
-                  <StackPanel>
-                    <Label Content="Задержка, мс" Target="{Binding ElementName=NoiseDelayBox}" />
-                    <TextBox x:Name="NoiseDelayBox" Text="10-20" Width="140" MaxLength="12" />
-                  </StackPanel>
-                </WrapPanel>
-                <CheckBox x:Name="MuxCheck" Content="MUX · несколько потоков в одном соединении" FontWeight="SemiBold" Margin="0,0,0,6" />
-                <TextBlock Text="Xray MUX/XUDP — VLESS TCP/WS/HTTPUpgrade без Vision. h2mux/smux/yamux — Shadowsocks и Trojan. Режим должен поддерживаться сервером. У XHTTP, gRPC и Hysteria объединение потоков встроено. Для h2mux/smux/yamux укажи число соединений или оставь 0, чтобы ограничивать потоки в сессии." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8" />
-                <StackPanel IsEnabled="{Binding IsChecked, ElementName=MuxCheck}" HorizontalAlignment="Left">
-                  <Label Content="Одновременных потоков (1–128)" Target="{Binding ElementName=MuxConcurrencyBox}" />
-                  <TextBox x:Name="MuxConcurrencyBox" Text="8" Width="140" MaxLength="3" HorizontalAlignment="Left" />
-                  <WrapPanel Margin="0,8,0,0">
-                    <StackPanel Margin="0,0,16,8">
-                      <Label Content="Режим MUX" />
-                      <ComboBox x:Name="MuxProtocolBox" Width="180" SelectedIndex="0" SelectionChanged="MuxProtocol_Changed">
-                        <ComboBoxItem Content="Xray MUX / XUDP" Tag="" />
-                        <ComboBoxItem Content="h2mux" Tag="h2mux" />
-                        <ComboBoxItem Content="smux" Tag="smux" />
-                        <ComboBoxItem Content="yamux" Tag="yamux" />
-                      </ComboBox>
-                    </StackPanel>
-                    <StackPanel Margin="0,0,16,8">
-                      <Label Content="Соединений (0 — авто)" />
-                      <TextBox x:Name="MuxMaxConnectionsBox" Width="160" Text="0" MaxLength="2" TextChanged="MuxConnections_Changed" />
-                    </StackPanel>
-                    <StackPanel Margin="0,0,0,8">
-                      <Label Content="Минимум потоков" />
-                      <TextBox x:Name="MuxMinStreamsBox" Width="140" Text="0" MaxLength="3" />
-                    </StackPanel>
-                  </WrapPanel>
-                  <CheckBox x:Name="MuxPaddingBox" Content="Padding для h2mux/smux/yamux" Margin="4,0,4,8" />
-                  <WrapPanel>
-                    <StackPanel Margin="0,0,16,0">
-                      <Label Content="Потоков XUDP (0 — авто)" />
-                      <TextBox x:Name="XUDPConcurrencyBox" Width="180" Text="0" MaxLength="3" />
-                    </StackPanel>
-                    <StackPanel>
-                      <Label Content="UDP 443 в XUDP" />
-                      <ComboBox x:Name="MuxUDP443Box" Width="180" SelectedIndex="0">
-                        <ComboBoxItem Content="По умолчанию (skip)" Tag="" />
-                        <ComboBoxItem Content="Пропускать вне XUDP" Tag="skip" />
-                        <ComboBoxItem Content="Разрешить в XUDP" Tag="allow" />
-                        <ComboBoxItem Content="Отклонять" Tag="reject" />
-                      </ComboBox>
-                    </StackPanel>
-                  </WrapPanel>
-                </StackPanel>
-              </StackPanel>
-            </Expander>
+
             <TextBlock Text="Подписка: импорт отдельных серверов без маршрутизации и балансировщиков Xray. Повторный импорт пропускает дубликаты; автопроверки обновлений нет." Foreground="{StaticResource Muted}" FontSize="12" Margin="0,0,0,12" />
           </StackPanel>
           <StackPanel x:Name="EnginesPanel" Visibility="Collapsed">
@@ -584,6 +533,28 @@
                 <TextBlock x:Name="UserAutoConnectInhibited" Text="После ручного отключения автоподключение приостановлено." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,2,4,4" Visibility="Collapsed" />
               </StackPanel>
             </Border>
+            <Expander x:Name="BalanceExpander" Header="Общий балансировщик" Margin="0,8,0,18" Visibility="{Binding Visibility,ElementName=AutoConnectSettingsSection}">
+              <StackPanel Margin="0,12,0,0">
+                <CheckBox x:Name="BalanceEnabledBox" Content="Использовать общий пул серверов" Checked="BalanceDraft_Changed" Unchecked="BalanceDraft_Changed" MinHeight="44"/>
+                <TextBlock Text="Автоматический режим проверяет серверы из всех подписок и ручных групп в течение 20 секунд и выбирает до 8 лучших по задержке, её разбросу и успешности ответов. Новые соединения используют выбранный пул; прямого выхода при его отказе нет." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,12"/>
+                <StackPanel IsEnabled="{Binding IsChecked,ElementName=BalanceEnabledBox}">
+                  <TextBlock Text="Состав пула" Margin="0,0,0,4"/>
+                  <ComboBox x:Name="BalanceSelectionBox" SelectedIndex="0" SelectionChanged="BalanceDraft_Changed" Margin="0,0,0,12"><ComboBoxItem Content="Автоматически — до 8 лучших"/><ComboBoxItem Content="Выбрать вручную"/></ComboBox>
+                  <TextBlock Text="Режим" Margin="0,0,0,4"/>
+                  <ComboBox x:Name="BalanceModeBox" SelectedIndex="0" SelectionChanged="BalanceDraft_Changed" Margin="0,0,0,12"><ComboBoxItem Content="Один лучший сервер"/><ComboBoxItem Content="Распределять соединения между лучшими"/></ComboBox>
+                  <WrapPanel>
+                    <StackPanel x:Name="BalanceBestPanel" Margin="0,0,16,12"><Label Content="Лучших серверов"/><TextBox x:Name="BalanceBestBox" Width="140" Text="2" MaxLength="1" TextChanged="BalanceDraft_Changed"/></StackPanel>
+                    <StackPanel Margin="0,0,16,12"><Label Content="Проверка, секунд"/><TextBox x:Name="BalanceIntervalBox" Width="160" Text="30" MaxLength="3" TextChanged="BalanceDraft_Changed"/></StackPanel>
+                    <StackPanel Margin="0,0,0,12"><Label Content="Макс. задержка, мс"/><TextBox x:Name="BalanceMaxRTTBox" Width="170" Text="1500" MaxLength="5" TextChanged="BalanceDraft_Changed"/></StackPanel>
+                  </WrapPanel>
+                  <TextBlock x:Name="BalanceSelectionStatus" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/>
+                  <ListBox x:Name="BalanceProfilesList" MaxHeight="240" MinHeight="100" HorizontalContentAlignment="Stretch" ScrollViewer.CanContentScroll="True" VirtualizingPanel.ScrollUnit="Pixel">
+                    <ListBox.ItemTemplate><DataTemplate><CheckBox IsChecked="{Binding Selected,Mode=TwoWay,UpdateSourceTrigger=PropertyChanged}" Click="BalanceMember_Changed" MinHeight="40"><TextBlock Text="{Binding Label}" TextWrapping="Wrap"/></CheckBox></DataTemplate></ListBox.ItemTemplate>
+                  </ListBox>
+                </StackPanel>
+                <TextBlock Text="Работает через общий TUN или локальный прокси. В режиме «Маршрутизация по настройкам» WG/AWG используют временную копию с полными AllowedIPs. В режиме исходных AllowedIPs общий пул не применяется. Правила DNS и маршрутизации берутся из выбранного профиля подключения; изменение пула применяется после переподключения. Несколько серверов могут давать разные внешние IP." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,12,0,0"/>
+              </StackPanel>
+            </Expander>
             <Border Background="Transparent" BorderBrush="{StaticResource Line}" BorderThickness="0" CornerRadius="8" Padding="0,12,0,0" Margin="0,0,0,14" x:Name="ProxySettingsSection">
               <StackPanel>
                 <TextBlock Text="Системный прокси Windows" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="{StaticResource TextSecondary}" />
@@ -597,10 +568,11 @@
               </StackPanel>
             </Border>
             <StackPanel x:Name="GeneralSettingsSection" Visibility="Collapsed">
+
               <Border Background="Transparent" BorderBrush="{StaticResource Line}" BorderThickness="0" CornerRadius="8" Padding="0,12,0,0" Margin="0,0,0,14" x:Name="StartupSettingsSection">
                 <StackPanel>
                   <TextBlock Text="Запуск вместе с Windows" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,8" Foreground="{StaticResource TextSecondary}" />
-                  <TextBlock Text="Запуск приложения при входе в Windows настраивается отдельно. Для автоматического подключения включи его выше." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,0,4,8" />
+                  <TextBlock Text="Запуск приложения при входе в Windows настраивается отдельно. Автоматическое подключение настраивается на вкладке «Подключение»." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="4,0,4,8" />
                   <TextBlock Text="Путь приложения" FontWeight="SemiBold" Margin="4,0,4,4" />
                   <TextBox x:Name="UserStartupPath" IsReadOnly="True" Text="Unavailable" TextWrapping="Wrap" Margin="4,0,4,8" />
                   <TextBlock x:Name="UserStartupStatus" Text="Startup: not registered" Foreground="{StaticResource Muted}" Margin="4,0,4,4" />
@@ -614,7 +586,78 @@
               <StackPanel>
                 <CheckBox x:Name="TrayNotificationsBox" Content="Уведомлять об изменении статуса" IsEnabled="False" MinHeight="44" Checked="TrayNotifications_Changed" Unchecked="TrayNotifications_Changed" />
                 <Button x:Name="HideToTrayButton" Content="Свернуть приложение в трей" IsEnabled="False" Click="HideToTray_Click" ToolTip="Вернуть окно: Ctrl+Shift+O" HorizontalAlignment="Left" />
+              <Expander x:Name="TransportExpander" Header="Фрагментация, шумы и MUX · все профили" Margin="0,4,0,18">
+              <StackPanel Margin="0,14,0,0">
+                <TextBlock Text="Общие настройки применяются ко всем совместимым профилям при следующем подключении. После сохранения заменяют индивидуальные параметры транспорта; обновление подписки их не меняет." Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,0,0,16" />
+                <TextBlock x:Name="GlobalTransportLegacyNotice" Text="Включены индивидуальные параметры прежних профилей. Они сохраняются до первого сохранения общих настроек." Visibility="Collapsed" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" Margin="0,0,0,12"/>
+                <CheckBox x:Name="FragmentCheck" Content="Фрагментация TLS" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Text="VLESS с TLS/REALITY поверх TCP. Делит приветствие TLS на части; может замедлить подключение." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8" />
+                <WrapPanel IsEnabled="{Binding IsChecked, ElementName=FragmentCheck}" Margin="0,0,0,18">
+                  <StackPanel Margin="0,0,20,0">
+                    <Label Content="Размер частей, байт" Target="{Binding ElementName=FragmentLengthBox}" />
+                    <TextBox x:Name="FragmentLengthBox" Text="100-200" Width="140" MaxLength="12" />
+                  </StackPanel>
+                  <StackPanel>
+                    <Label Content="Интервал, мс" Target="{Binding ElementName=FragmentIntervalBox}" />
+                    <TextBox x:Name="FragmentIntervalBox" Text="10-20" Width="140" MaxLength="12" />
+                  </StackPanel>
+                </WrapPanel>
+                <CheckBox x:Name="NoiseCheck" Content="Шумы UDP" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Text="Случайный пакет перед UDP-соединением: Hysteria2 или VLESS KCP/Hysteria. Сервер должен принимать такой трафик." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8" />
+                <WrapPanel IsEnabled="{Binding IsChecked, ElementName=NoiseCheck}" Margin="0,0,0,18">
+                  <StackPanel Margin="0,0,20,0">
+                    <Label Content="Размер пакета, байт" Target="{Binding ElementName=NoiseLengthBox}" />
+                    <TextBox x:Name="NoiseLengthBox" Text="50-150" Width="140" MaxLength="12" />
+                  </StackPanel>
+                  <StackPanel>
+                    <Label Content="Задержка, мс" Target="{Binding ElementName=NoiseDelayBox}" />
+                    <TextBox x:Name="NoiseDelayBox" Text="10-20" Width="140" MaxLength="12" />
+                  </StackPanel>
+                </WrapPanel>
+                <CheckBox x:Name="MuxCheck" Content="MUX · несколько потоков в одном соединении" FontWeight="SemiBold" Margin="0,0,0,6" />
+                <TextBlock Text="Xray MUX/XUDP — VLESS TCP/WS/HTTPUpgrade без Vision. h2mux/smux/yamux — Shadowsocks и Trojan. Режим должен поддерживаться сервером. У XHTTP, gRPC и Hysteria объединение потоков встроено. Для h2mux/smux/yamux укажи число соединений или оставь 0, чтобы ограничивать потоки в сессии." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8" />
+                <StackPanel IsEnabled="{Binding IsChecked, ElementName=MuxCheck}" HorizontalAlignment="Left">
+                  <Label Content="Одновременных потоков (1–128)" Target="{Binding ElementName=MuxConcurrencyBox}" />
+                  <TextBox x:Name="MuxConcurrencyBox" Text="8" Width="140" MaxLength="3" HorizontalAlignment="Left" />
+                  <WrapPanel Margin="0,8,0,0">
+                    <StackPanel Margin="0,0,16,8">
+                      <Label Content="MUX для Shadowsocks / Trojan" />
+                      <ComboBox x:Name="MuxProtocolBox" Width="180" SelectedIndex="0" SelectionChanged="MuxProtocol_Changed">
+                        <ComboBoxItem Content="Автоматически (h2mux)" Tag="" />
+                        <ComboBoxItem Content="h2mux" Tag="h2mux" />
+                        <ComboBoxItem Content="smux" Tag="smux" />
+                        <ComboBoxItem Content="yamux" Tag="yamux" />
+                      </ComboBox>
+                    </StackPanel>
+                    <StackPanel Margin="0,0,16,8">
+                      <Label Content="Соединений (0 — авто)" />
+                      <TextBox x:Name="MuxMaxConnectionsBox" Width="160" Text="0" MaxLength="2" TextChanged="MuxConnections_Changed" />
+                    </StackPanel>
+                    <StackPanel Margin="0,0,0,8">
+                      <Label Content="Минимум потоков" />
+                      <TextBox x:Name="MuxMinStreamsBox" Width="140" Text="0" MaxLength="3" />
+                    </StackPanel>
+                  </WrapPanel>
+                  <CheckBox x:Name="MuxPaddingBox" Content="Padding для h2mux/smux/yamux" Margin="4,0,4,8" />
+                  <WrapPanel>
+                    <StackPanel Margin="0,0,16,0">
+                      <Label Content="Потоков XUDP (0 — авто)" />
+                      <TextBox x:Name="XUDPConcurrencyBox" Width="180" Text="0" MaxLength="3" />
+                    </StackPanel>
+                    <StackPanel>
+                      <Label Content="UDP 443 в XUDP" />
+                      <ComboBox x:Name="MuxUDP443Box" Width="180" SelectedIndex="0">
+                        <ComboBoxItem Content="По умолчанию (skip)" Tag="" />
+                        <ComboBoxItem Content="Пропускать вне XUDP" Tag="skip" />
+                        <ComboBoxItem Content="Разрешить в XUDP" Tag="allow" />
+                        <ComboBoxItem Content="Отклонять" Tag="reject" />
+                      </ComboBox>
+                    </StackPanel>
+                  </WrapPanel>
+                </StackPanel>
               </StackPanel>
+            </Expander>
+            </StackPanel>
             </StackPanel>
             <WrapPanel Margin="0,8,0,0">
               <Button x:Name="SaveUserSettingsButton" Content="Сохранить настройки" Background="{StaticResource AccentFill}" Foreground="White" IsEnabled="False" Click="SaveUserSettings_Click" />
@@ -672,10 +715,144 @@
             </WrapPanel>
           </StackPanel>
           <StackPanel x:Name="ProfileToolsPanel" Visibility="Collapsed">
-            <Expander x:Name="NetworkPreferencesPanel" Header="DNS и правила маршрутизации" IsExpanded="False" Margin="0,0,0,16">
-              <StackPanel Margin="0,10,0,0">
-                <TextBlock Text="Network preferences use the shared TUN in full-device mode for proxy profiles and for AWG/WireGuard when a nonempty policy is saved. Native profiles keep imported DNS and routing until this opt-in; policy DNS replaces imported DNS and peer AllowedIPs stay unchanged. TCP/UDP only; ICMP is unavailable. Reset all preferences to restore the native path. Apply changes by manually installing an updated OneTunnel service bundle; the installed service is not changed automatically." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
+            <StackPanel x:Name="NetworkPreferencesPanel" Margin="0,0,0,16" MaxWidth="620" HorizontalAlignment="Left">
+                <TextBlock Text="МАРШРУТИЗАЦИЯ" FontSize="24" FontWeight="SemiBold" Margin="0,0,0,12"/>
                 <TextBlock Text="Пользовательские правила задают исключения из маршрутизации всего трафика через VPN. Правило direct отправляет совпавший трафик напрямую в сеть и может раскрыть его внешний адрес. Правила проверяются сверху вниз, первое совпадение важнее. Имена доменов не всегда видны при шифровании DNS/ECH, а процессы зависят от атрибуции Windows." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
+
+                <StackPanel>
+                  <CheckBox x:Name="RoutingPresetToggle" Content="Пресеты" Tag="1" Checked="RoutingToggle_Changed" Unchecked="RoutingToggle_Changed" Margin="0,4"/>
+                  <CheckBox x:Name="RoutingCustomToggle" Content="Свои правила" Tag="2" Checked="RoutingToggle_Changed" Unchecked="RoutingToggle_Changed" Margin="0,4"/>
+                  <CheckBox x:Name="RoutingNoneToggle" Tag="0" Checked="RoutingToggle_Changed" Unchecked="RoutingToggle_Changed" Margin="0,4"><TextBlock Text="Без маршрутизации · всё через VPN/прокси" TextWrapping="Wrap"/></CheckBox>
+                </StackPanel>
+                <ComboBox x:Name="RoutingModeBox" Visibility="Collapsed" SelectedIndex="0" SelectionChanged="RoutingMode_Changed" AutomationProperties.Name="Режим маршрутизации" HorizontalAlignment="Left" MinWidth="240">
+                  <ComboBoxItem Content="Без маршрутизации" Tag="none"/>
+                  <ComboBoxItem Content="Пресеты" Tag="preset"/>
+                  <ComboBoxItem Content="Свои правила" Tag="custom"/>
+                </ComboBox>
+                <TextBlock x:Name="RoutingModeDescription" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,6,0,10"/>
+                <TextBlock x:Name="RoutingPresetSummary" TextWrapping="Wrap" Margin="0,0,0,8"/>
+                <StackPanel x:Name="CustomRoutingPanel">
+                  <TextBlock Text="Добавить правило" FontWeight="SemiBold" Margin="0,8,0,8"/>
+                  <WrapPanel>
+                    <StackPanel Margin="0,0,12,8"><TextBlock Text="Условие" Margin="0,0,0,4"/><ComboBox x:Name="RuleKindBox" SelectedIndex="0" MinWidth="200" SelectionChanged="RuleBuilder_Changed">
+                      <ComboBoxItem Content="Точный домен" Tag="domain"/><ComboBoxItem Content="Домен и поддомены" Tag="domain-suffix"/><ComboBoxItem Content="IP-адрес или сеть" Tag="cidr"/><ComboBoxItem Content="Программа / процесс" Tag="process"/><ComboBoxItem Content="Порт или диапазон" Tag="port"/><ComboBoxItem Content="TCP или UDP" Tag="network"/><ComboBoxItem Content="Именованный набор" Tag="rule-set"/>
+                    </ComboBox></StackPanel>
+                    <StackPanel Margin="0,0,0,8"><TextBlock Text="Действие" Margin="0,0,0,4"/><ComboBox x:Name="RuleActionBox" SelectedIndex="0" MinWidth="170" SelectionChanged="RuleBuilder_Changed"><ComboBoxItem Content="VPN / прокси" Tag="proxy"/><ComboBoxItem Content="Напрямую" Tag="direct"/><ComboBoxItem Content="Блокировать" Tag="reject"/></ComboBox></StackPanel>
+                  </WrapPanel>
+                  <TextBlock Text="Значение" Margin="0,0,0,4"/><TextBox x:Name="RuleValueBox"/>
+                  <TextBlock x:Name="RuleValueHint" TextWrapping="Wrap" Foreground="{StaticResource Muted}" FontSize="12" Margin="0,4,0,8"/>
+                  <Button x:Name="RuleExecutableButton" Content="Выбрать программу (.exe)…" Click="ChooseRuleExecutable_Click" HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                  <Expander Header="Дополнительные условия" Margin="0,4,0,8">
+                    <StackPanel Margin="0,8,0,0">
+                      <TextBlock Text="Все заполненные условия должны совпасть одновременно." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/>
+                      <TextBlock Text="Порт или диапазон"/><TextBox x:Name="RulePortBox" Margin="0,4,0,8"/>
+                      <TextBlock Text="Протокол"/><ComboBox x:Name="RuleNetworkBox" SelectedIndex="0" HorizontalAlignment="Left" MinWidth="170" Margin="0,4,0,8"><ComboBoxItem Content="Любой" Tag=""/><ComboBoxItem Content="TCP" Tag="tcp"/><ComboBoxItem Content="UDP" Tag="udp"/></ComboBox>
+                      <TextBlock Text="Путь к программе (необязательно)"/><TextBox x:Name="RuleProcessBox" Margin="0,4,0,8"/>
+                      <Button x:Name="RuleConditionExecutableButton" Content="Выбрать программу для условия…" Click="ChooseRuleConditionExecutable_Click" HorizontalAlignment="Left" Margin="0,0,0,8"/>
+                      <TextBlock Text="Дополнительный сервер (имя из редактора ниже)"/><TextBox x:Name="RuleOutboundBox" Margin="0,4,0,8"/>
+                    </StackPanel>
+                  </Expander>
+                  <Button x:Name="AddCustomRuleButton" Content="Добавить правило" Click="AddCustomRule_Click" HorizontalAlignment="Left"/>
+                  <TextBlock x:Name="RuleBuilderStatus" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,8,0,8"/>
+                  <Expander x:Name="AdvancedRoutingEditor" Header="Все правила · расширенный редактор" Margin="0,4,0,8">
+                    <StackPanel Margin="0,8,0,0">
+                <TextBlock x:Name="RoutingRulesHelp" Text="Простые правила: тип | действие | значение. Доступны domain, domain-suffix, cidr, process, port, network, rule-set. В JSON также доступны дополнительные серверы, цепочки и наборы. До 64 правил; первое совпадение имеет приоритет. Здесь можно изменить порядок и удалить правила." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5" />
+                <TextBox x:Name="NetworkRulesBox" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="110" MaxHeight="220" FontFamily="Consolas" />
+                    </StackPanel>
+                  </Expander>
+                </StackPanel>
+                <Expander x:Name="LoyalRulesPanel" Header="Источник пресетов" Margin="0,12,0,4">
+                  <StackPanel Margin="0,8,0,0">
+                    <TextBlock Text="Источник маршрутизации" Margin="0,0,0,4" />
+                    <ComboBox x:Name="RoutingSourceBox" SelectedIndex="0" SelectionChanged="RoutingSource_Changed" Margin="0,0,0,12">
+                      <ComboBoxItem Content="Loyalsoldier · geosite + geoip" />
+                      <ComboBoxItem Content="Из импортированных подписок" />
+                    </ComboBox>
+                    <StackPanel x:Name="ProviderRoutingPanel" Visibility="Collapsed">
+                      <TextBlock Text="Маршрутизация сохраняется вместе с импортом подписки. Для ранее добавленной подписки нажмите «Обновить» в списке серверов." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,12"/>
+                      <TextBlock Text="Импортированная подписка" Margin="0,0,0,4"/>
+                      <ComboBox x:Name="ProviderRoutingGroupBox" DisplayMemberPath="Group" SelectionChanged="ProviderRoutingGroup_Changed" Margin="0,0,0,12"/>
+                      <TextBlock x:Name="ProviderRoutingReview" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,12,0,8"/>
+                    </StackPanel>
+                    <StackPanel x:Name="LoyalsoldierSourcePanel">
+                    <TextBlock Text="Loyalsoldier · geosite + geoip" FontSize="16" Margin="0,8,0,4"/>
+                    <TextBlock Text="Реклама — блокировать. Российские домены и IP — напрямую. Остальное — через VPN/прокси. Обновление заменяет текущие пресеты этой схемой; свои правила сохраняются отдельно." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/>
+                    <TextBlock x:Name="PresetSourceStatus" TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,12"/>
+                    <ListBox Visibility="Collapsed" x:Name="PresetCatalogList" MaxHeight="220" Margin="0,10,0,8" SelectionChanged="PresetCatalog_SelectionChanged" AutomationProperties.Name="Выбранные пресеты">
+                      <ListBox.ItemTemplate><DataTemplate><Grid Margin="4,7"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="108"/><ColumnDefinition Width="118"/></Grid.ColumnDefinitions><TextBlock Text="{Binding DisplayName}" TextWrapping="Wrap"/><TextBlock Grid.Column="1" Text="{Binding ActionLabel}" Margin="8,0" TextWrapping="Wrap"/><TextBlock Grid.Column="2" Text="{Binding Status}" Foreground="{StaticResource Muted}" TextWrapping="Wrap"/></Grid></DataTemplate></ListBox.ItemTemplate>
+                    </ListBox>
+                    <WrapPanel><Button x:Name="RefreshPresetsButton" Content="Обновить" Click="RefreshPresets_Click" Background="{StaticResource AccentFill}" Foreground="White" Margin="0,0,8,8"/><Button x:Name="RemovePresetButton" Content="Убрать выбранный" Visibility="Collapsed" Click="RemovePreset_Click" Margin="0,0,0,8"/></WrapPanel>
+                    <TextBlock x:Name="LoyalStatus" Text="Нажмите «Обновить», чтобы загрузить оба файла. Сохранение применяется при следующем подключении." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/>
+                    <StackPanel Visibility="Collapsed">
+                    <ComboBox x:Name="PresetGeoKindBox" SelectedIndex="0" SelectionChanged="PresetSource_Changed" HorizontalAlignment="Left" MinWidth="240" Margin="0,8,0,0"><ComboBoxItem Content="geosite.dat · домены"/><ComboBoxItem Content="geoip.dat · IP-адреса"/></ComboBox>
+                    <ComboBox x:Name="LoyalFormatBox" Visibility="Collapsed" SelectedIndex="0" HorizontalAlignment="Left" MinWidth="220">
+                      <ComboBoxItem Content="geosite.dat — домены" Tag="geosite"/>
+                      <ComboBoxItem Content="geoip.dat — IP-адреса" Tag="geoip"/>
+                    </ComboBox>
+                    <TextBlock x:Name="PresetCategoryLabel" Text="Категория" Margin="0,10,0,4"/>
+                    <TextBox x:Name="LoyalCategoryBox" MaxLength="120" AutomationProperties.Name="Категория Loyalsoldier"/>
+                    <TextBlock x:Name="PresetCategoryError" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{StaticResource Error}" Margin="0,4,0,0"/>
+                    <TextBlock x:Name="PresetCategoryHint" Text="Например: youtube, google или category-ads-all. Добавляйте категории отдельными наборами." TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource Muted}" Margin="0,4,0,0"/>
+                    <TextBox x:Name="LoyalNameBox" Visibility="Collapsed" MaxLength="32" AutomationProperties.Name="Имя импортируемого набора"/>
+                    <TextBlock Text="Действие набора" Margin="0,10,0,4"/>
+                    <ComboBox x:Name="LoyalActionBox" SelectedIndex="0" HorizontalAlignment="Left" MinWidth="220">
+                      <ComboBoxItem Content="Через VPN" Tag="proxy"/>
+                      <ComboBoxItem Content="Напрямую" Tag="direct"/>
+                      <ComboBoxItem Content="Блокировать" Tag="reject"/>
+                    </ComboBox>
+                    <CheckBox x:Name="LoyalReplaceBox" Visibility="Collapsed" Content="Обновить содержимое существующего набора" Margin="0,10,0,4"/>
+                    <TextBlock Text="Первое совпадение в списке имеет приоритет. Чтобы изменить набор, выберите его в списке. Список direct рассчитан на Китай — действие выбирайте для своей сети." TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource Muted}"/>
+                    <WrapPanel Margin="0,12,0,0">
+                      <Button x:Name="ConfigurePresetButton" Content="Добавить / изменить" Click="ConfigurePreset_Click" Margin="0,0,8,8"/>
+                      <Button x:Name="LoyalFileButton" Content="Импорт из файла…" Click="LoyalFile_Click" Margin="0,0,8,8"/>
+                      <Button x:Name="LoyalDownloadButton" Visibility="Collapsed" Content="Скачать с GitHub" Click="LoyalDownload_Click" Margin="0,0,0,8"/>
+                    </WrapPanel>
+                    </StackPanel>
+                  </StackPanel>
+                  </StackPanel>
+                </Expander>
+                <Expander x:Name="PolicyToolsPanel" Visibility="Collapsed" Header="Проверка правил" IsExpanded="False" Margin="0,12,0,4">
+                  <StackPanel Margin="0,8,0,0">
+                    <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                      <TextBlock x:Name="PolicyContext" FontWeight="SemiBold" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis" ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}" />
+                      <TextBlock x:Name="PolicySnapshotLabel" Grid.Column="1" Text="Сохранённая политика" FontSize="12" Foreground="{StaticResource Muted}" Margin="12,0,0,0" VerticalAlignment="Center"/>
+                    </Grid>
+                    <TextBlock Text="Прогноз по сохранённой политике общего туннеля (Всё устройство). Не проверяет фактическое соединение и режим локального прокси. DNS-запросы не выполняются." FontSize="12" Foreground="{StaticResource Muted}" TextWrapping="Wrap" Margin="0,8,0,8" />
+                    <TextBlock x:Name="PolicyStatus" TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,12" />
+                    <TextBlock Text="Повторы правил" FontWeight="SemiBold" Margin="0,0,0,8" />
+                    <Button x:Name="CheckPolicyDuplicatesButton" Content="Проверить повторы" Click="CheckPolicyDuplicates_Click" HorizontalAlignment="Left" IsEnabled="False" />
+                    <TextBlock x:Name="PolicyAnalysisResult" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,8,0,0" />
+                    <Border Height="1" Background="{StaticResource Line}" Margin="0,16,0,16" />
+                    <TextBlock Text="Куда пойдёт адрес" FontWeight="SemiBold" Margin="0,0,0,8" />
+                    <TextBlock x:Name="PolicyNativeHint" Text="Исходные маршруты WireGuard/AmneziaWG (AllowedIPs) этой проверкой не анализируются. Для прогноза нужна сохранённая политика общего туннеля." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Visibility="Collapsed" Margin="0,0,0,8" />
+                    <Grid>
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="8"/><ColumnDefinition Width="80"/><ColumnDefinition Width="8"/><ColumnDefinition Width="128"/></Grid.ColumnDefinitions>
+                      <StackPanel><TextBlock Text="Домен или IP-адрес" Margin="0,0,0,4"/><TextBox x:Name="PolicyAddressBox" MaxLength="253" AutomationProperties.Name="Домен или IP-адрес для прогноза" AutomationProperties.HelpText="{Binding Text, ElementName=PolicyAddressError}" ToolTip="Например example.org или 192.0.2.10; без URL и пути"/><TextBlock x:Name="PolicyAddressError" Foreground="{StaticResource Error}" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,4,0,0"/></StackPanel>
+                      <StackPanel Grid.Column="2"><TextBlock Text="Порт" Margin="0,0,0,4"/><TextBox x:Name="PolicyPortBox" MaxLength="5" AutomationProperties.Name="Порт для прогноза" AutomationProperties.HelpText="{Binding Text, ElementName=PolicyPortError}" ToolTip="1–65535. Пустое поле — порт не указан"/><TextBlock x:Name="PolicyPortError" Foreground="{StaticResource Error}" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,4,0,0"/></StackPanel>
+                      <StackPanel Grid.Column="4"><TextBlock Text="Протокол трафика" Margin="0,0,0,4"/><ComboBox x:Name="PolicyTransportBox" SelectedIndex="0" AutomationProperties.Name="Протокол трафика для прогноза"><ComboBoxItem Content="Не указан" Tag=""/><ComboBoxItem Content="TCP" Tag="tcp"/><ComboBoxItem Content="UDP" Tag="udp"/></ComboBox></StackPanel>
+                    </Grid>
+                    <Expander x:Name="PolicyAdditionalDataPanel" Header="Дополнительные данные" Margin="0,8,0,8">
+                      <StackPanel Margin="0,8,0,0">
+                        <TextBlock Text="IP и процесс указываются вручную." FontSize="12" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/>
+                        <TextBlock Text="IP-адрес для введённого домена" Margin="0,0,0,4"/><TextBox x:Name="PolicyIPBox" MaxLength="64" AutomationProperties.Name="Известный IP-адрес домена" AutomationProperties.HelpText="{Binding Text, ElementName=PolicyIPError}"/><TextBlock x:Name="PolicyIPError" Foreground="{StaticResource Error}" FontSize="12" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,4,0,0"/>
+                        <TextBlock Text="Процесс (полный путь)" Margin="0,8,0,4"/><TextBox x:Name="PolicyProcessBox" MaxLength="4096" AutomationProperties.Name="Полный путь процесса для прогноза"/>
+                      </StackPanel>
+                    </Expander>
+                    <Button x:Name="ExplainPolicyButton" Content="Показать прогноз" Click="ExplainPolicy_Click" HorizontalAlignment="Left" IsEnabled="False" Background="{StaticResource AccentFill}" Foreground="White" />
+                    <StackPanel x:Name="PolicyRouteResult" Visibility="Collapsed" Margin="0,12,0,0">
+                      <TextBlock x:Name="PolicyDecision" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                      <TextBlock x:Name="PolicyExplanation" TextWrapping="Wrap" Foreground="{StaticResource TextSecondary}" Margin="0,4,0,0"/>
+                      <TextBlock x:Name="PolicyOutbound" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                      <Expander Header="Технические подробности" Margin="0,8,0,0"><TextBlock x:Name="PolicyTechnicalDetails" TextWrapping="Wrap" FontSize="12" Foreground="{StaticResource Muted}"/></Expander>
+                    </StackPanel>
+                    <Border Height="1" Background="{StaticResource Line}" Margin="0,16,0,8"/>
+                  </StackPanel>
+                </Expander>
+                <CheckBox x:Name="NetworkAllowLANBox" Content="Прямой доступ к частным IPv4 и IPv6 ULA сетям" IsChecked="False" Margin="4,10,4,4" ToolTip="Добавляет обход туннеля только для частных IPv4 и IPv6 ULA диапазонов. По умолчанию выключен." />
+              <Expander x:Name="DNSSettingsExpander" IsExpanded="True" Margin="0,20,0,12">
+                <Expander.Header><TextBlock Text="DNS" FontSize="24" FontWeight="SemiBold" /></Expander.Header>
+                <StackPanel Margin="0,10,0,0">
+                <TextBlock Text="Эти настройки применяются через общий туннель. В режиме «Маршрутизация по настройкам» для WG/AWG создаётся временная копия с полными AllowedIPs: 0.0.0.0/0 и ::/0 для поддерживаемых семейств IP. DNS и разделение трафика задаются здесь; исходный профиль сохраняется. Поддерживаются TCP и UDP, без ICMP. Сброс настроек возвращает исходный нативный режим. Изменения используются при следующем подключении; для новых параметров нужна совместимая версия службы. Обновление службы выполняется отдельно." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -730,20 +907,18 @@
                     <TextBox x:Name="NetworkCacheCapacityBox" Width="170" MaxLength="5" />
                   </StackPanel>
                 </WrapPanel>
-                <TextBlock Text="Правила: тип | действие | значение. Примеры: domain | proxy | login.example; domain-suffix | direct | example.org; cidr | reject | 192.0.2.0/24; process | proxy | C:\Apps\Browser\browser.exe. Типы: domain, domain-suffix, cidr, process. Действия: proxy, direct, reject. Максимум 64 правила; порядок строк сохраняется." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5" />
-                <TextBox x:Name="NetworkRulesBox" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="110" MaxHeight="220" FontFamily="Consolas" />
-                <TextBlock Text="Additional DNS resolvers: transport | IP | TLS name | port | path (one per line; blank port and path use defaults). These resolvers also use the proxy." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5" />
+                <TextBlock Text="Дополнительные DNS-резолверы: транспорт | IP | имя TLS | порт | путь. Один на строку; пустые порт и путь — значения по умолчанию. Запросы проходят через прокси." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5" />
                 <TextBox x:Name="NetworkResolversBox" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="72" MaxHeight="160" FontFamily="Consolas" />
-                <TextBlock Text="DNS rules: domain or domain-suffix | domain | resolver number (starting at 1). Line order is preserved; the default DNS rule remains last." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5" />
+                <TextBlock Text="Правила DNS: domain или domain-suffix | домен | номер резолвера (от 1). Порядок строк сохраняется; правило DNS по умолчанию остаётся последним." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,10,0,5" />
                 <TextBox x:Name="NetworkDNSRulesBox" AcceptsReturn="True" TextWrapping="NoWrap" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto" MinHeight="72" MaxHeight="160" FontFamily="Consolas" />
-                <CheckBox x:Name="NetworkAllowLANBox" Content="Allow direct access to private IPv4 and IPv6 ULA networks" IsChecked="False" Margin="4,10,4,4" ToolTip="Adds a tunnel bypass only for private IPv4 and IPv6 ULA ranges. Off by default." />
+                </StackPanel>
+              </Expander>
                 <WrapPanel Margin="0,8,0,0">
                   <Button x:Name="SaveNetworkPreferencesButton" Content="Сохранить DNS и правила" Background="{StaticResource AccentFill}" Foreground="White" IsEnabled="False" Click="SaveNetworkPreferences_Click" />
                   <Button x:Name="ReloadNetworkPreferencesButton" Content="Обновить сведения" IsEnabled="False" Click="ReloadNetworkPreferences_Click" />
                   <TextBlock x:Name="NetworkPreferencesStatus" Foreground="{StaticResource Muted}" VerticalAlignment="Center" TextWrapping="Wrap" Margin="8,4,4,4" />
                 </WrapPanel>
-              </StackPanel>
-            </Expander>
+            </StackPanel>
             <Expander x:Name="ProfileOrganizationPanel" Header="Копировать или переместить профиль" IsExpanded="False" Margin="0,0,0,16">
               <StackPanel Margin="0,10,0,0">
                 <TextBlock Text="Копия не подключается автоматически. Управляемые подпиской профили можно копировать, но перемещать можно только между ручными группами. Перемещение сохраняет место профиля в порядке хранения и резервного подключения." TextWrapping="Wrap" Foreground="{StaticResource Muted}" Margin="0,0,0,10" />
@@ -937,7 +1112,7 @@
                   <TextBlock Text="Куда направлять трафик" FontWeight="SemiBold" Margin="0,0,0,6" />
                   <ComboBox x:Name="ModeBox" SelectedIndex="0" MaxWidth="280" HorizontalAlignment="Stretch" MinWidth="0" SelectionChanged="Mode_Changed">
                     <ComboBoxItem Content="Локальный прокси · только выбранные приложения" />
-                    <ComboBoxItem Content="Всё устройство · системный туннель" />
+                    <ComboBoxItem Content="Маршрутизация по настройкам" />
                   </ComboBox>
                 </StackPanel>
               </StackPanel>
@@ -995,7 +1170,7 @@
               <TextBlock x:Name="InspectorReceived" Text="—" Foreground="{StaticResource Warning}" FontSize="16" />
             </StackPanel>
           </Grid>
-          <Button x:Name="PrimaryConnectButton" Height="44" Background="{StaticResource Selected}" BorderBrush="{StaticResource Accent}" Foreground="{StaticResource Ink}" Margin="0" HorizontalContentAlignment="Center" Click="PrimaryConnect_Click">
+          <Button AutomationProperties.Name="{Binding Text, ElementName=PrimaryActionCaption}" x:Name="PrimaryConnectButton" Height="44" Background="{StaticResource Selected}" BorderBrush="{StaticResource Accent}" Foreground="{StaticResource Ink}" Margin="0" HorizontalContentAlignment="Center" Click="PrimaryConnect_Click">
             <StackPanel Orientation="Horizontal">
               <Rectangle x:Name="PrimaryActionIcon" Width="10" Height="10" Fill="{StaticResource Ink}" Margin="0,0,10,0" VerticalAlignment="Center" Visibility="Collapsed" />
               <TextBlock x:Name="PrimaryActionCaption" Text="Подключить" />

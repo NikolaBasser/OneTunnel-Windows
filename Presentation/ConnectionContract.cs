@@ -20,8 +20,9 @@ public interface IConnectionController
 }
 
 public sealed record ConnectionStatistics(int SchemaVersion,string SessionID,ulong ElapsedMilliseconds,ulong? UploadedBytes,ulong? DownloadedBytes,ulong? UploadBytesPerSecond,ulong? DownloadBytesPerSecond,string Scope);
-public sealed record CoreStatus(bool Active, bool NeedsRecovery, bool TrafficLocked, bool WholeDevice, bool FullDeviceMode, bool ClockSynchronized, int LocalPort, string Status, Guid? ProfileId, bool Reconnecting=false,int ReconnectAttempt=0,[property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ConnectionStatistics? Statistics=null,bool ProxyListenerStable=false);
-public sealed record CoreRequest(int Version, string Command, Profile? Profile = null, bool FullDevice = false);
+public sealed record CoreStatus(bool Active, bool NeedsRecovery, bool TrafficLocked, bool WholeDevice, bool FullDeviceMode, bool ClockSynchronized, int LocalPort, string Status, Guid? ProfileId, bool Reconnecting=false,int ReconnectAttempt=0,[property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ConnectionStatistics? Statistics=null,bool ProxyListenerStable=false,string BalanceStatus="");
+public sealed record CoreBalance(string Mode,int Best,int Interval,int MaxRTT,List<Profile> Members,bool Automatic=false);
+public sealed record CoreRequest(int Version, string Command, Profile? Profile = null, bool FullDevice = false,[property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] CoreBalance? Balance=null);
 public sealed record ConnectionErrorInfo(string Stage,string Code,bool Retryable);
 public sealed record CoreResponse(int Version, string Instance, CoreStatus State, string? Result = null, string? Error = null, ulong Revision = 0, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)] ConnectionErrorInfo? ErrorInfo = null);
 
